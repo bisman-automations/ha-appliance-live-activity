@@ -1,0 +1,28 @@
+blueprint:
+  name: Appliance Live Activity - Manual Refresh
+  description: >
+    Optional helper for the Appliance Live Activity integration. The
+    integration already tracks appliance state changes and refreshes every
+    minute on its own -- most users do not need this blueprint at all.
+    Use it only if you want to force an extra refresh on a custom trigger,
+    such as a button press or Home Assistant startup.
+  domain: automation
+  input:
+    appliance_entry:
+      name: Appliance
+      description: The Appliance Live Activity entry to refresh.
+      selector:
+        config_entry:
+          integration: appliance_live_activity
+    refresh_trigger:
+      name: Refresh Trigger
+      description: Whatever should cause a manual refresh (button, event, HA start, etc).
+      selector:
+        trigger: {}
+
+trigger: !input refresh_trigger
+
+action:
+  - service: appliance_live_activity.update
+    data:
+      entry_id: !input appliance_entry

@@ -1,0 +1,13 @@
+update:
+  name: Update Live Activity
+  description: >
+    Force an immediate refresh and notification for a configured appliance,
+    without waiting for the next state change or the 1-minute timer.
+  fields:
+    entry_id:
+      name: Appliance
+      description: The config entry to refresh.
+      required: true
+      selector:
+        config_entry:
+          integration: appliance_live_activity

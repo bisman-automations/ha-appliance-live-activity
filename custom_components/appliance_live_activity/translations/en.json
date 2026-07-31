@@ -1,0 +1,57 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Add an Appliance",
+        "data": {
+          "appliance_type": "Appliance type",
+          "name": "Name"
+        }
+      },
+      "entities": {
+        "title": "Choose Entities",
+        "data": {
+          "state_entity": "State sensor (required)",
+          "phase_entity": "Phase / sub-cycle sensor (optional)",
+          "cycle_entity": "Cycle sensor (optional)",
+          "remaining_entity": "Remaining time sensor, in minutes (optional)"
+        }
+      },
+      "notify": {
+        "title": "Notifications",
+        "data": {
+          "icon": "Icon",
+          "icon_color": "Icon color",
+          "notification_tag": "Notification tag",
+          "devices": "Phones to notify"
+        }
+      }
+    },
+    "abort": {
+      "already_configured": "This appliance is already configured."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "data": {
+          "icon": "Icon",
+          "icon_color": "Icon color",
+          "devices": "Phones to notify"
+        }
+      }
+    }
+  },
+  "services": {
+    "update": {
+      "name": "Update Live Activity",
+      "description": "Force an immediate refresh and notification for a configured appliance.",
+      "fields": {
+        "entry_id": {
+          "name": "Appliance",
+          "description": "The config entry to refresh."
+        }
+      }
+    }
+  }
+}
