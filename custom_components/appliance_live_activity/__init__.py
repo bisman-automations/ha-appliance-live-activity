@@ -7,8 +7,7 @@ from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.typing import ConfigType
 
 from . import appliances  # noqa: F401  (import registers all appliance plugins)
-from .const import DOMAIN, PLATFORMS
-from .const import CONF_APPLIANCE_TYPE, DOOR_TYPES
+from .const import CONF_APPLIANCE_TYPE, DOMAIN, DOOR_TYPES, PLATFORMS
 from .coordinator import ApplianceCoordinator
 from .door import DoorCoordinator
 from .services import async_setup_services, async_unload_services
