@@ -274,8 +274,9 @@ class ApplianceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         return f"{round(value)}{unit}"
 
     def _status(self) -> str:
-        return classify_state(
-            self._state(self.state_entity),
+        raw = self._state(self.state_entity)
+        status = classify_state(
+            raw,
             active=self.active_states,
             paused=self.pause_states,
             complete=self.complete_states,
@@ -283,6 +284,19 @@ class ApplianceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             unknown_is_running=self.definition.unknown_is_running,
             done_signal=bool(self.done_entity) and self._state(self.done_entity) == STATE_ON,
         )
+        # An unrecognised state (e.g. GE's "Control Locked") keeps a running
+        # cycle running, but must not *start* one -- otherwise a finished
+        # appliance flips back to "running" and its Live Activity never clears.
+        # Only treat it as a new cycle when a timer is actually counting down.
+        if (
+            status == STATUS_RUNNING
+            and not self._in_cycle
+            and raw.strip().lower() not in {s.lower() for s in self.active_states}
+            and self._remaining_minutes() <= FINISHED_THRESHOLD_MINUTES
+        ):
+            _LOGGER.debug("%s: ignoring unrecognised state %r while idle", self.name, raw)
+            return STATUS_IDLE
+        return status
 
     # ------------------------------------------------------------------
     # Core logic
@@ -441,7 +455,9 @@ class ApplianceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     async def _async_dismiss(self) -> None:
         self._cancel_dismiss()
         if self._dismiss_at is None or self._in_cycle:
+            _LOGGER.debug("%s: dismiss skipped (in cycle: %s)", self.name, self._in_cycle)
             return
+        _LOGGER.debug("%s: dismissing finished Live Activity", self.name)
         self._dismiss_at = None
         await self._async_save()
         if self.devices:

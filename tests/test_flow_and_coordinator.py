@@ -178,6 +178,13 @@ async def test_options_flow(hass: HomeAssistant, setup_devices):
     entry = await _create_entry(hass, washer, phone)
     result = await hass.config_entries.options.async_init(entry.entry_id)
     assert result["step_id"] == "init"
+    # Color picker is pre-filled with RGB (not a hex string -> black picker)
+    suggested = {
+        str(k): k.description.get("suggested_value")
+        for k in result["data_schema"].schema
+        if getattr(k, "description", None)
+    }
+    assert suggested["icon_color"] == [0, 188, 212]
     result = await hass.config_entries.options.async_configure(
         result["flow_id"], {"devices": [phone.id], "finished_alert": False, "dismiss_minutes": 10}
     )

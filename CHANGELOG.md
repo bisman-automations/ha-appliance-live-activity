@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.3.1
+
+### Fixed
+- **Finished Live Activity didn't clear** after the dismiss delay. After a
+  cycle ended, an unrecognised appliance state (e.g. a GE dishwasher showing
+  "Control Locked") was treated as a new cycle, which switched the activity
+  back to "running" and cancelled the dismissal. Unrecognised states now only
+  start a cycle when a timer is actually counting down; during a cycle they
+  still count as running.
+- **Icon color picker showed black** under Configure for appliances set up
+  before 1.2.1 (stored as hex). It now shows the saved color.
+
 ## 1.3.0
 
 ### Added

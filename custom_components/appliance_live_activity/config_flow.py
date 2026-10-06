@@ -356,5 +356,13 @@ class ApplianceLiveActivityOptionsFlow(OptionsFlow):
             }
         )
         return self.async_show_form(
-            step_id="init", data_schema=self.add_suggested_values_to_schema(schema, current)
+            step_id="init",
+            data_schema=self.add_suggested_values_to_schema(
+                schema,
+                {
+                    **current,
+                    # Older entries stored a hex string; the color picker needs RGB
+                    CONF_ICON_COLOR: _current_rgb(current.get(CONF_ICON_COLOR), definition.color),
+                },
+            ),
         )
