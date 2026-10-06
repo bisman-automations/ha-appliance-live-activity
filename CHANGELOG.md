@@ -1,6 +1,8 @@
 # Changelog
 
-## 1.1.0
+## 1.2.0
+
+Everything since 1.0.0 (1.1.0 was never released as a tagged version).
 
 ### Added
 - **GE Home Appliances (SmartHQ) automatic setup**: pick the GE device and

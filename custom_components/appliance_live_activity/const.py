@@ -75,7 +75,7 @@ FINISHED_THRESHOLD_MINUTES = 5
 DEFAULT_OPEN_DELAY_SECONDS = 30  # ignore quick grabs; saves iOS push-to-start budget
 DEFAULT_CRITICAL_AFTER_MINUTES = 5
 DEFAULT_CRITICAL_REPEAT_MINUTES = 1
-DEFAULT_ESCALATE_AFTER = 0  # 0 = never
+DEFAULT_ESCALATE_AFTER = 0  # 0 = escalate with the first critical alert
 CLOSED_DISPLAY_SECONDS = 60  # show "Closed" this long before ending the activity
 
 # Cooktop defaults
