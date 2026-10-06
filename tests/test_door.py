@@ -177,6 +177,8 @@ async def test_generic_door_escalation(hass: HomeAssistant, enable_custom_integr
     hass.states.async_set("binary_sensor.garage_door", "on", {"friendly_name": "Garage Door"})
     await hass.async_block_till_done()
     assert len(_live(mine)) == 1  # no start delay
+    # Manual setup: tapping opens this integration's device for the door
+    assert _live(mine)[0].data["data"]["url"].startswith("/config/devices/device/")
 
     for _ in range(10):
         freezer.tick(timedelta(minutes=1))

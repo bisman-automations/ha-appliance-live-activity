@@ -18,7 +18,7 @@ from __future__ import annotations
 
 import logging
 
-from datetime import timedelta
+from datetime import datetime, timedelta
 from typing import Any
 
 from homeassistant.config_entries import ConfigEntry
@@ -30,6 +30,7 @@ from homeassistant.helpers.event import (
     async_track_state_change_event,
     async_track_time_interval,
 )
+from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.storage import Store
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 
@@ -55,6 +56,7 @@ from .const import (
     CONF_PAUSE_STATES,
     CONF_PHASE_ENTITY,
     CONF_REMAINING_ENTITY,
+    CONF_SOURCE_DEVICE,
     CONF_SPEAKERS,
     CONF_STATE_ENTITY,
     CONF_TEMPERATURE_ENTITY,
@@ -91,6 +93,7 @@ class ApplianceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.definition = APPLIANCE_REGISTRY[self.appliance_type]
 
         self.name: str = cfg.get(CONF_NAME) or self.definition.display_name
+        self.source_device: str | None = cfg.get(CONF_SOURCE_DEVICE) or None
         self.state_entity: str | None = cfg.get(CONF_STATE_ENTITY) or None
         self.cycle_entity: str | None = cfg.get(CONF_CYCLE_ENTITY) or None
         self.phase_entity: str | None = cfg.get(CONF_PHASE_ENTITY) or None
@@ -143,6 +146,7 @@ class ApplianceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._sent_at: float = 0.0
 
         self._unsubs: list[CALLBACK_TYPE] = []
+        self._finish_time: datetime | None = None
         self._dismiss_unsub: CALLBACK_TYPE | None = None
 
         self.data = {
@@ -152,6 +156,21 @@ class ApplianceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             "remaining": 0,
             "progress": 0,
         }
+
+    def tap_path(self) -> str:
+        """Where tapping a notification / Live Activity goes in the app.
+
+        The appliance's own device page (e.g. the GE washer, with its controls)
+        when there is one, else this integration's device for the appliance,
+        else the integration page.
+        """
+        dev_reg = dr.async_get(self.hass)
+        if self.source_device and dev_reg.async_get(self.source_device):
+            return f"/config/devices/device/{self.source_device}"
+        own = dev_reg.async_get_device(identifiers={(DOMAIN, self.entry.entry_id)})
+        if own is not None:
+            return f"/config/devices/device/{own.id}"
+        return f"/config/integrations/integration/{DOMAIN}"
 
     # ------------------------------------------------------------------
     # Setup / teardown
@@ -284,6 +303,7 @@ class ApplianceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         progress = self._progress(remaining) if status in ACTIVE else (
             100 if status == STATUS_COMPLETE and self.definition.supports_progress else 0
         )
+        active = status in ACTIVE
         self.async_set_updated_data(
             {
                 "status": status,
@@ -291,8 +311,21 @@ class ApplianceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 "cycle": cycle,
                 "remaining": round(remaining),
                 "progress": progress or 0,
+                # Dashboard sensors: only meaningful while a cycle is in progress
+                "time_remaining": round(remaining) if active else 0,
+                "finishes_at": self._finishes_at(remaining) if status == STATUS_RUNNING else None,
             }
         )
+
+    def _finishes_at(self, remaining: float) -> datetime | None:
+        """Estimated end time, kept steady unless it moves by a minute or more."""
+        if remaining <= 0:
+            self._finish_time = None
+            return None
+        estimate = (dt_util.utcnow() + timedelta(minutes=remaining)).replace(second=0, microsecond=0)
+        if self._finish_time is None or abs((estimate - self._finish_time).total_seconds()) >= 120:
+            self._finish_time = estimate
+        return self._finish_time
 
     def _progress(self, remaining: float) -> int | None:
         if not self.definition.supports_progress or self._total_minutes <= 0:

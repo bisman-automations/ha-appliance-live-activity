@@ -96,8 +96,13 @@ async def test_ge_flow_and_lifecycle(hass: HomeAssistant, setup_devices):
     await hass.async_block_till_done()
     assert calls, "running update expected"
     data = calls[-1].data["data"]
+    assert hass.states.get("sensor.laundry_room_washer_time_left").state == "60"
+    assert hass.states.get("sensor.laundry_room_washer_finishes_at").state not in ("unknown", "unavailable")
     assert data["live_update"] is True
     assert data["notification_icon_color"] == "#00BCD4"
+    # Tapping opens the GE washer's device page
+    assert data["url"] == f"/config/devices/device/{washer.id}"
+    assert data["clickAction"] == data["url"]
     assert data["chronometer"] is True and data["when_relative"] is True
     assert calls[-1].data["title"] == "Laundry Room Washer"
     sent = len(calls)
@@ -130,6 +135,9 @@ async def test_ge_flow_and_lifecycle(hass: HomeAssistant, setup_devices):
     await hass.async_block_till_done()
     sent = len(calls)
 
+    # Paused / resumed above; time left still tracked
+    assert hass.states.get("sensor.laundry_room_washer_time_left").state == "44"
+
     # Finish: end-of-cycle on -> Done + finished alert, once
     _set(hass, "time_remaining", "0")
     _set(hass, "end_of_cycle", "on", domain="binary_sensor")
@@ -138,6 +146,9 @@ async def test_ge_flow_and_lifecycle(hass: HomeAssistant, setup_devices):
     assert [c.data["data"].get("critical_text") for c in new if c.data["data"].get("live_update")] == ["Done"]
     assert any("finished" in c.data.get("title", "") for c in new)
     sent = len(calls)
+
+    assert hass.states.get("sensor.laundry_room_washer_time_left").state == "0"
+    assert hass.states.get("sensor.laundry_room_washer_finishes_at").state == "unknown"
 
     # Staying finished does not re-send every minute
     async_fire_time_changed(hass, dt_util.utcnow() + timedelta(minutes=3))

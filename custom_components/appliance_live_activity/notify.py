@@ -66,6 +66,14 @@ async def _async_send(
     devices: list[str] | None = None,
 ) -> None:
     targets = list(dict.fromkeys(coordinator.devices if devices is None else devices))
+    if payload.get("message") != "clear_notification":
+        # Tapping the notification / Live Activity opens the appliance's device
+        # page. iOS needs `url` on every update; Android uses `clickAction`.
+        path = coordinator.tap_path()
+        data = dict(payload.get("data") or {})
+        data.setdefault("url", path)
+        data.setdefault("clickAction", path)
+        payload = {**payload, "data": data}
     for device_id in targets:
         for service in notify_services_for_device(hass, device_id):
             try:

@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.3.0
+
+### Added
+- **Tap to open**: tapping a Live Activity or any alert opens the appliance's
+  device page in the Home Assistant app — the GE appliance itself (with its
+  controls) for GE setups, otherwise the appliance's device in this
+  integration. Works on iOS Live Activities and on Android notifications.
+- **Time Left** sensor (minutes, duration) and **Finishes At** sensor
+  (timestamp) for washers, dryers, dishwashers and ovens — for dashboards and
+  automations. Time Left is 0 and Finishes At is unknown when nothing is
+  running; Finishes At is unknown while paused.
+
 ## 1.2.2
 
 ### Added

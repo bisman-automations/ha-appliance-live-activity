@@ -82,9 +82,15 @@ Everything after the sensors can be changed later with **Configure**.
 3. Closed → alerts removed, lights restored, the Live Activity shows
    **Closed · was open N min** for a minute, then goes away.
 
+### Tapping a notification
+
+Tapping a Live Activity or alert opens the appliance's device page in the
+Home Assistant app (the GE appliance's own page for GE setups).
+
 ### Dashboards and services
 
-- **Status** and **Progress** sensors per appliance (status attributes include
+- **Status** and **Progress** sensors per appliance, plus **Time Left** and
+  **Finishes At** for washers, dryers, dishwashers and ovens (status attributes include
   phase, cycle, remaining minutes, door open minutes and cooktop on-time).
 - `appliance_live_activity.update` re-sends an appliance's Live Activity.
 

@@ -1,26 +1,31 @@
 """Sensor entities so appliance status/progress can be used on dashboards."""
 from __future__ import annotations
 
-from homeassistant.components.sensor import SensorEntity
+from homeassistant.components.sensor import SensorDeviceClass, SensorEntity
+from homeassistant.const import UnitOfTime
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import DOMAIN
+from .const import DOMAIN, DOOR_TYPES
 
 
 async def async_setup_entry(
     hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
 ) -> None:
     coordinator = hass.data[DOMAIN][entry.entry_id]
-    async_add_entities(
-        [
-            ApplianceStatusSensor(coordinator, entry),
-            ApplianceProgressSensor(coordinator, entry),
+    entities: list[SensorEntity] = [
+        ApplianceStatusSensor(coordinator, entry),
+        ApplianceProgressSensor(coordinator, entry),
+    ]
+    if coordinator.appliance_type not in DOOR_TYPES:
+        entities += [
+            ApplianceTimeRemainingSensor(coordinator, entry),
+            ApplianceFinishesAtSensor(coordinator, entry),
         ]
-    )
+    async_add_entities(entities)
 
 
 class _ApplianceBaseSensor(CoordinatorEntity, SensorEntity):
@@ -94,3 +99,45 @@ class ApplianceProgressSensor(_ApplianceBaseSensor):
     @property
     def entity_registry_enabled_default(self) -> bool:
         return self.coordinator.definition.supports_progress
+
+
+class ApplianceTimeRemainingSensor(_ApplianceBaseSensor):
+    """Minutes left in the current cycle (0 when nothing is running)."""
+
+    _attr_device_class = SensorDeviceClass.DURATION
+    _attr_native_unit_of_measurement = UnitOfTime.MINUTES
+    _attr_suggested_display_precision = 0
+
+    def __init__(self, coordinator, entry: ConfigEntry) -> None:
+        super().__init__(coordinator, entry)
+        self._attr_unique_id = f"{entry.entry_id}_time_left"
+        self._attr_icon = "mdi:timer-sand"
+
+    @property
+    def name(self) -> str:
+        # "Time Left" (not "Time Remaining") so it never collides with the
+        # appliance integration's own *_time_remaining entity
+        return f"{self.coordinator.name} Time Left"
+
+    @property
+    def native_value(self):
+        return self.coordinator.data.get("time_remaining", 0)
+
+
+class ApplianceFinishesAtSensor(_ApplianceBaseSensor):
+    """When the current cycle should finish (unknown when not running)."""
+
+    _attr_device_class = SensorDeviceClass.TIMESTAMP
+
+    def __init__(self, coordinator, entry: ConfigEntry) -> None:
+        super().__init__(coordinator, entry)
+        self._attr_unique_id = f"{entry.entry_id}_finishes_at"
+        self._attr_icon = "mdi:clock-end"
+
+    @property
+    def name(self) -> str:
+        return f"{self.coordinator.name} Finishes At"
+
+    @property
+    def native_value(self):
+        return self.coordinator.data.get("finishes_at")
