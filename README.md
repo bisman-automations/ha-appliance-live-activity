@@ -1,3 +1,5 @@
+<img src="custom_components/appliance_live_activity/brand/icon.png" alt="Appliance Live Activity" width="96" align="right">
+
 # Appliance Live Activity
 
 Live Activities (iOS) and Live Updates (Android) for your appliances in Home

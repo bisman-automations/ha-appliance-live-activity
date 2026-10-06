@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.2.2
+
+### Added
+- Integration icon (light and dark) in `custom_components/appliance_live_activity/brand/`,
+  shown by Home Assistant 2026.3+ in Settings → Devices & services and on the
+  integration's devices.
+
 ## 1.2.1
 
 ### Changed
