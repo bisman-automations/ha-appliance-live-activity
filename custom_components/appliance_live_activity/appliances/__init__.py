@@ -9,3 +9,4 @@ from . import dryer  # noqa: F401
 from . import dishwasher  # noqa: F401
 from . import oven  # noqa: F401
 from . import refrigerator  # noqa: F401
+from . import door  # noqa: F401

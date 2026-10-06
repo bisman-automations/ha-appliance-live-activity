@@ -1,7 +1,7 @@
 {
   "domain": "appliance_live_activity",
   "name": "Appliance Live Activity",
-  "after_dependencies": ["automation", "mobile_app"],
+  "after_dependencies": ["mobile_app", "tts"],
   "codeowners": ["@donavanbecker"],
   "config_flow": true,
   "documentation": "https://github.com/donavanbecker/ha-appliance-live-activity",

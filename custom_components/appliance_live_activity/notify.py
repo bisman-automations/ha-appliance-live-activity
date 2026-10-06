@@ -60,9 +60,13 @@ def notify_services_for_device(hass: HomeAssistant, device_id: str) -> list[str]
 
 
 async def _async_send(
-    hass: HomeAssistant, coordinator: ApplianceCoordinator, payload: dict[str, Any]
+    hass: HomeAssistant,
+    coordinator: ApplianceCoordinator,
+    payload: dict[str, Any],
+    devices: list[str] | None = None,
 ) -> None:
-    for device_id in coordinator.devices:
+    targets = list(dict.fromkeys(coordinator.devices if devices is None else devices))
+    for device_id in targets:
         for service in notify_services_for_device(hass, device_id):
             try:
                 await hass.services.async_call(NOTIFY, service, payload, blocking=False)
@@ -212,7 +216,12 @@ async def async_send_door_open(
 
 
 async def async_send_door_critical(
-    hass: HomeAssistant, coordinator: ApplianceCoordinator, *, labels: list[str], minutes_open: int
+    hass: HomeAssistant,
+    coordinator: ApplianceCoordinator,
+    *,
+    labels: list[str],
+    minutes_open: int,
+    devices: list[str] | None = None,
 ) -> None:
     """Critical alert (bypasses Silent / Focus on iOS, alarm stream on Android)."""
     doors = _door_text(labels)
@@ -233,6 +242,7 @@ async def async_send_door_critical(
                 "channel": "alarm_stream",
             },
         },
+        devices,
     )
 
 
@@ -258,6 +268,67 @@ async def async_send_door_closed(
     )
 
 
-async def async_clear_tag(hass: HomeAssistant, coordinator: ApplianceCoordinator, tag: str) -> None:
+async def async_clear_tag(
+    hass: HomeAssistant, coordinator: ApplianceCoordinator, tag: str, devices: list[str] | None = None
+) -> None:
     """Remove a notification by tag."""
-    await _async_send(hass, coordinator, {"message": "clear_notification", "data": {"tag": tag}})
+    await _async_send(
+        hass, coordinator, {"message": "clear_notification", "data": {"tag": tag}}, devices
+    )
+
+
+# ----------------------------------------------------------------------
+# Cooktop left on
+# ----------------------------------------------------------------------
+async def async_send_cooktop_critical(
+    hass: HomeAssistant,
+    coordinator: ApplianceCoordinator,
+    *,
+    tag: str,
+    minutes_on: int,
+    acknowledge_action: str | None,
+) -> None:
+    """Critical 'cooktop still on' alert with an optional Acknowledge button."""
+    data: dict[str, Any] = {
+        "tag": tag,
+        "push": {
+            "interruption-level": "critical",
+            "sound": {"name": "default", "critical": 1, "volume": 1.0},
+        },
+        "ttl": 0,
+        "priority": "high",
+        "channel": "alarm_stream",
+    }
+    if acknowledge_action:
+        data["actions"] = [{"action": acknowledge_action, "title": "Acknowledge"}]
+    await _async_send(
+        hass,
+        coordinator,
+        {
+            "title": "🔥 Cooktop still on",
+            "message": f"{coordinator.name}: the cooktop has been on for {minutes_on} min. "
+            "Please check it.",
+            "data": data,
+        },
+    )
+
+
+# ----------------------------------------------------------------------
+# Speaker announcements
+# ----------------------------------------------------------------------
+async def async_speak(
+    hass: HomeAssistant, tts_entity: str | None, speakers: list[str], message: str
+) -> None:
+    """Announce on speakers via a TTS entity (no-op if not configured)."""
+    if not tts_entity or not speakers:
+        return
+    try:
+        await hass.services.async_call(
+            "tts",
+            "speak",
+            {"media_player_entity_id": speakers, "message": message},
+            target={"entity_id": tts_entity},
+            blocking=False,
+        )
+    except Exception:  # noqa: BLE001
+        _LOGGER.exception("TTS announcement failed")

@@ -17,7 +17,11 @@ from homeassistant.helpers import selector
 
 from .appliance import APPLIANCE_REGISTRY
 from .const import (
+    CONF_ALERT_LIGHTS,
     CONF_APPLIANCE_TYPE,
+    CONF_COOKTOP_ALERT_MINUTES,
+    CONF_COOKTOP_ENTITIES,
+    CONF_COOKTOP_REPEAT_MINUTES,
     CONF_CRITICAL_AFTER_MINUTES,
     CONF_CRITICAL_REPEAT_MINUTES,
     CONF_CYCLE_ENTITY,
@@ -26,6 +30,8 @@ from .const import (
     CONF_DONE_ENTITY,
     CONF_DOOR_ENTITIES,
     CONF_DOOR_ENTITY,
+    CONF_ESCALATE_AFTER,
+    CONF_ESCALATION_DEVICES,
     CONF_FINISHED_ALERT,
     CONF_ICON,
     CONF_ICON_COLOR,
@@ -36,12 +42,18 @@ from .const import (
     CONF_REMAINING_ENTITY,
     CONF_SOURCE,
     CONF_SOURCE_DEVICE,
+    CONF_SPEAKERS,
     CONF_STATE_ENTITY,
+    CONF_TTS_ENTITY,
+    DEFAULT_COOKTOP_ALERT_MINUTES,
+    DEFAULT_COOKTOP_REPEAT_MINUTES,
     DEFAULT_CRITICAL_AFTER_MINUTES,
     DEFAULT_CRITICAL_REPEAT_MINUTES,
     DEFAULT_DISMISS_MINUTES,
+    DEFAULT_ESCALATE_AFTER,
     DEFAULT_OPEN_DELAY_SECONDS,
     DOMAIN,
+    DOOR_TYPES,
     GE_HOME_DOMAIN,
     SOURCE_GE_HOME,
     SOURCE_MANUAL,
@@ -89,9 +101,20 @@ def _number(min_: float, max_: float, step: float, unit: str) -> selector.Number
     )
 
 
-def _behaviour_fields(appliance_type: str, current: dict[str, Any]) -> dict:
-    """Alert settings: doors (refrigerator) vs cycles (everything else)."""
-    if appliance_type == "refrigerator":
+def _announce_fields() -> dict:
+    return {
+        vol.Optional(CONF_TTS_ENTITY): selector.EntitySelector(
+            selector.EntitySelectorConfig(domain="tts")
+        ),
+        vol.Optional(CONF_SPEAKERS): selector.EntitySelector(
+            selector.EntitySelectorConfig(domain="media_player", multiple=True)
+        ),
+    }
+
+
+def _behaviour_fields(appliance_type: str, current: dict[str, Any], has_cooktop: bool) -> dict:
+    """Alert settings for the appliance type."""
+    if appliance_type in DOOR_TYPES:
         return {
             vol.Optional(
                 CONF_OPEN_DELAY_SECONDS,
@@ -105,8 +128,17 @@ def _behaviour_fields(appliance_type: str, current: dict[str, Any]) -> dict:
                 CONF_CRITICAL_REPEAT_MINUTES,
                 default=current.get(CONF_CRITICAL_REPEAT_MINUTES, DEFAULT_CRITICAL_REPEAT_MINUTES),
             ): _number(1, 60, 1, "min"),
+            vol.Optional(
+                CONF_ESCALATE_AFTER,
+                default=current.get(CONF_ESCALATE_AFTER, DEFAULT_ESCALATE_AFTER),
+            ): _number(0, 50, 1, "alerts"),
+            vol.Optional(CONF_ESCALATION_DEVICES): _phones_selector(),
+            **_announce_fields(),
+            vol.Optional(CONF_ALERT_LIGHTS): selector.EntitySelector(
+                selector.EntitySelectorConfig(domain="light", multiple=True)
+            ),
         }
-    return {
+    fields: dict = {
         vol.Optional(
             CONF_FINISHED_ALERT, default=current.get(CONF_FINISHED_ALERT, True)
         ): selector.BooleanSelector(),
@@ -114,6 +146,21 @@ def _behaviour_fields(appliance_type: str, current: dict[str, Any]) -> dict:
             CONF_DISMISS_MINUTES, default=current.get(CONF_DISMISS_MINUTES, DEFAULT_DISMISS_MINUTES)
         ): _dismiss_selector(),
     }
+    if has_cooktop:
+        fields.update(
+            {
+                vol.Optional(
+                    CONF_COOKTOP_ALERT_MINUTES,
+                    default=current.get(CONF_COOKTOP_ALERT_MINUTES, DEFAULT_COOKTOP_ALERT_MINUTES),
+                ): _number(1, 240, 1, "min"),
+                vol.Optional(
+                    CONF_COOKTOP_REPEAT_MINUTES,
+                    default=current.get(CONF_COOKTOP_REPEAT_MINUTES, DEFAULT_COOKTOP_REPEAT_MINUTES),
+                ): _number(1, 120, 1, "min"),
+                **_announce_fields(),
+            }
+        )
+    return fields
 
 
 class ApplianceLiveActivityConfigFlow(ConfigFlow, domain=DOMAIN):
@@ -215,7 +262,15 @@ class ApplianceLiveActivityConfigFlow(ConfigFlow, domain=DOMAIN):
                 vol.Optional(CONF_DOOR_ENTITY): binary,
             }
         )
-        if self._data[CONF_APPLIANCE_TYPE] == "refrigerator":
+        if self._data[CONF_APPLIANCE_TYPE] == "oven":
+            schema = schema.extend(
+                {
+                    vol.Optional(CONF_COOKTOP_ENTITIES): selector.EntitySelector(
+                        selector.EntitySelectorConfig(domain="binary_sensor", multiple=True)
+                    )
+                }
+            )
+        if self._data[CONF_APPLIANCE_TYPE] in DOOR_TYPES:
             # Doors only: the state entity is the first door, add more here
             schema = vol.Schema(
                 {
@@ -247,7 +302,9 @@ class ApplianceLiveActivityConfigFlow(ConfigFlow, domain=DOMAIN):
         schema = vol.Schema(
             {
                 vol.Required(CONF_DEVICES, default=[]): _phones_selector(),
-                **_behaviour_fields(self._data[CONF_APPLIANCE_TYPE], {}),
+                **_behaviour_fields(
+                    self._data[CONF_APPLIANCE_TYPE], {}, bool(self._data.get(CONF_COOKTOP_ENTITIES))
+                ),
                 vol.Optional(CONF_ICON, default=definition.icon): selector.IconSelector(),
                 vol.Optional(CONF_ICON_COLOR, default=definition.color): selector.TextSelector(),
                 vol.Optional(CONF_NOTIFICATION_TAG, default=default_tag): selector.TextSelector(),
@@ -273,7 +330,9 @@ class ApplianceLiveActivityOptionsFlow(OptionsFlow):
         schema = vol.Schema(
             {
                 vol.Required(CONF_DEVICES, default=current.get(CONF_DEVICES, [])): _phones_selector(),
-                **_behaviour_fields(current[CONF_APPLIANCE_TYPE], current),
+                **_behaviour_fields(
+                    current[CONF_APPLIANCE_TYPE], current, bool(current.get(CONF_COOKTOP_ENTITIES))
+                ),
                 vol.Optional(
                     CONF_ICON, default=current.get(CONF_ICON) or definition.icon
                 ): selector.IconSelector(),
@@ -282,4 +341,6 @@ class ApplianceLiveActivityOptionsFlow(OptionsFlow):
                 ): selector.TextSelector(),
             }
         )
-        return self.async_show_form(step_id="init", data_schema=schema)
+        return self.async_show_form(
+            step_id="init", data_schema=self.add_suggested_values_to_schema(schema, current)
+        )
