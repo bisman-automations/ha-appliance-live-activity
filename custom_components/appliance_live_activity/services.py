@@ -18,7 +18,7 @@ async def async_setup_services(hass: HomeAssistant) -> None:
         coordinator = hass.data[DOMAIN].get(call.data["entry_id"])
         if coordinator is None:
             return
-        await coordinator._async_refresh(notify=True)  # noqa: SLF001
+        await coordinator.async_evaluate(send=True, force=True)
 
     hass.services.async_register(DOMAIN, SERVICE_UPDATE, handle_update, schema=SERVICE_UPDATE_SCHEMA)
 

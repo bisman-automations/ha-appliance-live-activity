@@ -1,12 +1,11 @@
 """Refrigerator appliance definition.
 
 Fridges don't run "cycles" the way a washer or oven does, so this plugin
-disables progress-bar math (supports_progress=False) and repurposes the
-active/complete states for door-open monitoring by default. Point
-state_entity at a door sensor (or the fridge's overall status sensor if
-your integration exposes one) and override active/complete states in the
-config flow if your model uses different text, e.g. an ice-maker-running
-sensor instead of a door sensor.
+disables progress-bar math (supports_progress=False) and uses the Live
+Activity to show that a door is open. Point state_entity at a door
+binary_sensor ("on" = open) or a door status sensor ("Open"/"Closed").
+Only listed states count as open, so unrecognised states never start
+an activity.
 """
 from ..appliance import ApplianceDefinition, register
 
@@ -16,12 +15,15 @@ register(
         display_name="Refrigerator",
         icon="mdi:fridge",
         color="#03A9F4",
-        active_states=["Open", "open", "Door Open", "door open"],
+        active_states=["on", "Open", "Door Open"],
         pause_states=[],
-        complete_states=["Closed", "closed", "Door Closed", "door closed"],
+        complete_states=[],
+        idle_states=["off", "Closed", "Door Closed"],
         running_message="Door Open",
         paused_message="Paused",
         complete_message="Door Closed",
+        finished_alert_message="Door closed.",
         supports_progress=False,
+        unknown_is_running=False,
     )
 )
