@@ -68,7 +68,7 @@ async def _create_entry(hass, washer, phone):
     )
     assert result["step_id"] == "notify"
     result = await hass.config_entries.flow.async_configure(
-        result["flow_id"], {"devices": [phone.id], "finished_alert": True, "dismiss_minutes": 30}
+        result["flow_id"], {"devices": [phone.id], "finished_alert": True, "dismiss_minutes": 30, "icon_color": [0, 188, 212]}
     )
     assert result["type"] is FlowResultType.CREATE_ENTRY
     data = result["data"]
@@ -97,6 +97,7 @@ async def test_ge_flow_and_lifecycle(hass: HomeAssistant, setup_devices):
     assert calls, "running update expected"
     data = calls[-1].data["data"]
     assert data["live_update"] is True
+    assert data["notification_icon_color"] == "#00BCD4"
     assert data["chronometer"] is True and data["when_relative"] is True
     assert calls[-1].data["title"] == "Laundry Room Washer"
     sent = len(calls)

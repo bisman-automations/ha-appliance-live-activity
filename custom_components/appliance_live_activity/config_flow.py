@@ -59,7 +59,7 @@ from .const import (
     SOURCE_MANUAL,
 )
 from .ge import async_discover, async_has_ge_devices, device_name
-from .helpers import slugify_tag
+from .helpers import hex_to_rgb, slugify_tag
 
 AUTO = "auto"
 
@@ -99,6 +99,19 @@ def _number(min_: float, max_: float, step: float, unit: str) -> selector.Number
             min=min_, max=max_, step=step, unit_of_measurement=unit, mode=selector.NumberSelectorMode.BOX
         )
     )
+
+
+def _make_tag(appliance_type: str, name: str) -> str:
+    """Notification tag, e.g. 'kitchen_refrigerator' (no repeated type prefix)."""
+    slug = slugify_tag(name) or appliance_type
+    return slug if appliance_type in slug.split("_") else f"{appliance_type}_{slug}"
+
+
+def _current_rgb(value, fallback_hex: str) -> list[int]:
+    """Stored color (RGB list, or hex from older versions) as an RGB list."""
+    if isinstance(value, (list, tuple)) and len(value) == 3:
+        return [int(c) for c in value]
+    return hex_to_rgb(value or fallback_hex)
 
 
 def _announce_fields() -> dict:
@@ -290,10 +303,12 @@ class ApplianceLiveActivityConfigFlow(ConfigFlow, domain=DOMAIN):
     async def async_step_notify(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         """Pick phones and notification options."""
         definition = APPLIANCE_REGISTRY[self._data[CONF_APPLIANCE_TYPE]]
-        default_tag = f"{self._data[CONF_APPLIANCE_TYPE]}_{slugify_tag(self._data[CONF_NAME])}"
+        default_tag = _make_tag(self._data[CONF_APPLIANCE_TYPE], self._data[CONF_NAME])
 
         if user_input is not None:
             self._data.update(user_input)
+            # Internal: identifies this appliance's notifications on the phone
+            self._data[CONF_NOTIFICATION_TAG] = default_tag
             if self._data.get(CONF_SOURCE) != SOURCE_GE_HOME:
                 await self.async_set_unique_id(default_tag)
                 self._abort_if_unique_id_configured()
@@ -306,8 +321,7 @@ class ApplianceLiveActivityConfigFlow(ConfigFlow, domain=DOMAIN):
                     self._data[CONF_APPLIANCE_TYPE], {}, bool(self._data.get(CONF_COOKTOP_ENTITIES))
                 ),
                 vol.Optional(CONF_ICON, default=definition.icon): selector.IconSelector(),
-                vol.Optional(CONF_ICON_COLOR, default=definition.color): selector.TextSelector(),
-                vol.Optional(CONF_NOTIFICATION_TAG, default=default_tag): selector.TextSelector(),
+                vol.Optional(CONF_ICON_COLOR, default=hex_to_rgb(definition.color)): selector.ColorRGBSelector(),
             }
         )
         return self.async_show_form(step_id="notify", data_schema=schema)
@@ -337,8 +351,8 @@ class ApplianceLiveActivityOptionsFlow(OptionsFlow):
                     CONF_ICON, default=current.get(CONF_ICON) or definition.icon
                 ): selector.IconSelector(),
                 vol.Optional(
-                    CONF_ICON_COLOR, default=current.get(CONF_ICON_COLOR) or definition.color
-                ): selector.TextSelector(),
+                    CONF_ICON_COLOR, default=_current_rgb(current.get(CONF_ICON_COLOR), definition.color)
+                ): selector.ColorRGBSelector(),
             }
         )
         return self.async_show_form(

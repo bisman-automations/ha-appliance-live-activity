@@ -62,6 +62,7 @@ async def fridge(hass: HomeAssistant, enable_custom_integrations):
     )
     assert result["data"]["appliance_type"] == "refrigerator"
     assert len(result["data"]["door_entities"]) == 4
+    assert result["data"]["notification_tag"] == "kitchen_refrigerator"
     await hass.async_block_till_done()
     return calls
 

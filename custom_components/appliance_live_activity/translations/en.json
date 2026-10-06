@@ -55,7 +55,6 @@
           "dismiss_minutes": "Dismiss the finished Live Activity after",
           "icon": "Icon",
           "icon_color": "Icon color",
-          "notification_tag": "Notification tag",
           "open_delay_seconds": "Start the Live Activity after the door is open for",
           "critical_after_minutes": "Send critical alerts after",
           "critical_repeat_minutes": "Repeat critical alerts every",

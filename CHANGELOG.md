@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.2.1
+
+### Changed
+- **Icon color** is now a color picker in setup and **Configure** instead of
+  a hex text field. Existing hex values keep working and show up in the
+  picker.
+- The **Notification tag** field was removed from setup; it's generated
+  automatically and no longer repeats the appliance type
+  (`kitchen_refrigerator` instead of `refrigerator_kitchen_refrigerator`).
+
 ## 1.2.0
 
 ### Added

@@ -7,7 +7,13 @@ from custom_components.appliance_live_activity.const import (
     STATUS_RUNNING,
 )
 from custom_components.appliance_live_activity.ge import discover_from_entity_ids
-from custom_components.appliance_live_activity.helpers import classify_state, meaningful, to_minutes
+from custom_components.appliance_live_activity.helpers import (
+    classify_state,
+    color_to_hex,
+    hex_to_rgb,
+    meaningful,
+    to_minutes,
+)
 
 
 def _classify(state, **kw):
@@ -142,3 +148,11 @@ def test_discover_fridge():
     d = discover_from_entity_ids(FRIDGE)
     assert d.appliance_type == "refrigerator"
     assert d.state_entity == "binary_sensor.kitchen_refrigerator_door"
+
+
+def test_colors():
+    assert hex_to_rgb("#00BCD4") == [0, 188, 212]
+    assert hex_to_rgb("fff") == [255, 255, 255]
+    assert color_to_hex([0, 188, 212]) == "#00BCD4"
+    assert color_to_hex("#4CAF50") == "#4CAF50"  # older entries stored hex
+    assert color_to_hex(None, "#F44336") == "#F44336"

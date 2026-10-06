@@ -71,7 +71,7 @@ from .const import (
     STATUS_RUNNING,
     STORAGE_VERSION,
 )
-from .helpers import classify_state, meaningful, to_minutes
+from .helpers import classify_state, color_to_hex, meaningful, to_minutes
 from .notify import async_clear, async_send_done, async_send_finished_alert, async_send_progress
 
 _LOGGER = logging.getLogger(__name__)
@@ -105,7 +105,7 @@ class ApplianceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.idle_states: list[str] = cfg.get(CONF_IDLE_STATES) or self.definition.idle_states
 
         self.icon: str = cfg.get(CONF_ICON) or self.definition.icon
-        self.icon_color: str = cfg.get(CONF_ICON_COLOR) or self.definition.color
+        self.icon_color: str = color_to_hex(cfg.get(CONF_ICON_COLOR), self.definition.color)
         self.notification_tag: str = cfg.get(CONF_NOTIFICATION_TAG) or f"{DOMAIN}_{entry.entry_id}"
         self.devices: list[str] = cfg.get(CONF_DEVICES) or []
         self.finished_alert: bool = cfg.get(CONF_FINISHED_ALERT, True)

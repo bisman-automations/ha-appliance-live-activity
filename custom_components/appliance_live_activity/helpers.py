@@ -98,3 +98,28 @@ def meaningful(text: str | None) -> str:
         return ""
     stripped = str(text).strip()
     return "" if stripped.lower() in BLANK_TEXT else stripped
+
+
+def hex_to_rgb(value: str) -> list[int]:
+    """'#00BCD4' -> [0, 188, 212] (invalid input -> Home Assistant blue)."""
+    text = str(value or "").strip().lstrip("#")
+    if len(text) == 3:
+        text = "".join(ch * 2 for ch in text)
+    try:
+        return [int(text[i : i + 2], 16) for i in (0, 2, 4)]
+    except ValueError:
+        return [3, 169, 244]
+
+
+def color_to_hex(value, default: str = "#03A9F4") -> str:
+    """Accept an [r, g, b] list (color picker) or a hex string (older entries)."""
+    if isinstance(value, (list, tuple)) and len(value) == 3:
+        try:
+            r, g, b = (max(0, min(255, int(c))) for c in value)
+        except (TypeError, ValueError):
+            return default
+        return f"#{r:02X}{g:02X}{b:02X}"
+    if isinstance(value, str) and value.strip():
+        text = value.strip()
+        return text if text.startswith("#") else f"#{text}"
+    return default

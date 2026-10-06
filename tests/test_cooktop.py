@@ -63,6 +63,7 @@ async def oven(hass: HomeAssistant, enable_custom_integrations):
         },
     )
     assert result["data"]["appliance_type"] == "oven"
+    assert result["data"]["notification_tag"] == "kitchen_oven"
     assert result["data"]["cooktop_entities"] == ["binary_sensor.kitchen_oven_cooktop_status"]
     await hass.async_block_till_done()
     return calls, tts
