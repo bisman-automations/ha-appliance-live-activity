@@ -1,8 +1,8 @@
 update:
   name: Update Live Activity
   description: >
-    Force an immediate refresh and notification for a configured appliance,
-    without waiting for the next state change or the 1-minute timer.
+    Re-send the Live Activity for a configured appliance now,
+    even if nothing has changed.
   fields:
     entry_id:
       name: Appliance

@@ -2,30 +2,67 @@
   "config": {
     "step": {
       "user": {
-        "title": "Add an Appliance",
+        "title": "Add an appliance",
+        "description": "GE Home (SmartHQ) appliances can be set up automatically.",
+        "menu_options": {
+          "ge_home": "GE appliance (SmartHQ) — automatic",
+          "manual": "Any appliance — choose entities"
+        }
+      },
+      "ge_home": {
+        "title": "GE appliance (SmartHQ)",
+        "description": "Pick the washer, dryer, dishwasher, oven or refrigerator. Its state, cycle, time-remaining and door entities are found automatically.",
+        "data": {
+          "source_device": "GE appliance",
+          "name": "Display name (optional)",
+          "appliance_type": "Appliance type"
+        },
+        "data_description": {
+          "name": "Shown as the Live Activity title. Blank = the device name."
+        }
+      },
+      "manual": {
+        "title": "Add an appliance",
         "data": {
           "appliance_type": "Appliance type",
           "name": "Name"
         }
       },
       "entities": {
-        "title": "Choose Entities",
+        "title": "Choose entities",
         "data": {
           "state_entity": "State sensor (required)",
-          "phase_entity": "Phase / sub-cycle sensor (optional)",
-          "cycle_entity": "Cycle sensor (optional)",
-          "remaining_entity": "Remaining time sensor, in minutes (optional)"
+          "phase_entity": "Phase / sub-cycle sensor",
+          "cycle_entity": "Cycle sensor",
+          "remaining_entity": "Time remaining sensor",
+          "done_entity": "End-of-cycle binary sensor",
+          "door_entity": "Door binary sensor"
+        },
+        "data_description": {
+          "remaining_entity": "Hours, minutes or seconds — the unit is read from the sensor.",
+          "done_entity": "Turns on when a cycle finishes. Optional, but makes 'Done' detection exact.",
+          "door_entity": "Opening the door dismisses a finished Live Activity."
         }
       },
       "notify": {
         "title": "Notifications",
         "data": {
+          "devices": "Phones",
+          "finished_alert": "Also send a regular \"finished\" alert",
+          "dismiss_minutes": "Dismiss the finished Live Activity after",
           "icon": "Icon",
           "icon_color": "Icon color",
-          "notification_tag": "Notification tag",
-          "devices": "Phones to notify"
+          "notification_tag": "Notification tag"
+        },
+        "data_description": {
+          "finished_alert": "Changing a Live Activity to Done doesn't always alert you; this does.",
+          "dismiss_minutes": "It is also dismissed as soon as the door opens."
         }
       }
+    },
+    "error": {
+      "no_ge_entities": "No state sensor was found on this device. Use \"Any appliance\" setup instead.",
+      "unknown_type": "Couldn't tell what kind of appliance this is — choose the type."
     },
     "abort": {
       "already_configured": "This appliance is already configured."
@@ -34,10 +71,13 @@
   "options": {
     "step": {
       "init": {
+        "title": "Appliance Live Activity options",
         "data": {
+          "devices": "Phones",
+          "finished_alert": "Also send a regular \"finished\" alert",
+          "dismiss_minutes": "Dismiss the finished Live Activity after",
           "icon": "Icon",
-          "icon_color": "Icon color",
-          "devices": "Phones to notify"
+          "icon_color": "Icon color"
         }
       }
     }
@@ -45,11 +85,11 @@
   "services": {
     "update": {
       "name": "Update Live Activity",
-      "description": "Force an immediate refresh and notification for a configured appliance.",
+      "description": "Re-send the Live Activity for an appliance now.",
       "fields": {
         "entry_id": {
           "name": "Appliance",
-          "description": "The config entry to refresh."
+          "description": "The configured appliance to refresh."
         }
       }
     }

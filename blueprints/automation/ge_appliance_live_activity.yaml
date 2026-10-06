@@ -32,7 +32,7 @@ blueprint:
     Appliance Live Activity integration (ha-appliance-live-activity).
   domain: automation
   author: donavanbecker
-  source_url: https://github.com/donavanbecker/ha-appliance-live-activity/blob/main/blueprints/automation/ha-appliance-live-activity/ge_appliance_live_activity.yaml
+  source_url: https://github.com/donavanbecker/ha-appliance-live-activity/blob/main/blueprints/automation/ge_appliance_live_activity.yaml
   homeassistant:
     min_version: "2026.7.0"
   input:
