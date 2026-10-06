@@ -62,6 +62,14 @@ class ApplianceStatusSensor(_ApplianceBaseSensor):
                 if "open_minutes" in self.coordinator.data
                 else {}
             ),
+            **(
+                {
+                    "cooktop_on": self.coordinator.cooktop.is_on,
+                    "cooktop_on_minutes": round(self.coordinator.cooktop.minutes_on, 1),
+                }
+                if getattr(self.coordinator, "cooktop", None) is not None
+                else {}
+            ),
         }
 
 

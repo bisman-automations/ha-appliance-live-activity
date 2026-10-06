@@ -35,6 +35,19 @@ CONF_DOOR_ENTITIES = "door_entities"
 CONF_OPEN_DELAY_SECONDS = "open_delay_seconds"
 CONF_CRITICAL_AFTER_MINUTES = "critical_after_minutes"
 CONF_CRITICAL_REPEAT_MINUTES = "critical_repeat_minutes"
+CONF_ESCALATION_DEVICES = "escalation_devices"
+CONF_ESCALATE_AFTER = "escalate_after"
+CONF_ALERT_LIGHTS = "alert_lights"
+# Announcements (doors + cooktop)
+CONF_TTS_ENTITY = "tts_entity"
+CONF_SPEAKERS = "speakers"
+# Cooktop left on (ovens / ranges)
+CONF_COOKTOP_ENTITIES = "cooktop_entities"
+CONF_COOKTOP_ALERT_MINUTES = "cooktop_alert_minutes"
+CONF_COOKTOP_REPEAT_MINUTES = "cooktop_repeat_minutes"
+
+# Appliance types handled by the door monitor
+DOOR_TYPES = ("refrigerator", "door")
 
 # Setup sources
 SOURCE_GE_HOME = "ge_home"
@@ -62,7 +75,15 @@ FINISHED_THRESHOLD_MINUTES = 5
 DEFAULT_OPEN_DELAY_SECONDS = 30  # ignore quick grabs; saves iOS push-to-start budget
 DEFAULT_CRITICAL_AFTER_MINUTES = 5
 DEFAULT_CRITICAL_REPEAT_MINUTES = 1
+DEFAULT_ESCALATE_AFTER = 0  # 0 = never
 CLOSED_DISPLAY_SECONDS = 60  # show "Closed" this long before ending the activity
+
+# Cooktop defaults
+DEFAULT_COOKTOP_ALERT_MINUTES = 30
+DEFAULT_COOKTOP_REPEAT_MINUTES = 15
+
+# Event fired by the Companion app when a notification action is tapped
+EVENT_NOTIFICATION_ACTION = "mobile_app_notification_action"
 
 # States that always mean "not running", regardless of appliance type.
 UNAVAILABLE_STATES = {"", "unknown", "unavailable", "none"}

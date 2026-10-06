@@ -4,23 +4,24 @@
 
 ### Added
 - **GE Home Appliances (SmartHQ) automatic setup**: pick the GE device and
-  its state, sub-cycle, cycle, time-remaining, end-of-cycle, door and oven
-  temperature entities are discovered automatically.
-- **Door monitoring** for refrigerators / freezers: Live Activity counting
-  up while a door is open (after a 30 s start delay), critical alerts every
-  minute after 5 minutes until it's closed, then "Closed" for a minute before
-  the activity ends. GE fridges get all doors automatically.
-- **Door Left Open blueprint** (`blueprints/automation/door_left_open.yaml`)
-  for any door sensor, with snooze, escalation, TTS and red lights.
-- **GE blueprint** (`blueprints/automation/ge_appliance_live_activity.yaml`)
-  for using GE appliances without the integration. The integration also
-  installs it, and keeps it updated unless you've edited it.
+  its state, sub-cycle, cycle, time-remaining, end-of-cycle, door, oven
+  temperature, cooktop and fridge/freezer door entities are discovered.
+- **Door monitoring** (refrigerator / freezer, and a new generic **Door**
+  type for garage, patio…): Live Activity counting up while open (after a
+  30 s start delay), critical alerts every minute after 5 minutes until
+  closed, then "Closed" for a minute before the activity ends. Optional
+  escalation: extra phones, speaker announcements, red lights (restored on
+  close).
+- **Cooktop left-on alerts** for ovens (from the "Critical Gas Cooktop Left
+  On Alert" blueprint): critical alert after 30 min with an Acknowledge
+  button, repeating every 15 min, optional speaker announcement, cleared
+  when the cooktop turns off.
 - Native countdown on the phone (`chronometer` / `when` / `when_relative`).
 - "Finished" handling: *Done* state, optional time-sensitive alert, and the
   Live Activity is ended when the door opens or after a configurable delay.
 - Optional end-of-cycle and door entities for manually configured appliances.
-- Options: finished alert and dismiss delay.
-- Tests and a CI workflow (hassfest, HACS validation, blueprint sync check).
+- Options for all alert timings, escalation and announcements.
+- Tests and a CI workflow (hassfest, HACS validation, pytest).
 
 ### Fixed
 - **Notifications were never sent**: phones were looked up by notify
@@ -41,6 +42,7 @@
 
 ### Changed
 - Requires Home Assistant 2026.7+ (Live Activities support).
+- Everything lives in the integration; the repo no longer ships blueprints.
 
 ## 1.0.0
 

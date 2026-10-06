@@ -8,8 +8,11 @@ Flow for one appliance (any of its doors):
 2. Still open after ``critical_after`` minutes (default 5) -> the activity
    turns red and a **critical** notification is sent, repeated every
    ``critical_repeat`` minutes until the door closes.
-3. Closed -> the critical notification is removed, the activity shows
-   "Closed" for a minute, then it is ended.
+   After ``escalate_after`` critical alerts (0 = straight away) the
+   optional escalation kicks in: extra phones get the alerts too, speakers
+   announce it, and chosen lights turn red.
+3. Closed -> critical notifications are removed, lights are restored, the
+   activity shows "Closed" for a minute, then it is ended.
 """
 from __future__ import annotations
 
@@ -30,13 +33,19 @@ from homeassistant.helpers.event import (
 from .const import (
     CLOSED_DISPLAY_SECONDS,
     CONF_CRITICAL_AFTER_MINUTES,
+    CONF_ALERT_LIGHTS,
     CONF_CRITICAL_REPEAT_MINUTES,
     CONF_DOOR_ENTITIES,
     CONF_DOOR_ENTITY,
+    CONF_ESCALATE_AFTER,
+    CONF_ESCALATION_DEVICES,
     CONF_OPEN_DELAY_SECONDS,
+    CONF_SPEAKERS,
     CONF_STATE_ENTITY,
+    CONF_TTS_ENTITY,
     DEFAULT_CRITICAL_AFTER_MINUTES,
     DEFAULT_CRITICAL_REPEAT_MINUTES,
+    DEFAULT_ESCALATE_AFTER,
     DEFAULT_OPEN_DELAY_SECONDS,
     STATUS_IDLE,
     STATUS_RUNNING,
@@ -47,11 +56,12 @@ from .notify import (
     async_send_door_closed,
     async_send_door_critical,
     async_send_door_open,
+    async_speak,
 )
 
 _LOGGER = logging.getLogger(__name__)
 
-OPEN_STATES = {STATE_ON, STATE_OPEN, "door open"}
+OPEN_STATES = {STATE_ON, STATE_OPEN, "opening", "door open"}
 TICK = timedelta(seconds=15)
 
 
@@ -72,6 +82,14 @@ class DoorCoordinator(ApplianceCoordinator):
             30.0, float(cfg.get(CONF_CRITICAL_REPEAT_MINUTES, DEFAULT_CRITICAL_REPEAT_MINUTES)) * 60
         )
         self.critical_tag = f"{self.notification_tag}_critical"
+        self.escalation_devices: list[str] = list(cfg.get(CONF_ESCALATION_DEVICES) or [])
+        self.escalate_after = int(cfg.get(CONF_ESCALATE_AFTER, DEFAULT_ESCALATE_AFTER) or 0)
+        self.alert_lights: list[str] = list(cfg.get(CONF_ALERT_LIGHTS) or [])
+        self.tts_entity: str | None = cfg.get(CONF_TTS_ENTITY) or None
+        self.speakers: list[str] = list(cfg.get(CONF_SPEAKERS) or [])
+        self._critical_count = 0
+        self._lights_scene: str = f"scene.{self.notification_tag}_lights"
+        self._lights_saved = False
 
         self._open_since: float | None = None
         self._activity_started = False
@@ -134,10 +152,23 @@ class DoorCoordinator(ApplianceCoordinator):
                 if critical and (
                     self._last_critical is None or now - self._last_critical >= self.critical_repeat - 1
                 ):
+                    self._critical_count += 1
+                    escalated = self._critical_count > self.escalate_after
+                    minutes_open = round(elapsed / 60)
+                    devices = self.devices + (self.escalation_devices if escalated else [])
                     await async_send_door_critical(
-                        self.hass, self, labels=labels, minutes_open=round(elapsed / 60)
+                        self.hass, self, labels=labels, minutes_open=minutes_open, devices=devices
                     )
                     self._last_critical = now
+                    if escalated:
+                        doors = " and ".join(labels)
+                        await async_speak(
+                            self.hass,
+                            self.tts_entity,
+                            self.speakers,
+                            f"The {self.name} {doors} has been open for {minutes_open} minutes.",
+                        )
+                        await self._async_lights_red()
 
             self.async_set_updated_data(
                 {
@@ -156,18 +187,57 @@ class DoorCoordinator(ApplianceCoordinator):
             minutes_open = round((now - self._open_since) / 60)
             if send and self.devices and self._activity_started:
                 if self._last_critical is not None:
-                    await async_clear_tag(self.hass, self, self.critical_tag)
+                    await async_clear_tag(
+                        self.hass, self, self.critical_tag, self.devices + self.escalation_devices
+                    )
                 await async_send_door_closed(self.hass, self, minutes_open=minutes_open)
                 self._schedule_closed_clear()
+            await self._async_lights_restore()
         self._open_since = None
         self._activity_started = False
         self._sent_signature = None
         self._last_critical = None
+        self._critical_count = 0
         self.async_set_updated_data(
             {"status": STATUS_IDLE, "phase": "", "cycle": "", "remaining": 0, "progress": 0}
         )
 
     # ------------------------------------------------------------------
+    async def _async_lights_red(self) -> None:
+        """Snapshot the alert lights once, then turn them red."""
+        if not self.alert_lights or self._lights_saved:
+            return
+        scene_id = self._lights_scene.split(".", 1)[1]
+        try:
+            await self.hass.services.async_call(
+                "scene", "create",
+                {"scene_id": scene_id, "snapshot_entities": self.alert_lights},
+                blocking=True,
+            )
+            self._lights_saved = True
+            await self.hass.services.async_call(
+                "light", "turn_on",
+                {"rgb_color": [255, 0, 0], "brightness_pct": 100},
+                target={"entity_id": self.alert_lights},
+                blocking=False,
+            )
+        except Exception:  # noqa: BLE001
+            _LOGGER.exception("Could not turn alert lights red")
+
+    async def _async_lights_restore(self) -> None:
+        if not self._lights_saved:
+            return
+        self._lights_saved = False
+        try:
+            await self.hass.services.async_call(
+                "scene", "turn_on", target={"entity_id": self._lights_scene}, blocking=True
+            )
+            await self.hass.services.async_call(
+                "scene", "delete", target={"entity_id": self._lights_scene}, blocking=False
+            )
+        except Exception:  # noqa: BLE001
+            _LOGGER.exception("Could not restore alert lights")
+
     def _schedule_closed_clear(self) -> None:
         self._cancel_closed_clear()
 

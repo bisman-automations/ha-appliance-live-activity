@@ -139,3 +139,58 @@ async def test_door_flow(hass: HomeAssistant, fridge, freezer):
     await hass.async_block_till_done()
     assert calls[-1].data["message"] == "clear_notification"
     assert not calls[-1].data["data"]["tag"].endswith("_critical")
+
+
+async def test_generic_door_escalation(hass: HomeAssistant, enable_custom_integrations, freezer):
+    dev_reg = dr.async_get(hass)
+    phone_entry = MockConfigEntry(domain="mobile_app")
+    phone_entry.add_to_hass(hass)
+    me = dev_reg.async_get_or_create(config_entry_id=phone_entry.entry_id,
+                                     identifiers={("mobile_app", "a")}, name="My Phone")
+    partner = dev_reg.async_get_or_create(config_entry_id=phone_entry.entry_id,
+                                          identifiers={("mobile_app", "b")}, name="Partner Phone")
+    mine = async_mock_service(hass, "notify", "mobile_app_my_phone")
+    theirs = async_mock_service(hass, "notify", "mobile_app_partner_phone")
+    scene_create = async_mock_service(hass, "scene", "create")
+    light_on = async_mock_service(hass, "light", "turn_on")
+    scene_on = async_mock_service(hass, "scene", "turn_on")
+    async_mock_service(hass, "scene", "delete")
+    tts = async_mock_service(hass, "tts", "speak")
+    hass.states.async_set("binary_sensor.garage_door", "off", {"friendly_name": "Garage Door"})
+
+    result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": config_entries.SOURCE_USER})
+    assert result["step_id"] == "manual"
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {"appliance_type": "door", "name": "Garage"})
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {"state_entity": "binary_sensor.garage_door"})
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"],
+        {"devices": [me.id], "open_delay_seconds": 0, "critical_after_minutes": 10,
+         "critical_repeat_minutes": 2, "escalate_after": 1, "escalation_devices": [partner.id],
+         "tts_entity": "tts.home", "speakers": ["media_player.kitchen"], "alert_lights": ["light.hall"]},
+    )
+    assert result["type"] == "create_entry"
+    await hass.async_block_till_done()
+
+    hass.states.async_set("binary_sensor.garage_door", "on", {"friendly_name": "Garage Door"})
+    await hass.async_block_till_done()
+    assert len(_live(mine)) == 1  # no start delay
+
+    for _ in range(10):
+        freezer.tick(timedelta(minutes=1))
+        async_fire_time_changed(hass)
+        await hass.async_block_till_done()
+    assert len(_critical(mine)) == 1 and _critical(theirs) == []  # not escalated yet
+    assert tts == [] and light_on == []
+
+    freezer.tick(timedelta(minutes=2))
+    async_fire_time_changed(hass)
+    await hass.async_block_till_done()
+    assert len(_critical(mine)) == 2 and len(_critical(theirs)) == 1
+    assert len(tts) == 1 and len(scene_create) == 1 and len(light_on) == 1
+
+    hass.states.async_set("binary_sensor.garage_door", "off", {"friendly_name": "Garage Door"})
+    await hass.async_block_till_done()
+    assert len(scene_on) == 1  # lights restored
+    assert any(c.data.get("message") == "clear_notification" for c in theirs)

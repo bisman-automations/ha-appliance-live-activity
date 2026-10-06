@@ -38,6 +38,9 @@ from .const import (
     CONF_ACTIVE_STATES,
     CONF_APPLIANCE_TYPE,
     CONF_COMPLETE_STATES,
+    CONF_COOKTOP_ALERT_MINUTES,
+    CONF_COOKTOP_ENTITIES,
+    CONF_COOKTOP_REPEAT_MINUTES,
     CONF_CYCLE_ENTITY,
     CONF_DEVICES,
     CONF_DISMISS_MINUTES,
@@ -52,8 +55,12 @@ from .const import (
     CONF_PAUSE_STATES,
     CONF_PHASE_ENTITY,
     CONF_REMAINING_ENTITY,
+    CONF_SPEAKERS,
     CONF_STATE_ENTITY,
     CONF_TEMPERATURE_ENTITY,
+    CONF_TTS_ENTITY,
+    DEFAULT_COOKTOP_ALERT_MINUTES,
+    DEFAULT_COOKTOP_REPEAT_MINUTES,
     DEFAULT_DISMISS_MINUTES,
     DOMAIN,
     DRIFT_MINUTES,
@@ -103,6 +110,22 @@ class ApplianceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.devices: list[str] = cfg.get(CONF_DEVICES) or []
         self.finished_alert: bool = cfg.get(CONF_FINISHED_ALERT, True)
         self.dismiss_minutes: float = float(cfg.get(CONF_DISMISS_MINUTES, DEFAULT_DISMISS_MINUTES))
+
+        # Cooktop left-on alerts (ovens / ranges)
+        self.cooktop = None
+        cooktop_entities = list(cfg.get(CONF_COOKTOP_ENTITIES) or [])
+        if cooktop_entities:
+            from .cooktop import CooktopMonitor  # noqa: PLC0415 - avoids import cycle
+
+            self.cooktop = CooktopMonitor(
+                hass,
+                self,
+                entities=cooktop_entities,
+                alert_minutes=float(cfg.get(CONF_COOKTOP_ALERT_MINUTES, DEFAULT_COOKTOP_ALERT_MINUTES)),
+                repeat_minutes=float(cfg.get(CONF_COOKTOP_REPEAT_MINUTES, DEFAULT_COOKTOP_REPEAT_MINUTES)),
+                tts_entity=cfg.get(CONF_TTS_ENTITY) or None,
+                speakers=list(cfg.get(CONF_SPEAKERS) or []),
+            )
 
         self._store: Store[dict[str, Any]] = Store(
             hass, STORAGE_VERSION, f"{DOMAIN}_{entry.entry_id}"
@@ -167,12 +190,16 @@ class ApplianceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             self._schedule_dismiss(max(0.0, self._dismiss_at - dt_util.utcnow().timestamp()))
 
         await self.async_evaluate(send=True)
+        if self.cooktop is not None:
+            await self.cooktop.async_setup()
 
     async def async_unload(self) -> None:
         for unsub in self._unsubs:
             unsub()
         self._unsubs.clear()
         self._cancel_dismiss()
+        if self.cooktop is not None:
+            await self.cooktop.async_unload()
 
     # ------------------------------------------------------------------
     # Event handlers

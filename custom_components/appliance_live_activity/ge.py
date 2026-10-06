@@ -6,7 +6,6 @@ appliance, not six sensors. ha_gehome names entities
 ``sensor.kitchen_dishwasher_operating_mode``, so suffix matching works for
 both friendly-named and serial-named devices.
 
-The same rules are used by blueprints/automation/ge_appliance_live_activity.yaml.
 """
 from __future__ import annotations
 
@@ -17,6 +16,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry as dr, entity_registry as er
 
 from .const import (
+    CONF_COOKTOP_ENTITIES,
     CONF_CYCLE_ENTITY,
     CONF_DONE_ENTITY,
     CONF_DOOR_ENTITIES,
@@ -42,6 +42,7 @@ class GEDiscovery:
     door_entity: str | None = None
     temperature_entity: str | None = None
     door_entities: list[str] = field(default_factory=list)
+    cooktop_entities: list[str] = field(default_factory=list)
 
     def as_config(self) -> dict[str, str]:
         """Config-entry keys for every entity that was found."""
@@ -57,6 +58,8 @@ class GEDiscovery:
         result = {k: v for k, v in mapping.items() if v}
         if self.door_entities:
             result[CONF_DOOR_ENTITIES] = list(self.door_entities)
+        if self.cooktop_entities:
+            result[CONF_COOKTOP_ENTITIES] = list(self.cooktop_entities)
         return result
 
 
@@ -119,6 +122,7 @@ def discover_from_entity_ids(entity_ids: list[str]) -> GEDiscovery:
         done_entity=_first(ids, r"^binary_sensor\..*_end_of_cycle$"),
         door_entity=_first(ids, r"^binary_sensor\..*_door$"),
         temperature_entity=_first(ids, r"^sensor\..*_display_temperature$"),
+        cooktop_entities=[e for e in ids if re.search(r"^binary_sensor\..*_cooktop_status$", e)],
     )
 
 

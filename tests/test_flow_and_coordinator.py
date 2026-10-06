@@ -161,15 +161,6 @@ async def test_cancelled_cycle_clears(hass: HomeAssistant, setup_devices):
     assert not any("finished" in c.data.get("title", "") for c in calls)
 
 
-async def test_bundled_blueprint_installed(hass: HomeAssistant, setup_devices):
-    import os
-
-    washer, phone, _ = setup_devices
-    await _create_entry(hass, washer, phone)
-    path = hass.config.path("blueprints", "automation", DOMAIN, "ge_appliance_live_activity.yaml")
-    assert os.path.exists(path)
-
-
 async def test_options_flow(hass: HomeAssistant, setup_devices):
     washer, phone, _ = setup_devices
     entry = await _create_entry(hass, washer, phone)
