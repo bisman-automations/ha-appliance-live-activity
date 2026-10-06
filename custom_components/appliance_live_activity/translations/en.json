@@ -36,7 +36,8 @@
           "cycle_entity": "Cycle sensor",
           "remaining_entity": "Time remaining sensor",
           "done_entity": "End-of-cycle binary sensor",
-          "door_entity": "Door binary sensor"
+          "door_entity": "Door binary sensor",
+          "door_entities": "Other doors (e.g. freezer)"
         },
         "data_description": {
           "remaining_entity": "Hours, minutes or seconds — the unit is read from the sensor.",
@@ -52,11 +53,16 @@
           "dismiss_minutes": "Dismiss the finished Live Activity after",
           "icon": "Icon",
           "icon_color": "Icon color",
-          "notification_tag": "Notification tag"
+          "notification_tag": "Notification tag",
+          "open_delay_seconds": "Start the Live Activity after the door is open for",
+          "critical_after_minutes": "Send critical alerts after",
+          "critical_repeat_minutes": "Repeat critical alerts every"
         },
         "data_description": {
           "finished_alert": "Changing a Live Activity to Done doesn't always alert you; this does.",
-          "dismiss_minutes": "It is also dismissed as soon as the door opens."
+          "dismiss_minutes": "It is also dismissed as soon as the door opens.",
+          "open_delay_seconds": "Quick grabs don't start a Live Activity (iOS limits how many can be started).",
+          "critical_after_minutes": "Critical alerts bypass Silent and Focus until the door is closed."
         }
       }
     },
@@ -77,7 +83,10 @@
           "finished_alert": "Also send a regular \"finished\" alert",
           "dismiss_minutes": "Dismiss the finished Live Activity after",
           "icon": "Icon",
-          "icon_color": "Icon color"
+          "icon_color": "Icon color",
+          "open_delay_seconds": "Start the Live Activity after the door is open for",
+          "critical_after_minutes": "Send critical alerts after",
+          "critical_repeat_minutes": "Repeat critical alerts every"
         }
       }
     }

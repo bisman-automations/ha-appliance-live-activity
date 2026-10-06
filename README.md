@@ -9,6 +9,8 @@ finishes.
   found automatically.
 - **Any other brand** (LG, Samsung, Bosch, Whirlpool, Miele…) — pick its
   state / phase / time-remaining sensors.
+- **Doors left open** (fridge, freezer, garage…) — a Live Activity counting
+  how long it's been open, then critical alerts until it's closed.
 
 Two ways to use it — pick one per appliance:
 
@@ -60,6 +62,13 @@ later with **Configure**.
   a regular time-sensitive "finished" alert, and **ends the Live Activity when
   the door opens** (or after 30 minutes).
 - **Cancelled** cycles (stopped with time left) just end the activity.
+- **Refrigerator / freezer doors:** after a door has been open 30 s (so quick
+  grabs don't start one), a Live Activity counts up how long it's been open.
+  After 5 minutes it turns red and **critical alerts** repeat every minute
+  until the door is closed. When it closes, the alerts are removed and the
+  Live Activity shows **Closed** for a minute, then goes away. GE fridges get
+  every door (fridge left/right, freezer) automatically; all three timings
+  are configurable.
 - Adds **Status** and **Progress** sensors per appliance for dashboards.
 - Service `appliance_live_activity.update` re-sends the activity on demand.
 
@@ -79,6 +88,15 @@ for one GE appliance without installing the integration: pick the GE device
 and your phones. It is also installed automatically to
 `blueprints/automation/appliance_live_activity/` when you install the
 integration (and kept up to date, unless you've edited your copy).
+
+## Blueprint: Door Left Open (any door)
+
+[![Import blueprint](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fdonavanbecker%2Fha-appliance-live-activity%2Fblob%2Fmain%2Fblueprints%2Fautomation%2Fdoor_left_open.yaml)
+
+`blueprints/automation/door_left_open.yaml` — the same door flow for any
+door `binary_sensor` (garage, patio, a fridge from another brand), with extras:
+optional Snooze button, escalation to more phones, speaker announcements and
+turning lights red.
 
 > Use either the integration **or** the blueprint for a given appliance, not
 > both — they would send competing updates to the same phone.

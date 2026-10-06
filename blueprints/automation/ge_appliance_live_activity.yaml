@@ -105,30 +105,30 @@ blueprint:
         idle_states:
           name: Idle states (exact match)
           description: Appliance states that mean "not running". Add your own if needed.
-          default: [Off, Ready, Standby, Low Power, Power Up, Power Off, Idle, N/A, "---", Delay Run, Delay Start, Delay]
+          default: ["Off", "Ready", "Standby", "Low Power", "Power Up", "Power Off", "Idle", "N/A", "---", "Delay Run", "Delay Start", "Delay"]
           selector:
             select:
               multiple: true
               custom_value: true
-              options: [Off, Ready, Standby, Low Power, Power Up, Power Off, Idle, N/A, "---", Delay Run, Delay Start, Delay]
+              options: ["Off", "Ready", "Standby", "Low Power", "Power Up", "Power Off", "Idle", "N/A", "---", "Delay Run", "Delay Start", "Delay"]
         paused_keywords:
           name: Paused keywords
           description: A state containing any of these is treated as paused.
-          default: [Pause]
+          default: ["Pause"]
           selector:
             select:
               multiple: true
               custom_value: true
-              options: [Pause]
+              options: ["Pause"]
         done_keywords:
           name: Finished keywords
           description: A state containing any of these is treated as finished.
-          default: [End Of Cycle, Done, Complete, Finished]
+          default: ["End Of Cycle", "Done", "Complete", "Finished"]
           selector:
             select:
               multiple: true
               custom_value: true
-              options: [End Of Cycle, Done, Complete, Finished]
+              options: ["End Of Cycle", "Done", "Complete", "Finished"]
 
 mode: restart
 max_exceeded: silent
@@ -147,9 +147,9 @@ triggers:
     id: active
     value_template: >
       {% set e = device_entities(dev_tv) %}
-      {% set c = (e | select('search', '^sensor\..*_operating_mode$') | list)
-               + (e | select('search', '^sensor\..*_current_state$') | list)
-               + (e | select('search', '^sensor\..*_state$')
+      {% set c = (e | select('search', '^sensor\\..*_operating_mode$') | list)
+               + (e | select('search', '^sensor\\..*_current_state$') | list)
+               + (e | select('search', '^sensor\\..*_state$')
                     | reject('search', '_(cycle|current)_state$') | list) %}
       {% set se = c | first | default('') %}
       {% set s = (states(se) | lower) if se else 'unavailable' %}
@@ -189,32 +189,32 @@ variables:
 
   state_ent: >
     {% set e = ents %}
-    {% set c = (e | select('search', '^sensor\..*_operating_mode$') | list)
-             + (e | select('search', '^sensor\..*_current_state$') | list)
-             + (e | select('search', '^sensor\..*_state$')
+    {% set c = (e | select('search', '^sensor\\..*_operating_mode$') | list)
+             + (e | select('search', '^sensor\\..*_current_state$') | list)
+             + (e | select('search', '^sensor\\..*_state$')
                   | reject('search', '_(cycle|current)_state$') | list) %}
     {{ c | first | default('') }}
   phase_ent: >
     {% set e = ents %}
-    {{ ((e | select('search', '^sensor\..*_sub_cycle$') | list)
-        + (e | select('search', '^sensor\..*_cook_mode$') | list)
-        + (e | select('search', '^sensor\..*_cycle_state$') | list)) | first | default('') }}
+    {{ ((e | select('search', '^sensor\\..*_sub_cycle$') | list)
+        + (e | select('search', '^sensor\\..*_cook_mode$') | list)
+        + (e | select('search', '^sensor\\..*_cycle_state$') | list)) | first | default('') }}
   cycle_ent: >
     {% set e = ents %}
-    {{ ((e | select('search', '^sensor\..*_cycle_name$') | list)
-        + (e | select('search', '^sensor\..*_cycle$') | reject('search', '_sub_cycle$') | list))
+    {{ ((e | select('search', '^sensor\\..*_cycle_name$') | list)
+        + (e | select('search', '^sensor\\..*_cycle$') | reject('search', '_sub_cycle$') | list))
        | first | default('') }}
   rem_ent: >
     {% set e = ents %}
-    {{ ((e | select('search', '^sensor\..*_cook_time_remaining$') | list)
-        + (e | select('search', '^sensor\..*_time_remaining$')
+    {{ ((e | select('search', '^sensor\\..*_cook_time_remaining$') | list)
+        + (e | select('search', '^sensor\\..*_time_remaining$')
              | reject('search', '_(delay|cook)_time_remaining$') | list)) | first | default('') }}
   eoc_ent: >
-    {{ ents | select('search', '^binary_sensor\..*_end_of_cycle$') | first | default('') }}
+    {{ ents | select('search', '^binary_sensor\\..*_end_of_cycle$') | first | default('') }}
   door_ent: >
-    {{ ents | select('search', '^binary_sensor\..*_door$') | first | default('') }}
+    {{ ents | select('search', '^binary_sensor\\..*_door$') | first | default('') }}
   temp_ent: >
-    {{ ents | select('search', '^sensor\..*_display_temperature$') | first | default('') }}
+    {{ ents | select('search', '^sensor\\..*_display_temperature$') | first | default('') }}
 
   title: "{{ name_in if name_in else (device_attr(dev, 'name_by_user') or device_attr(dev, 'name')) }}"
   icon: >
