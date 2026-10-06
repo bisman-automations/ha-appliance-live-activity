@@ -1,5 +1,32 @@
 # Changelog
 
+## 1.4.0
+
+### Added
+- **Oven preheated alert**: a time-sensitive "Kitchen Oven preheated — it's
+  at 350°F, ready to cook" when the oven reaches its set temperature. While
+  preheating, the Live Activity shows "Preheating · 275°F → 350°F" with the
+  progress bar filling as it heats (updated in 10 % steps so iOS doesn't
+  throttle it); once cooking it shows the set temperature. The alert is
+  removed when the oven turns off. GE ovens' set-temperature entity is found
+  automatically; can be turned off in Configure.
+- **Water leak alerts** for any appliance: a critical alert the moment a leak
+  sensor detects water, plus an optional speaker announcement, repeated every
+  5 minutes until it's dry, then replaced with "leak cleared". Leak sensors
+  named after the appliance (e.g. "Kitchen Dishwasher Leak Sensor") are
+  picked automatically during GE setup; any moisture sensor can be added.
+- **Move-the-laundry reminder** for washers: 15 minutes after a wash
+  finishes, a time-sensitive reminder repeats every 15 minutes (up to 3
+  times) until the washer door is opened or the dryer starts. The GE dryer is
+  found automatically. Set the delay to 0 to turn it off.
+- Speaker announcement settings are now available for every appliance.
+- Status sensor attribute `leak_detected`.
+
+### Fixed
+- Oven "Delayed Start" is treated as idle.
+- Clearing an optional picker (leak sensors, speakers, dryer…) in Configure
+  now actually removes it instead of falling back to the value found at setup.
+
 ## 1.3.1
 
 ### Fixed

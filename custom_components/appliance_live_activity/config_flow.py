@@ -30,20 +30,29 @@ from .const import (
     CONF_DONE_ENTITY,
     CONF_DOOR_ENTITIES,
     CONF_DOOR_ENTITY,
+    CONF_DRYER_ENTITY,
     CONF_ESCALATE_AFTER,
     CONF_ESCALATION_DEVICES,
     CONF_FINISHED_ALERT,
     CONF_ICON,
     CONF_ICON_COLOR,
+    CONF_LEAK_ENTITIES,
+    CONF_LEAK_REPEAT_MINUTES,
+    CONF_MOVE_MAX_REMINDERS,
+    CONF_MOVE_REMINDER_MINUTES,
+    CONF_MOVE_REPEAT_MINUTES,
     CONF_NAME,
     CONF_NOTIFICATION_TAG,
     CONF_OPEN_DELAY_SECONDS,
     CONF_PHASE_ENTITY,
+    CONF_PREHEAT_ALERT,
     CONF_REMAINING_ENTITY,
     CONF_SOURCE,
     CONF_SOURCE_DEVICE,
     CONF_SPEAKERS,
     CONF_STATE_ENTITY,
+    CONF_TARGET_TEMPERATURE_ENTITY,
+    CONF_TEMPERATURE_ENTITY,
     CONF_TTS_ENTITY,
     DEFAULT_COOKTOP_ALERT_MINUTES,
     DEFAULT_COOKTOP_REPEAT_MINUTES,
@@ -51,6 +60,10 @@ from .const import (
     DEFAULT_CRITICAL_REPEAT_MINUTES,
     DEFAULT_DISMISS_MINUTES,
     DEFAULT_ESCALATE_AFTER,
+    DEFAULT_LEAK_REPEAT_MINUTES,
+    DEFAULT_MOVE_MAX_REMINDERS,
+    DEFAULT_MOVE_REMINDER_MINUTES,
+    DEFAULT_MOVE_REPEAT_MINUTES,
     DEFAULT_OPEN_DELAY_SECONDS,
     DOMAIN,
     DOOR_TYPES,
@@ -125,40 +138,82 @@ def _announce_fields() -> dict:
     }
 
 
+# Optional fields without defaults: cleared in Configure -> stored as None
+CLEARABLE = (
+    CONF_LEAK_ENTITIES,
+    CONF_DRYER_ENTITY,
+    CONF_TTS_ENTITY,
+    CONF_SPEAKERS,
+    CONF_ESCALATION_DEVICES,
+    CONF_ALERT_LIGHTS,
+)
+
+
 def _behaviour_fields(appliance_type: str, current: dict[str, Any], has_cooktop: bool) -> dict:
-    """Alert settings for the appliance type."""
+    """Alert settings for the appliance type (entity pickers are pre-filled
+    via suggested values, see add_suggested_values_to_schema)."""
+    fields: dict = {}
     if appliance_type in DOOR_TYPES:
-        return {
-            vol.Optional(
-                CONF_OPEN_DELAY_SECONDS,
-                default=current.get(CONF_OPEN_DELAY_SECONDS, DEFAULT_OPEN_DELAY_SECONDS),
-            ): _number(0, 600, 5, "s"),
-            vol.Optional(
-                CONF_CRITICAL_AFTER_MINUTES,
-                default=current.get(CONF_CRITICAL_AFTER_MINUTES, DEFAULT_CRITICAL_AFTER_MINUTES),
-            ): _number(1, 120, 1, "min"),
-            vol.Optional(
-                CONF_CRITICAL_REPEAT_MINUTES,
-                default=current.get(CONF_CRITICAL_REPEAT_MINUTES, DEFAULT_CRITICAL_REPEAT_MINUTES),
-            ): _number(1, 60, 1, "min"),
-            vol.Optional(
-                CONF_ESCALATE_AFTER,
-                default=current.get(CONF_ESCALATE_AFTER, DEFAULT_ESCALATE_AFTER),
-            ): _number(0, 50, 1, "alerts"),
-            vol.Optional(CONF_ESCALATION_DEVICES): _phones_selector(),
-            **_announce_fields(),
-            vol.Optional(CONF_ALERT_LIGHTS): selector.EntitySelector(
-                selector.EntitySelectorConfig(domain="light", multiple=True)
-            ),
-        }
-    fields: dict = {
-        vol.Optional(
-            CONF_FINISHED_ALERT, default=current.get(CONF_FINISHED_ALERT, True)
-        ): selector.BooleanSelector(),
-        vol.Optional(
-            CONF_DISMISS_MINUTES, default=current.get(CONF_DISMISS_MINUTES, DEFAULT_DISMISS_MINUTES)
-        ): _dismiss_selector(),
-    }
+        fields.update(
+            {
+                vol.Optional(
+                    CONF_OPEN_DELAY_SECONDS,
+                    default=current.get(CONF_OPEN_DELAY_SECONDS, DEFAULT_OPEN_DELAY_SECONDS),
+                ): _number(0, 600, 5, "s"),
+                vol.Optional(
+                    CONF_CRITICAL_AFTER_MINUTES,
+                    default=current.get(CONF_CRITICAL_AFTER_MINUTES, DEFAULT_CRITICAL_AFTER_MINUTES),
+                ): _number(1, 120, 1, "min"),
+                vol.Optional(
+                    CONF_CRITICAL_REPEAT_MINUTES,
+                    default=current.get(CONF_CRITICAL_REPEAT_MINUTES, DEFAULT_CRITICAL_REPEAT_MINUTES),
+                ): _number(1, 60, 1, "min"),
+                vol.Optional(
+                    CONF_ESCALATE_AFTER,
+                    default=current.get(CONF_ESCALATE_AFTER, DEFAULT_ESCALATE_AFTER),
+                ): _number(0, 50, 1, "alerts"),
+                vol.Optional(CONF_ESCALATION_DEVICES): _phones_selector(),
+                vol.Optional(CONF_ALERT_LIGHTS): selector.EntitySelector(
+                    selector.EntitySelectorConfig(domain="light", multiple=True)
+                ),
+            }
+        )
+    else:
+        fields.update(
+            {
+                vol.Optional(
+                    CONF_FINISHED_ALERT, default=current.get(CONF_FINISHED_ALERT, True)
+                ): selector.BooleanSelector(),
+                vol.Optional(
+                    CONF_DISMISS_MINUTES,
+                    default=current.get(CONF_DISMISS_MINUTES, DEFAULT_DISMISS_MINUTES),
+                ): _dismiss_selector(),
+            }
+        )
+    if appliance_type == "oven":
+        fields[
+            vol.Optional(CONF_PREHEAT_ALERT, default=current.get(CONF_PREHEAT_ALERT, True))
+        ] = selector.BooleanSelector()
+    if appliance_type == "washer":
+        fields.update(
+            {
+                vol.Optional(
+                    CONF_MOVE_REMINDER_MINUTES,
+                    default=current.get(CONF_MOVE_REMINDER_MINUTES, DEFAULT_MOVE_REMINDER_MINUTES),
+                ): _number(0, 240, 5, "min"),
+                vol.Optional(
+                    CONF_MOVE_REPEAT_MINUTES,
+                    default=current.get(CONF_MOVE_REPEAT_MINUTES, DEFAULT_MOVE_REPEAT_MINUTES),
+                ): _number(5, 120, 5, "min"),
+                vol.Optional(
+                    CONF_MOVE_MAX_REMINDERS,
+                    default=current.get(CONF_MOVE_MAX_REMINDERS, DEFAULT_MOVE_MAX_REMINDERS),
+                ): _number(1, 10, 1, "reminders"),
+                vol.Optional(CONF_DRYER_ENTITY): selector.EntitySelector(
+                    selector.EntitySelectorConfig(domain="sensor")
+                ),
+            }
+        )
     if has_cooktop:
         fields.update(
             {
@@ -170,9 +225,23 @@ def _behaviour_fields(appliance_type: str, current: dict[str, Any], has_cooktop:
                     CONF_COOKTOP_REPEAT_MINUTES,
                     default=current.get(CONF_COOKTOP_REPEAT_MINUTES, DEFAULT_COOKTOP_REPEAT_MINUTES),
                 ): _number(1, 120, 1, "min"),
-                **_announce_fields(),
             }
         )
+    # Every appliance: leak sensors + speaker announcements
+    fields.update(
+        {
+            vol.Optional(CONF_LEAK_ENTITIES): selector.EntitySelector(
+                selector.EntitySelectorConfig(
+                    domain="binary_sensor", device_class="moisture", multiple=True
+                )
+            ),
+            vol.Optional(
+                CONF_LEAK_REPEAT_MINUTES,
+                default=current.get(CONF_LEAK_REPEAT_MINUTES, DEFAULT_LEAK_REPEAT_MINUTES),
+            ): _number(1, 60, 1, "min"),
+            **_announce_fields(),
+        }
+    )
     return fields
 
 
@@ -280,7 +349,15 @@ class ApplianceLiveActivityConfigFlow(ConfigFlow, domain=DOMAIN):
                 {
                     vol.Optional(CONF_COOKTOP_ENTITIES): selector.EntitySelector(
                         selector.EntitySelectorConfig(domain="binary_sensor", multiple=True)
-                    )
+                    ),
+                    vol.Optional(CONF_TEMPERATURE_ENTITY): selector.EntitySelector(
+                        selector.EntitySelectorConfig(domain="sensor", device_class="temperature")
+                    ),
+                    vol.Optional(CONF_TARGET_TEMPERATURE_ENTITY): selector.EntitySelector(
+                        selector.EntitySelectorConfig(
+                            domain=["water_heater", "climate", "number", "sensor"]
+                        )
+                    ),
                 }
             )
         if self._data[CONF_APPLIANCE_TYPE] in DOOR_TYPES:
@@ -324,7 +401,9 @@ class ApplianceLiveActivityConfigFlow(ConfigFlow, domain=DOMAIN):
                 vol.Optional(CONF_ICON_COLOR, default=hex_to_rgb(definition.color)): selector.ColorRGBSelector(),
             }
         )
-        return self.async_show_form(step_id="notify", data_schema=schema)
+        return self.async_show_form(
+            step_id="notify", data_schema=self.add_suggested_values_to_schema(schema, self._data)
+        )
 
     @staticmethod
     @callback
@@ -337,6 +416,10 @@ class ApplianceLiveActivityOptionsFlow(OptionsFlow):
 
     async def async_step_init(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         if user_input is not None:
+            # A cleared picker is simply missing from user_input; store None so
+            # it doesn't fall back to the value discovered at setup
+            for key in CLEARABLE:
+                user_input.setdefault(key, None)
             return self.async_create_entry(data=user_input)
 
         current = {**self.config_entry.data, **self.config_entry.options}

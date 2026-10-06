@@ -75,6 +75,11 @@ class ApplianceStatusSensor(_ApplianceBaseSensor):
                 if getattr(self.coordinator, "cooktop", None) is not None
                 else {}
             ),
+            **(
+                {"leak_detected": bool(self.coordinator.leak.wet)}
+                if getattr(self.coordinator, "leak", None) is not None
+                else {}
+            ),
         }
 
 

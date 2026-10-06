@@ -7,8 +7,9 @@ Assistant — plus critical alerts when something is left open or left on.
 
 | Appliance | What you get |
 |---|---|
-| **Washer, dryer, dishwasher** | Live Activity with the current phase, cycle, a live countdown and progress bar → **Done** → dismissed when the door opens |
-| **Oven** | Live Activity while cooking (mode, temperature, cook-timer countdown) + **cooktop left-on** critical alerts |
+| **Washer, dryer, dishwasher** | Live Activity with the current phase, cycle, a live countdown and progress bar → **Done** → dismissed when the door opens. Washers also remind you to **move the laundry** |
+| **Oven** | Live Activity while **preheating** (temperature climbing) and cooking + **preheated** alert + **cooktop left-on** critical alerts |
+| **Any appliance** | **Water leak** critical alerts from leak sensors |
 | **Refrigerator / freezer** | Live Activity while a door is open → **critical alerts** if it stays open → **Closed** |
 | **Any door** (garage, patio, gate…) | Same as the fridge, for any door sensor |
 
@@ -60,6 +61,27 @@ Everything after the sensors can be changed later with **Configure**.
   time-sensitive "finished" alert, and the Live Activity ends when the door
   opens (or after 30 minutes).
 - **Cancelled** cycles (stopped with time left) just end the activity.
+
+### Oven preheat
+
+When the oven is preheating, the Live Activity shows the temperature climbing
+toward the set temperature (with a progress bar). When it gets there you get a
+time-sensitive **"Oven preheated — it's at 350°F"** alert, which is removed
+when the oven turns off.
+
+### Water leaks (any appliance)
+
+Add leak sensors to any appliance. The moment one detects water you get a
+**critical alert** (and a speaker announcement if configured), repeated every
+5 minutes until it's dry, then "leak cleared". Sensors named after the
+appliance, like a "Kitchen Dishwasher Leak Sensor", are picked automatically
+in GE setup.
+
+### Move the laundry (washers)
+
+15 minutes after the washer finishes, a reminder to move the laundry repeats
+every 15 minutes (up to 3 times) until the washer door opens or the dryer
+starts. The GE dryer is found automatically.
 
 ### Cooktop left on (ovens / ranges)
 

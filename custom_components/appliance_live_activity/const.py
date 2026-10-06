@@ -45,6 +45,17 @@ CONF_SPEAKERS = "speakers"
 CONF_COOKTOP_ENTITIES = "cooktop_entities"
 CONF_COOKTOP_ALERT_MINUTES = "cooktop_alert_minutes"
 CONF_COOKTOP_REPEAT_MINUTES = "cooktop_repeat_minutes"
+# Oven preheat
+CONF_TARGET_TEMPERATURE_ENTITY = "target_temperature_entity"
+CONF_PREHEAT_ALERT = "preheat_alert"
+# Leak sensors (any appliance)
+CONF_LEAK_ENTITIES = "leak_entities"
+CONF_LEAK_REPEAT_MINUTES = "leak_repeat_minutes"
+# Washer -> dryer reminder
+CONF_MOVE_REMINDER_MINUTES = "move_reminder_minutes"
+CONF_MOVE_REPEAT_MINUTES = "move_repeat_minutes"
+CONF_MOVE_MAX_REMINDERS = "move_max_reminders"
+CONF_DRYER_ENTITY = "dryer_entity"
 
 # Appliance types handled by the door monitor
 DOOR_TYPES = ("refrigerator", "door")
@@ -82,6 +93,17 @@ CLOSED_DISPLAY_SECONDS = 60  # show "Closed" this long before ending the activit
 DEFAULT_COOKTOP_ALERT_MINUTES = 30
 DEFAULT_COOKTOP_REPEAT_MINUTES = 15
 
+# Oven preheat: "reached" when within this many degrees of the set temperature
+PREHEAT_TOLERANCE = 5
+
+# Leak defaults
+DEFAULT_LEAK_REPEAT_MINUTES = 5
+
+# Washer -> dryer reminder defaults (0 minutes = off)
+DEFAULT_MOVE_REMINDER_MINUTES = 15
+DEFAULT_MOVE_REPEAT_MINUTES = 15
+DEFAULT_MOVE_MAX_REMINDERS = 3
+
 # Event fired by the Companion app when a notification action is tapped
 EVENT_NOTIFICATION_ACTION = "mobile_app_notification_action"
 
@@ -102,4 +124,5 @@ DEFAULT_IDLE_STATES = [
     "Delay Run",
     "Delay Start",
     "Delay",
+    "Delayed Start",
 ]

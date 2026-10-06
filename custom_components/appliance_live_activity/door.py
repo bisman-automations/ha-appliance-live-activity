@@ -104,6 +104,7 @@ class DoorCoordinator(ApplianceCoordinator):
             )
         self._unsubs.append(async_track_time_interval(self.hass, self._handle_tick, TICK))
         await self.async_evaluate(send=True)
+        await self._async_setup_monitors()
 
     async def async_unload(self) -> None:
         await super().async_unload()

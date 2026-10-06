@@ -38,7 +38,9 @@
           "done_entity": "End-of-cycle binary sensor",
           "door_entity": "Door binary sensor",
           "door_entities": "Other doors (e.g. freezer)",
-          "cooktop_entities": "Cooktop on/off sensors"
+          "cooktop_entities": "Cooktop on/off sensors",
+          "temperature_entity": "Oven temperature sensor",
+          "target_temperature_entity": "Oven set temperature (thermostat or sensor)"
         },
         "data_description": {
           "remaining_entity": "Hours, minutes or seconds — the unit is read from the sensor.",
@@ -64,7 +66,14 @@
           "speakers": "Announce on these speakers",
           "alert_lights": "Turn these lights red when escalated",
           "cooktop_alert_minutes": "Cooktop alert after on for",
-          "cooktop_repeat_minutes": "Repeat cooktop alert every"
+          "cooktop_repeat_minutes": "Repeat cooktop alert every",
+          "preheat_alert": "Alert when the oven is preheated",
+          "move_reminder_minutes": "Remind to move laundry after (0 = off)",
+          "move_repeat_minutes": "Repeat the laundry reminder every",
+          "move_max_reminders": "Maximum laundry reminders",
+          "dryer_entity": "Dryer state sensor (stops the reminder when the dryer starts)",
+          "leak_entities": "Leak sensors",
+          "leak_repeat_minutes": "Repeat leak alerts every"
         },
         "data_description": {
           "finished_alert": "Changing a Live Activity to Done doesn't always alert you; this does.",
@@ -72,7 +81,11 @@
           "open_delay_seconds": "Quick grabs don't start a Live Activity (iOS limits how many can be started).",
           "critical_after_minutes": "Critical alerts bypass Silent and Focus until the door is closed.",
           "escalate_after": "0 = escalate with the first critical alert. Speakers and lights are only used once escalated.",
-          "cooktop_alert_minutes": "Critical alert with an Acknowledge button; repeats until the cooktop is off or acknowledged. The cooktop is never turned off."
+          "cooktop_alert_minutes": "Critical alert with an Acknowledge button; repeats until the cooktop is off or acknowledged. The cooktop is never turned off.",
+          "preheat_alert": "A time-sensitive alert when the oven reaches its set temperature. The Live Activity shows the temperature climbing while it preheats.",
+          "move_reminder_minutes": "After the washer finishes, remind everyone until the washer door is opened or the dryer starts.",
+          "leak_entities": "Critical alert the moment any of these detects water, repeated until it's dry. Sensors named after the appliance are found automatically.",
+          "tts_entity": "Used for leak, cooktop and door announcements."
         }
       }
     },
@@ -103,7 +116,20 @@
           "speakers": "Announce on these speakers",
           "alert_lights": "Turn these lights red when escalated",
           "cooktop_alert_minutes": "Cooktop alert after on for",
-          "cooktop_repeat_minutes": "Repeat cooktop alert every"
+          "cooktop_repeat_minutes": "Repeat cooktop alert every",
+          "preheat_alert": "Alert when the oven is preheated",
+          "move_reminder_minutes": "Remind to move laundry after (0 = off)",
+          "move_repeat_minutes": "Repeat the laundry reminder every",
+          "move_max_reminders": "Maximum laundry reminders",
+          "dryer_entity": "Dryer state sensor (stops the reminder when the dryer starts)",
+          "leak_entities": "Leak sensors",
+          "leak_repeat_minutes": "Repeat leak alerts every"
+        },
+        "data_description": {
+          "preheat_alert": "A time-sensitive alert when the oven reaches its set temperature. The Live Activity shows the temperature climbing while it preheats.",
+          "move_reminder_minutes": "After the washer finishes, remind everyone until the washer door is opened or the dryer starts.",
+          "leak_entities": "Critical alert the moment any of these detects water, repeated until it's dry. Sensors named after the appliance are found automatically.",
+          "tts_entity": "Used for leak, cooktop and door announcements."
         }
       }
     }

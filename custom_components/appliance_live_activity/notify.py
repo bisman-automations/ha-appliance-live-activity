@@ -340,3 +340,104 @@ async def async_speak(
         )
     except Exception:  # noqa: BLE001
         _LOGGER.exception("TTS announcement failed")
+
+
+# ----------------------------------------------------------------------
+# Oven preheated
+# ----------------------------------------------------------------------
+async def async_send_preheated(
+    hass: HomeAssistant, coordinator: ApplianceCoordinator, *, temperature: str
+) -> None:
+    """Regular time-sensitive alert: the oven reached its set temperature."""
+    await _async_send(
+        hass,
+        coordinator,
+        {
+            "title": f"🔥 {coordinator.name} preheated",
+            "message": f"It's at {temperature} — ready to cook." if temperature else "Ready to cook.",
+            "data": {
+                "tag": f"{coordinator.notification_tag}_preheat",
+                "push": {"interruption-level": "time-sensitive"},
+                "ttl": 0,
+                "priority": "high",
+            },
+        },
+    )
+
+
+# ----------------------------------------------------------------------
+# Water leak
+# ----------------------------------------------------------------------
+async def async_send_leak(
+    hass: HomeAssistant,
+    coordinator: ApplianceCoordinator,
+    *,
+    tag: str,
+    sensors: list[str],
+    devices: list[str] | None = None,
+) -> None:
+    """Critical leak alert (bypasses Silent / Focus)."""
+    where = _door_text(sensors)
+    await _async_send(
+        hass,
+        coordinator,
+        {
+            "title": f"💧 Water leak: {coordinator.name}",
+            "message": f"{where} detected water. Check it now.",
+            "data": {
+                "tag": tag,
+                "push": {
+                    "interruption-level": "critical",
+                    "sound": {"name": "default", "critical": 1, "volume": 1.0},
+                },
+                "ttl": 0,
+                "priority": "high",
+                "channel": "alarm_stream",
+            },
+        },
+        devices,
+    )
+
+
+async def async_send_leak_cleared(
+    hass: HomeAssistant,
+    coordinator: ApplianceCoordinator,
+    *,
+    tag: str,
+    devices: list[str] | None = None,
+) -> None:
+    """Replace the leak alert with an 'all dry' notification."""
+    await _async_send(
+        hass,
+        coordinator,
+        {
+            "title": f"✅ {coordinator.name}: leak cleared",
+            "message": "The leak sensor is dry again.",
+            "data": {"tag": tag},
+        },
+        devices,
+    )
+
+
+# ----------------------------------------------------------------------
+# Washer -> dryer reminder
+# ----------------------------------------------------------------------
+async def async_send_move_reminder(
+    hass: HomeAssistant, coordinator: ApplianceCoordinator, *, tag: str, minutes_ago: int
+) -> None:
+    """Time-sensitive reminder that wet laundry is still in the washer."""
+    await _async_send(
+        hass,
+        coordinator,
+        {
+            "title": "🧺 Move the laundry",
+            "message": f"{coordinator.name} finished {minutes_ago} min ago — "
+            "move it to the dryer before it starts to smell.",
+            "data": {
+                "tag": tag,
+                "push": {"interruption-level": "time-sensitive"},
+                "ttl": 0,
+                "priority": "high",
+            },
+        },
+    )

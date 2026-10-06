@@ -21,9 +21,12 @@ from .const import (
     CONF_DONE_ENTITY,
     CONF_DOOR_ENTITIES,
     CONF_DOOR_ENTITY,
+    CONF_DRYER_ENTITY,
+    CONF_LEAK_ENTITIES,
     CONF_PHASE_ENTITY,
     CONF_REMAINING_ENTITY,
     CONF_STATE_ENTITY,
+    CONF_TARGET_TEMPERATURE_ENTITY,
     CONF_TEMPERATURE_ENTITY,
     GE_HOME_DOMAIN,
 )
@@ -43,6 +46,10 @@ class GEDiscovery:
     temperature_entity: str | None = None
     door_entities: list[str] = field(default_factory=list)
     cooktop_entities: list[str] = field(default_factory=list)
+    target_temperature_entity: str | None = None
+    leak_entities: list[str] = field(default_factory=list)
+    dryer_entity: str | None = None
+    prefix: str = ""
 
     def as_config(self) -> dict[str, str]:
         """Config-entry keys for every entity that was found."""
@@ -54,12 +61,16 @@ class GEDiscovery:
             CONF_DONE_ENTITY: self.done_entity,
             CONF_DOOR_ENTITY: self.door_entity,
             CONF_TEMPERATURE_ENTITY: self.temperature_entity,
+            CONF_TARGET_TEMPERATURE_ENTITY: self.target_temperature_entity,
+            CONF_DRYER_ENTITY: self.dryer_entity,
         }
         result = {k: v for k, v in mapping.items() if v}
         if self.door_entities:
             result[CONF_DOOR_ENTITIES] = list(self.door_entities)
         if self.cooktop_entities:
             result[CONF_COOKTOP_ENTITIES] = list(self.cooktop_entities)
+        if self.leak_entities:
+            result[CONF_LEAK_ENTITIES] = list(self.leak_entities)
         return result
 
 
@@ -95,6 +106,7 @@ def discover_from_entity_ids(entity_ids: list[str]) -> GEDiscovery:
             appliance_type=appliance_type,
             state_entity=doors[0] if doors else None,
             door_entities=doors,
+            prefix=entity_prefix(ids),
         )
 
     state = (
@@ -123,6 +135,36 @@ def discover_from_entity_ids(entity_ids: list[str]) -> GEDiscovery:
         door_entity=_first(ids, r"^binary_sensor\..*_door$"),
         temperature_entity=_first(ids, r"^sensor\..*_display_temperature$"),
         cooktop_entities=[e for e in ids if re.search(r"^binary_sensor\..*_cooktop_status$", e)],
+        target_temperature_entity=_first(ids, r"^water_heater\..*_set_temperature$"),
+        prefix=entity_prefix(ids),
+    )
+
+
+def entity_prefix(entity_ids: list[str]) -> str:
+    """Common object-id prefix of a device's entities, e.g. 'kitchen_dishwasher_'."""
+    objects = [e.split(".", 1)[1] for e in entity_ids if "." in e]
+    if not objects:
+        return ""
+    prefix = objects[0]
+    for obj in objects[1:]:
+        while not obj.startswith(prefix):
+            prefix = prefix[:-1]
+    cut = prefix.rfind("_")
+    return prefix[: cut + 1] if cut > 0 else ""
+
+
+def leak_sensors_for_prefix(states: list[tuple[str, str | None]], prefix: str) -> list[str]:
+    """Moisture sensors named after the appliance, e.g. a SwitchBot sensor called
+    'Kitchen Dishwasher Leak Sensor' -> binary_sensor.kitchen_dishwasher_leak_sensor_water_leak.
+
+    ``states`` is a list of (entity_id, device_class).
+    """
+    if not prefix:
+        return []
+    return sorted(
+        entity_id
+        for entity_id, device_class in states
+        if entity_id.startswith(f"binary_sensor.{prefix}") and device_class == "moisture"
     )
 
 
@@ -134,7 +176,32 @@ def async_discover(hass: HomeAssistant, device_id: str) -> GEDiscovery:
         for entry in er.async_entries_for_device(ent_reg, device_id)
         if not entry.disabled_by
     ]
-    return discover_from_entity_ids(entity_ids)
+    found = discover_from_entity_ids(entity_ids)
+
+    # Leak sensors live on their own (non-GE) device, so match them by name
+    moisture = [
+        (state.entity_id, state.attributes.get("device_class"))
+        for state in hass.states.async_all("binary_sensor")
+    ]
+    found.leak_entities = leak_sensors_for_prefix(moisture, found.prefix)
+
+    # Washer: stop the "move the laundry" reminder when the GE dryer starts
+    if found.appliance_type == "washer":
+        found.dryer_entity = async_find_ge_state_entity(hass, "dryer")
+    return found
+
+
+def async_find_ge_state_entity(hass: HomeAssistant, appliance_type: str) -> str | None:
+    """State sensor of the first GE appliance of this type (e.g. the dryer)."""
+    dev_reg = dr.async_get(hass)
+    ent_reg = er.async_get(hass)
+    for entry in hass.config_entries.async_entries(GE_HOME_DOMAIN):
+        for device in dr.async_entries_for_config_entry(dev_reg, entry.entry_id):
+            ids = [e.entity_id for e in er.async_entries_for_device(ent_reg, device.id)]
+            found = discover_from_entity_ids(ids)
+            if found.appliance_type == appliance_type and found.state_entity:
+                return found.state_entity
+    return None
 
 
 def async_has_ge_devices(hass: HomeAssistant) -> bool:

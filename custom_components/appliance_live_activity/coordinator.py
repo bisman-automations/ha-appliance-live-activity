@@ -47,26 +47,40 @@ from .const import (
     CONF_DISMISS_MINUTES,
     CONF_DONE_ENTITY,
     CONF_DOOR_ENTITY,
+    CONF_DRYER_ENTITY,
+    CONF_ESCALATION_DEVICES,
     CONF_FINISHED_ALERT,
     CONF_ICON,
     CONF_ICON_COLOR,
     CONF_IDLE_STATES,
+    CONF_LEAK_ENTITIES,
+    CONF_LEAK_REPEAT_MINUTES,
+    CONF_MOVE_MAX_REMINDERS,
+    CONF_MOVE_REMINDER_MINUTES,
+    CONF_MOVE_REPEAT_MINUTES,
     CONF_NAME,
     CONF_NOTIFICATION_TAG,
     CONF_PAUSE_STATES,
     CONF_PHASE_ENTITY,
+    CONF_PREHEAT_ALERT,
     CONF_REMAINING_ENTITY,
     CONF_SOURCE_DEVICE,
     CONF_SPEAKERS,
     CONF_STATE_ENTITY,
+    CONF_TARGET_TEMPERATURE_ENTITY,
     CONF_TEMPERATURE_ENTITY,
     CONF_TTS_ENTITY,
     DEFAULT_COOKTOP_ALERT_MINUTES,
     DEFAULT_COOKTOP_REPEAT_MINUTES,
     DEFAULT_DISMISS_MINUTES,
+    DEFAULT_LEAK_REPEAT_MINUTES,
+    DEFAULT_MOVE_MAX_REMINDERS,
+    DEFAULT_MOVE_REMINDER_MINUTES,
+    DEFAULT_MOVE_REPEAT_MINUTES,
     DOMAIN,
     DRIFT_MINUTES,
     FINISHED_THRESHOLD_MINUTES,
+    PREHEAT_TOLERANCE,
     STATUS_COMPLETE,
     STATUS_IDLE,
     STATUS_PAUSED,
@@ -74,7 +88,15 @@ from .const import (
     STORAGE_VERSION,
 )
 from .helpers import classify_state, color_to_hex, meaningful, to_minutes
-from .notify import async_clear, async_send_done, async_send_finished_alert, async_send_progress
+from .notify import (
+    async_clear,
+    async_clear_tag,
+    async_send_done,
+    async_send_finished_alert,
+    async_send_move_reminder,
+    async_send_preheated,
+    async_send_progress,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -101,6 +123,8 @@ class ApplianceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.done_entity: str | None = cfg.get(CONF_DONE_ENTITY) or None
         self.door_entity: str | None = cfg.get(CONF_DOOR_ENTITY) or None
         self.temperature_entity: str | None = cfg.get(CONF_TEMPERATURE_ENTITY) or None
+        self.target_entity: str | None = cfg.get(CONF_TARGET_TEMPERATURE_ENTITY) or None
+        self.preheat_alert: bool = cfg.get(CONF_PREHEAT_ALERT, True) is not False
 
         self.active_states: list[str] = cfg.get(CONF_ACTIVE_STATES) or self.definition.active_states
         self.pause_states: list[str] = cfg.get(CONF_PAUSE_STATES) or self.definition.pause_states
@@ -113,6 +137,20 @@ class ApplianceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.devices: list[str] = cfg.get(CONF_DEVICES) or []
         self.finished_alert: bool = cfg.get(CONF_FINISHED_ALERT, True)
         self.dismiss_minutes: float = float(cfg.get(CONF_DISMISS_MINUTES, DEFAULT_DISMISS_MINUTES))
+
+        # Washer -> dryer reminder (washers only; 0 minutes = off)
+        self.move_minutes: float = float(
+            cfg.get(CONF_MOVE_REMINDER_MINUTES, DEFAULT_MOVE_REMINDER_MINUTES) or 0
+        ) if self.appliance_type == "washer" else 0.0
+        self.move_repeat: float = float(
+            cfg.get(CONF_MOVE_REPEAT_MINUTES, DEFAULT_MOVE_REPEAT_MINUTES) or DEFAULT_MOVE_REPEAT_MINUTES
+        )
+        self.move_max: int = int(cfg.get(CONF_MOVE_MAX_REMINDERS, DEFAULT_MOVE_MAX_REMINDERS) or 1)
+        self.dryer_entity: str | None = cfg.get(CONF_DRYER_ENTITY) or None
+        self.move_tag = f"{self.notification_tag}_move"
+
+        # Extra monitors (cooktop, leak) that run alongside the Live Activity
+        self.monitors: list[Any] = []
 
         # Cooktop left-on alerts (ovens / ranges)
         self.cooktop = None
@@ -129,6 +167,24 @@ class ApplianceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 tts_entity=cfg.get(CONF_TTS_ENTITY) or None,
                 speakers=list(cfg.get(CONF_SPEAKERS) or []),
             )
+            self.monitors.append(self.cooktop)
+
+        # Water leak alerts (any appliance)
+        self.leak = None
+        leak_entities = list(cfg.get(CONF_LEAK_ENTITIES) or [])
+        if leak_entities:
+            from .leak import LeakMonitor  # noqa: PLC0415 - avoids import cycle
+
+            self.leak = LeakMonitor(
+                hass,
+                self,
+                entities=leak_entities,
+                repeat_minutes=float(cfg.get(CONF_LEAK_REPEAT_MINUTES) or DEFAULT_LEAK_REPEAT_MINUTES),
+                tts_entity=cfg.get(CONF_TTS_ENTITY) or None,
+                speakers=list(cfg.get(CONF_SPEAKERS) or []),
+                extra_devices=list(cfg.get(CONF_ESCALATION_DEVICES) or []),
+            )
+            self.monitors.append(self.leak)
 
         self._store: Store[dict[str, Any]] = Store(
             hass, STORAGE_VERSION, f"{DOMAIN}_{entry.entry_id}"
@@ -138,6 +194,14 @@ class ApplianceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._in_cycle: bool = False
         self._last_remaining: float = 0.0
         self._dismiss_at: float | None = None  # epoch seconds
+        self._move_since: float | None = None  # washer finished at (epoch)
+        self._move_count: int = 0
+
+        # Oven preheat (per cycle, not persisted)
+        self._preheat_seen = False
+        self._preheat_done = False
+        self._was_preheating = False
+        self._preheat_start: float | None = None
 
         # What the phone is currently showing (not persisted: after a
         # restart we always re-send once, which also resumes the activity)
@@ -182,6 +246,8 @@ class ApplianceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._in_cycle = bool(stored.get("in_cycle", False))
         self._last_remaining = float(stored.get("last_remaining", 0) or 0)
         self._dismiss_at = stored.get("dismiss_at")
+        self._move_since = stored.get("move_since")
+        self._move_count = int(stored.get("move_count", 0) or 0)
 
         tracked = [
             e
@@ -192,6 +258,9 @@ class ApplianceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 self.remaining_entity,
                 self.done_entity,
                 self.door_entity,
+                self.temperature_entity,
+                self.target_entity,
+                self.dryer_entity,
             )
             if e
         ]
@@ -209,16 +278,19 @@ class ApplianceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             self._schedule_dismiss(max(0.0, self._dismiss_at - dt_util.utcnow().timestamp()))
 
         await self.async_evaluate(send=True)
-        if self.cooktop is not None:
-            await self.cooktop.async_setup()
+        await self._async_setup_monitors()
+
+    async def _async_setup_monitors(self) -> None:
+        for monitor in self.monitors:
+            await monitor.async_setup()
 
     async def async_unload(self) -> None:
         for unsub in self._unsubs:
             unsub()
         self._unsubs.clear()
         self._cancel_dismiss()
-        if self.cooktop is not None:
-            await self.cooktop.async_unload()
+        for monitor in self.monitors:
+            await monitor.async_unload()
 
     # ------------------------------------------------------------------
     # Event handlers
@@ -229,11 +301,16 @@ class ApplianceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         new_state = event.data.get("new_state")
         if (
             entity_id == self.door_entity
-            and self._dismiss_at is not None
             and new_state is not None
             and new_state.state == STATE_ON
+            and (self._dismiss_at is not None or self._move_since is not None)
         ):
-            self.hass.async_create_task(self._async_dismiss())
+            # Door opened after a finished cycle: dismiss "Done" and stop the
+            # "move the laundry" reminders
+            if self._dismiss_at is not None:
+                self.hass.async_create_task(self._async_dismiss())
+            if self._move_since is not None:
+                self.hass.async_create_task(self._async_cancel_move("door opened"))
             return
         self.hass.async_create_task(self.async_evaluate(send=True))
 
@@ -310,9 +387,10 @@ class ApplianceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         remaining = self._remaining_minutes()
 
         if status in ACTIVE:
-            await self._async_on_active(status, phase, cycle, remaining, send, force)
+            await self._async_on_active(status, phase, cycle, remaining, send, force, raw_state)
         else:
             await self._async_on_inactive(status, cycle, send)
+        await self._async_check_move(send)
 
         progress = self._progress(remaining) if status in ACTIVE else (
             100 if status == STATUS_COMPLETE and self.definition.supports_progress else 0
@@ -348,13 +426,23 @@ class ApplianceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         return max(0, min(100, pct))
 
     async def _async_on_active(
-        self, status: str, phase: str, cycle: str, remaining: float, send: bool, force: bool
+        self,
+        status: str,
+        phase: str,
+        cycle: str,
+        remaining: float,
+        send: bool,
+        force: bool,
+        raw_state: str = "",
     ) -> None:
         changed = False  # cycle bookkeeping changed -> save now
         if not self._in_cycle:
             # New cycle: forget any leftover "Done" activity first
             self._cancel_dismiss()
             self._dismiss_at = None
+            await self._async_cancel_move("new cycle")
+            self._preheat_seen = self._preheat_done = self._was_preheating = False
+            self._preheat_start = None
             self._in_cycle = True
             self._total_minutes = remaining
             self._sent_signature = None
@@ -375,11 +463,25 @@ class ApplianceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         if changed:
             await self._async_save()
 
+        temperature = self._temperature_text()
+        progress = self._progress(remaining)
+        extra: Any = ""
+        if self.appliance_type == "oven":
+            preheat_phase, oven_temp, preheat_progress = await self._async_oven(raw_state, send)
+            if oven_temp is not None:
+                temperature = oven_temp
+            if preheat_phase:
+                # Preheating: show the temperature climbing as the progress bar.
+                # Only re-send per 10 % step so iOS doesn't throttle the activity.
+                phase, progress = preheat_phase, preheat_progress
+                extra = ("preheat", (preheat_progress or 0) // 10)
+            else:
+                extra = temperature
+
         if not send or not self.devices:
             return
 
-        temperature = self._temperature_text()
-        signature = (status, phase, cycle, temperature if self.appliance_type == "oven" else "")
+        signature = (status, phase, cycle, extra)
         now = dt_util.utcnow().timestamp()
         expected = self._sent_remaining - (now - self._sent_at) / 60
         drifted = (
@@ -398,7 +500,7 @@ class ApplianceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             cycle=cycle,
             temperature=temperature,
             remaining=remaining,
-            progress=self._progress(remaining),
+            progress=progress,
         )
         self._sent_signature = signature
         self._sent_remaining = remaining
@@ -407,6 +509,12 @@ class ApplianceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     async def _async_on_inactive(self, status: str, cycle: str, send: bool) -> None:
         if not self._in_cycle:
             return
+
+        if self._preheat_done and send and self.devices:
+            # Oven off: the "preheated" alert is no longer relevant
+            await async_clear_tag(self.hass, self, f"{self.notification_tag}_preheat")
+        self._preheat_seen = self._preheat_done = self._was_preheating = False
+        self._preheat_start = None
 
         # Finished = an explicit completion signal, or the countdown had
         # (nearly) run out when the appliance stopped. Stopping with a lot of
@@ -432,7 +540,137 @@ class ApplianceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             else:
                 # Cancelled, or a door that closed: just end the activity
                 await async_clear(self.hass, self)
+        if finished and self.move_minutes > 0:
+            # Washer done: remind to move the laundry unless the door opens
+            self._move_since = dt_util.utcnow().timestamp()
+            self._move_count = 0
         await self._async_save()
+
+    # ------------------------------------------------------------------
+    # Oven preheat
+    # ------------------------------------------------------------------
+    def _float_state(self, entity_id: str | None, attribute: str | None = None) -> float:
+        if not entity_id:
+            return 0.0
+        state = self.hass.states.get(entity_id)
+        if state is None:
+            return 0.0
+        value = state.attributes.get(attribute) if attribute else None
+        if value is None:
+            value = state.state
+        try:
+            return float(value)
+        except (TypeError, ValueError):
+            return 0.0
+
+    def _temp_unit(self) -> str:
+        for entity_id in (self.temperature_entity, self.target_entity):
+            state = self.hass.states.get(entity_id) if entity_id else None
+            if state and state.attributes.get(ATTR_UNIT_OF_MEASUREMENT):
+                return state.attributes[ATTR_UNIT_OF_MEASUREMENT]
+        return "°"
+
+    async def _async_oven(
+        self, raw_state: str, send: bool
+    ) -> tuple[str | None, str | None, int | None]:
+        """Preheat tracking. Returns (phase, temperature text, progress) overrides."""
+        target = self._float_state(self.target_entity, "temperature")
+        temp = self._float_state(self.temperature_entity)
+        unit = self._temp_unit()
+        preheating = "preheat" in raw_state.lower()
+        below = target > 0 and 0 < temp < target - PREHEAT_TOLERANCE
+
+        if not self._preheat_done and (preheating or below):
+            self._preheat_seen = True
+        if self._preheat_seen and self._preheat_start is None and temp > 0:
+            self._preheat_start = temp
+
+        reached = (
+            self._preheat_seen
+            and not self._preheat_done
+            and (
+                (self._was_preheating and not preheating)
+                or (target > 0 and temp >= target - PREHEAT_TOLERANCE)
+            )
+        )
+        self._was_preheating = preheating
+        if reached:
+            self._preheat_done = True
+            _LOGGER.debug("%s: preheated (%s / %s)", self.name, temp, target)
+            if send and self.devices and self.preheat_alert:
+                shown = target if target > 0 else temp
+                await async_send_preheated(
+                    self.hass, self, temperature=f"{round(shown)}{unit}" if shown > 0 else ""
+                )
+
+        if self._preheat_seen and not self._preheat_done:
+            if target > 0 and temp > 0:
+                text = f"{round(temp)}{unit} → {round(target)}{unit}"
+            else:
+                text = f"{round(temp)}{unit}" if temp > 0 else ""
+            progress = None
+            start = self._preheat_start
+            if target > 0 and start is not None and target > start:
+                progress = max(0, min(100, round((temp - start) / (target - start) * 100)))
+            return "Preheating", text, progress
+        # Cooking: show the set temperature (steady) rather than the cavity
+        # temperature, which wobbles and would cause needless updates
+        if target > 0:
+            return None, f"{round(target)}{unit}", None
+        return None, None, None
+
+    # ------------------------------------------------------------------
+    # Washer -> dryer reminder
+    # ------------------------------------------------------------------
+    def _dryer_running(self) -> bool:
+        if not self.dryer_entity:
+            return False
+        dryer = APPLIANCE_REGISTRY["dryer"]
+        status = classify_state(
+            self._state(self.dryer_entity),
+            active=dryer.active_states,
+            paused=dryer.pause_states,
+            complete=dryer.complete_states,
+            idle=dryer.idle_states,
+            unknown_is_running=False,
+        )
+        return status in ACTIVE
+
+    async def _async_check_move(self, send: bool) -> None:
+        if self._move_since is None or self.move_minutes <= 0 or self._in_cycle:
+            return
+        if self.door_entity and self._state(self.door_entity) == STATE_ON:
+            await self._async_cancel_move("door open")
+            return
+        if self._dryer_running():
+            await self._async_cancel_move("dryer started")
+            return
+        if self._move_count >= self.move_max:
+            return
+        now = dt_util.utcnow().timestamp()
+        due = self._move_since + (self.move_minutes + self._move_count * self.move_repeat) * 60
+        if now < due:
+            return
+        self._move_count += 1
+        await self._async_save()
+        if send and self.devices:
+            await async_send_move_reminder(
+                self.hass,
+                self,
+                tag=self.move_tag,
+                minutes_ago=round((now - self._move_since) / 60),
+            )
+
+    async def _async_cancel_move(self, reason: str) -> None:
+        if self._move_since is None:
+            return
+        _LOGGER.debug("%s: laundry reminder stopped (%s)", self.name, reason)
+        sent = self._move_count > 0
+        self._move_since = None
+        self._move_count = 0
+        await self._async_save()
+        if sent and self.devices:
+            await async_clear_tag(self.hass, self, self.move_tag)
 
     # ------------------------------------------------------------------
     # Dismissal
@@ -470,6 +708,8 @@ class ApplianceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             "in_cycle": self._in_cycle,
             "last_remaining": self._last_remaining,
             "dismiss_at": self._dismiss_at,
+            "move_since": self._move_since,
+            "move_count": self._move_count,
         }
 
     async def _async_save(self) -> None:
