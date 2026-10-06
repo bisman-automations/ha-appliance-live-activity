@@ -1,12 +1,13 @@
 {
   "domain": "appliance_live_activity",
   "name": "Appliance Live Activity",
-  "codeowners": ["@yourusername"],
+  "after_dependencies": ["automation", "mobile_app"],
+  "codeowners": ["@donavanbecker"],
   "config_flow": true,
-  "documentation": "https://github.com/yourusername/appliance-live-activity",
-  "integration_type": "hub",
-  "iot_class": "local_polling",
-  "issue_tracker": "https://github.com/yourusername/appliance-live-activity/issues",
+  "documentation": "https://github.com/donavanbecker/ha-appliance-live-activity",
+  "integration_type": "service",
+  "iot_class": "calculated",
+  "issue_tracker": "https://github.com/donavanbecker/ha-appliance-live-activity/issues",
   "requirements": [],
-  "version": "1.0.0"
+  "version": "1.1.0"
 }

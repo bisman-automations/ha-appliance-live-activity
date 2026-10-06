@@ -1,78 +1,94 @@
 # Appliance Live Activity
 
-Turn any Home Assistant appliance sensor into rich phone notifications — iOS
-Live Activities today, with Android progress notifications and Wear OS
-planned — for washers, dryers, dishwashers, ovens, and refrigerators.
-Brand-agnostic: it works with GE, LG, Samsung, Bosch, Whirlpool, Miele, or
-any appliance integration that exposes state/phase/remaining-time sensors.
+Live Activities (iOS) and Live Updates (Android) for your washer, dryer,
+dishwasher, oven and refrigerator in Home Assistant: the current phase, cycle,
+a live countdown and a progress bar on your Lock Screen, then **Done** when it
+finishes.
 
-This started as a single blueprint (`applianceminder.yaml`) that grew a
-full copy of its progress/pause/completion logic for every appliance type.
-This repo replaces that duplication with one generic integration: appliance
-types are small plugins, and the state-machine + notification logic lives
-in exactly one place.
+- **GE Home Appliances (SmartHQ)** — pick the appliance, everything else is
+  found automatically.
+- **Any other brand** (LG, Samsung, Bosch, Whirlpool, Miele…) — pick its
+  state / phase / time-remaining sensors.
 
-## Install via HACS
+Two ways to use it — pick one per appliance:
 
-1. HACS → Integrations → ⋮ → Custom repositories → add this repo URL,
-   category **Integration**.
-2. Install **Appliance Live Activity**, restart Home Assistant.
-3. Settings → Devices & Services → Add Integration → **Appliance Live
-   Activity**.
+| | **Integration** (HACS) | **Blueprint** (GE only) |
+|---|---|---|
+| Setup | Settings → Add Integration | Import blueprint, create an automation |
+| Brands | Any | GE Home (SmartHQ) |
+| Several appliances | One entry each | One automation each |
+| Dashboard sensors (status, progress) | ✅ | — |
+| Survives restarts mid-cycle | ✅ (keeps progress) | ✅ (progress restarts from current estimate) |
+| Installs the GE blueprint for you | ✅ | — |
 
-## Setup (config flow, no YAML)
+## Requirements
 
-1. **Pick an appliance type** — Washer, Dryer, Dishwasher, Oven, or
-   Refrigerator — and give it a name.
-2. **Pick entities** — a state sensor is required; phase/cycle/remaining-time
-   sensors are optional and improve the notification detail.
-3. **Pick phones** — choose which mobile-app devices get the Live Activity.
+- Home Assistant **2026.7** or newer
+- Companion app: iOS **17.2+** (Live Activities) or Android **16+** (Live Updates)
 
-Repeat for each appliance. Options (icon, color, devices) can be changed
-later from the integration's **Configure** button.
+## Integration
 
-## What it does
+### Install via HACS
 
-- Watches your state/phase sensors and a 1-minute timer, same triggers as
-  the original blueprint.
-- Classifies each update as **running / paused / complete / idle** using
-  per-appliance default state lists (overridable per instance).
-- Captures the starting "remaining minutes" once per cycle and computes
-  progress percentage from it — persisted across HA restarts, no
-  `input_number` helper required.
-- Sends a `notify.*` call per selected phone with `tag`, `live_update`,
-  `progress`, `critical_text`, and icon/color, matching the fields the iOS
-  Companion App uses to drive a Live Activity.
-- Exposes a **Status** sensor (state + phase/cycle/remaining as attributes)
-  and a **Progress** sensor per appliance for dashboards.
+1. HACS → ⋮ → **Custom repositories** → add
+   `https://github.com/donavanbecker/ha-appliance-live-activity`, category
+   **Integration**.
+2. Install **Appliance Live Activity** and restart Home Assistant.
+3. Settings → Devices & services → **Add integration** → *Appliance Live Activity*.
 
-## Adding a new appliance type
+### Setup
 
-Appliance types are plugins under `custom_components/appliance_live_activity/appliances/`.
-To add one (microwave, air fryer, coffee maker, robot vacuum...):
+- **GE appliance (SmartHQ) — automatic:** choose the GE device. The state,
+  sub-cycle, cycle, time-remaining, end-of-cycle and door entities are found
+  for you. Then choose your phones.
+- **Any appliance:** choose the appliance type, then its entities (only the
+  state sensor is required), then your phones.
 
-1. Create `appliances/my_appliance.py` with an `ApplianceDefinition` (see
-   `washer.py` for the shortest example).
-2. Add one import line to `appliances/__init__.py`.
+Phones, the "finished" alert, dismiss delay, icon and color can be changed
+later with **Configure**.
 
-No changes needed anywhere else — the config flow, coordinator, and
-notification logic all read from the plugin registry.
+### How it behaves
 
-## Optional blueprint
+- **Starts** a Live Activity when the appliance starts running.
+- **Updates only when something changes** — state, phase, cycle, or the
+  appliance's estimate drifting more than 3 minutes from the countdown. The
+  phone runs the countdown itself (`chronometer`), so there's no update every
+  minute for iOS to throttle.
+- Reads the time-remaining unit from the sensor (GE reports **hours** for
+  dishwashers and ovens, **minutes** for laundry).
+- **Finishes once:** shows *Done* with a full progress bar, optionally sends
+  a regular time-sensitive "finished" alert, and **ends the Live Activity when
+  the door opens** (or after 30 minutes).
+- **Cancelled** cycles (stopped with time left) just end the activity.
+- Adds **Status** and **Progress** sensors per appliance for dashboards.
+- Service `appliance_live_activity.update` re-sends the activity on demand.
 
-`blueprints/automation/appliance_live_activity.yaml` is a thin helper that
-just calls the `appliance_live_activity.update` service. Most users won't
-need it, since the integration tracks state changes on its own — it's there
-for edge cases like forcing a refresh from a physical button or on HA
-startup.
+### Adding an appliance type
 
-## Roadmap
+Appliance types are plugins in
+`custom_components/appliance_live_activity/appliances/`. Add a file with an
+`ApplianceDefinition` (see `washer.py`) and one import line in
+`appliances/__init__.py` — nothing else changes.
 
-- **v1.1** — smart appliance discovery, Android progress notifications,
-  Wear OS / Apple Watch companions.
-- **v1.2** — microwave, air fryer, range, coffee maker, dehumidifier plugins.
-- **v2.0** — Matter appliance support, energy dashboard integration,
-  statistics, dashboard cards.
+## Blueprint (GE Home / SmartHQ)
+
+[![Import blueprint](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fdonavanbecker%2Fha-appliance-live-activity%2Fblob%2Fmain%2Fblueprints%2Fautomation%2Fge_appliance_live_activity.yaml)
+
+`blueprints/automation/ge_appliance_live_activity.yaml` does the same thing
+for one GE appliance without installing the integration: pick the GE device
+and your phones. It is also installed automatically to
+`blueprints/automation/appliance_live_activity/` when you install the
+integration (and kept up to date, unless you've edited your copy).
+
+> Use either the integration **or** the blueprint for a given appliance, not
+> both — they would send competing updates to the same phone.
+
+## Development
+
+- `blueprints/automation/` is the source of truth for blueprints; run
+  `scripts/sync_blueprints.sh` to copy them into the integration (CI checks
+  the copies match).
+- Tests: `pip install pytest-homeassistant-custom-component && pytest`
 
 ## License
 
