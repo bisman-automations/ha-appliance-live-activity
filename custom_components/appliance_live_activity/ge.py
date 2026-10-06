@@ -25,6 +25,9 @@ from .const import (
     CONF_DRYER_ENTITY,
     CONF_DRYER_START_ENTITY,
     CONF_FILTER_ENTITY,
+    CONF_FREEZER_TEMP_ENTITY,
+    CONF_FRIDGE_TEMP_ENTITY,
+    CONF_ICE_ENTITY,
     CONF_OVEN_CAVITY,
     CONF_PROBE_ENTITY,
     CONF_SUPPLY_ENTITIES,
@@ -66,6 +69,9 @@ class GEDiscovery:
     tumble_entity: str | None = None
     vent_entity: str | None = None
     filter_entity: str | None = None
+    fridge_temp_entity: str | None = None
+    freezer_temp_entity: str | None = None
+    ice_entity: str | None = None
     supply_entities: list[str] = field(default_factory=list)
     # Double ovens: ["upper", "lower"] (set up one entry per oven)
     cavities: list[str] = field(default_factory=list)
@@ -92,6 +98,9 @@ class GEDiscovery:
             CONF_VENT_ENTITY: self.vent_entity,
             CONF_FILTER_ENTITY: self.filter_entity,
             CONF_OVEN_CAVITY: self.cavity,
+            CONF_FRIDGE_TEMP_ENTITY: self.fridge_temp_entity,
+            CONF_FREEZER_TEMP_ENTITY: self.freezer_temp_entity,
+            CONF_ICE_ENTITY: self.ice_entity,
         }
         result = {k: v for k, v in mapping.items() if v}
         if self.door_entities:
@@ -168,6 +177,9 @@ def discover_from_entity_ids(entity_ids: list[str], cavity: str | None = None) -
             state_entity=doors[0] if doors else None,
             door_entities=doors,
             filter_entity=_first(ids, r"^sensor\..*water_filter_status$"),
+            fridge_temp_entity=_first(ids, r"^sensor\..*_current_temperature_fridge$"),
+            freezer_temp_entity=_first(ids, r"^sensor\..*_current_temperature_freezer$"),
+            ice_entity=_first(ids, r"^sensor\..*_ice_maker_bucket_status$"),
             prefix=entity_prefix(ids),
         )
 

@@ -76,6 +76,17 @@ CONF_COMBINE_LAUNDRY = "combine_laundry"
 CONF_SUPPLY_ENTITIES = "supply_entities"
 CONF_SUPPLY_LOW = "supply_low"
 CONF_FILTER_ENTITY = "filter_entity"
+# Fridge temperatures / ice
+CONF_FRIDGE_TEMP_ENTITY = "fridge_temp_entity"
+CONF_FREEZER_TEMP_ENTITY = "freezer_temp_entity"
+CONF_ICE_ENTITY = "ice_entity"
+CONF_FRIDGE_MAX_TEMP = "fridge_max_temp"
+CONF_FREEZER_MAX_TEMP = "freezer_max_temp"
+CONF_WARM_MINUTES = "warm_minutes"
+CONF_ICE_FULL_ALERT = "ice_full_alert"
+# Quiet hours (non-critical alerts wait until they end)
+CONF_QUIET_START = "quiet_start"
+CONF_QUIET_END = "quiet_end"
 
 # Appliance types handled by the door monitor
 DOOR_TYPES = ("refrigerator", "door")
@@ -135,6 +146,19 @@ SUPPLY_LOW_PERCENT = 25
 
 # Blocked dryer vent: repeat the critical alert this often while it's flagged
 VENT_REPEAT_MINUTES = 30
+
+# Dryer "unload me" reminder defaults (0 minutes = off)
+DEFAULT_DRYER_REMINDER_MINUTES = 30
+DEFAULT_DRYER_REPEAT_MINUTES = 30
+DEFAULT_DRYER_MAX_REMINDERS = 2
+
+# Fridge / freezer too warm (in the Home Assistant unit system's unit)
+DEFAULT_FRIDGE_MAX_F = 45
+DEFAULT_FREEZER_MAX_F = 15
+DEFAULT_FRIDGE_MAX_C = 7
+DEFAULT_FREEZER_MAX_C = -9
+DEFAULT_WARM_MINUTES = 30
+WARM_REPEAT_MINUTES = 60
 
 # Notification action buttons (suffixes; the full action id is
 # "<NOTIFICATION TAG>_<SUFFIX>" so every appliance has its own)

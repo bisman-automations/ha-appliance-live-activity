@@ -100,5 +100,14 @@ async def test_every_form_field_has_a_label(hass: HomeAssistant, enable_custom_i
     for appliance_type in APPLIANCE_REGISTRY:
         for key in config_flow._behaviour_fields(appliance_type, {}, True):
             name = str(key.schema if isinstance(key, vol.Marker) else key)
-            assert f"component.{DOMAIN}.options.step.init.data.{name}" in options, name
-            assert f"component.{DOMAIN}.config.step.notify.data.{name}" in config, name
+            where = config_flow.SECTION_OF.get(name)
+            path = f"sections.{where}.data.{name}" if where else f"data.{name}"
+            assert f"component.{DOMAIN}.options.step.init.{path}" in options, name
+            assert f"component.{DOMAIN}.config.step.notify.{path}" in config, name
+    for name in config_flow.SECTIONS:
+        assert f"component.{DOMAIN}.options.step.init.sections.{name}.name" in options, name
+        assert f"component.{DOMAIN}.config.step.notify.sections.{name}.name" in config, name
+    for appliance_type in APPLIANCE_REGISTRY:
+        for key in config_flow._entity_fields(appliance_type):
+            name = str(key.schema if isinstance(key, vol.Marker) else key)
+            assert f"component.{DOMAIN}.config.step.reconfigure.data.{name}" in config, name

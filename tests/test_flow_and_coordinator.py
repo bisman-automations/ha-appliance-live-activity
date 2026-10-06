@@ -16,6 +16,7 @@ from homeassistant.data_entry_flow import FlowResultType
 from homeassistant.helpers import device_registry as dr, entity_registry as er
 from homeassistant.util import dt as dt_util
 
+from tests.conftest import suggested_values
 from custom_components.appliance_live_activity.const import DOMAIN
 
 PREFIX = "laundry_room_washer"
@@ -179,11 +180,7 @@ async def test_options_flow(hass: HomeAssistant, setup_devices):
     result = await hass.config_entries.options.async_init(entry.entry_id)
     assert result["step_id"] == "init"
     # Color picker is pre-filled with RGB (not a hex string -> black picker)
-    suggested = {
-        str(k): k.description.get("suggested_value")
-        for k in result["data_schema"].schema
-        if getattr(k, "description", None)
-    }
+    suggested = suggested_values(result)
     assert suggested["icon_color"] == [0, 188, 212]
     result = await hass.config_entries.options.async_configure(
         result["flow_id"], {"devices": [phone.id], "finished_alert": False, "dismiss_minutes": 10}

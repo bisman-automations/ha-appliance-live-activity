@@ -34,7 +34,7 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
 
 
 # Bump when GE discovery learns new entities, so existing entries pick them up
-GE_DISCOVERY_VERSION = 3
+GE_DISCOVERY_VERSION = 4
 
 
 def _async_backfill_ge(hass: HomeAssistant, entry: ConfigEntry) -> None:

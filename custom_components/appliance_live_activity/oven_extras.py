@@ -142,6 +142,7 @@ class KitchenTimerMonitor(_Monitor):
                 tag=self.done_tag,
                 title=f"⏰ {self.coordinator.name} timer done",
                 message="Your kitchen timer is up.",
+                deferrable=False,
             )
 
 
@@ -215,6 +216,7 @@ class ProbeMonitor(_Monitor):
                     tag=self.done_tag,
                     title=f"🍖 {self.coordinator.name}: probe at {round(temp)}{unit}",
                     message=f"The probe reached your target of {round(target)}{unit}.",
+                    deferrable=False,
                 )
 
         if reached:

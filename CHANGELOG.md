@@ -1,5 +1,31 @@
 # Changelog
 
+## 1.7.0
+
+### Added
+- **Grouped settings**: setup and Configure are split into sections —
+  Laundry, Cooking, Fridge & freezer, Escalation, Appliance health, Leak
+  sensors, Speaker announcements, Quiet hours and Icon — with the less-used
+  ones collapsed.
+- **Reconfigure** (⋮ on the appliance → Reconfigure): change the sensors an
+  appliance uses after setup, or have the GE sensors found again, without
+  deleting it.
+- **Quiet hours**: set a start and end time and regular alerts — Done,
+  laundry reminders, refills, filters — wait until quiet hours end (only the
+  latest of each is delivered, and anything dealt with overnight is
+  dropped). Live Activities, critical alerts and cooking alerts (preheated,
+  kitchen timer, probe) still come through.
+- **Dryer unload reminder**: 30 minutes after the dryer finishes, "Unload the
+  dryer" — repeated once — until the dryer door opens or you tap
+  **Unloaded** (also on the dryer's finished alert). On by default; set the
+  time to 0 in Configure → Laundry to turn it off.
+- **Fridge / freezer too warm**: a critical alert when the fridge or freezer
+  stays above its limit (45 °F / 7 °C and 15 °F / -9 °C by default) for 30
+  minutes — a door left ajar or a power cut — repeated hourly, then "back to
+  normal". GE fridges' temperature sensors are found automatically.
+- **Ice bucket full** notification (off by default — a full bucket is the
+  ice maker's normal resting state).
+
 ## 1.6.1
 
 ### Changed

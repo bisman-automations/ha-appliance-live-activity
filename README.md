@@ -10,7 +10,7 @@ Assistant — plus critical alerts when something is left open or left on.
 | **Washer, dryer, dishwasher** | Live Activity with the current phase, cycle, a live countdown and progress bar → **Done** → dismissed when the door opens. **Delayed starts** count down to the start. Washer and dryer share **one Live Activity per load**. Reminders to **move the laundry** (with **Start dryer** / **Laundry moved** buttons), **refill** detergent, pods and dryer sheets, and a critical alert for a **blocked dryer vent** |
 | **Oven** | Live Activity while **preheating** and cooking, plus separate ones for the **kitchen timer** and the **meat probe** + **preheated** alert + **cooktop left-on** critical alerts. Double ovens supported |
 | **Any appliance** | **Water leak** critical alerts from leak sensors |
-| **Refrigerator / freezer** | Live Activity while a door is open → **critical alerts** if it stays open → **Closed**, plus **water filter** reminders |
+| **Refrigerator / freezer** | Live Activity while a door is open → **critical alerts** if it stays open → **Closed**, plus **too warm** critical alerts and **water filter** reminders |
 | **Any door** (garage, patio, gate…) | Same as the fridge, for any door sensor |
 
 **GE Home Appliances (SmartHQ)** appliances are set up automatically — pick
@@ -53,7 +53,11 @@ Add one entry per appliance.
 - **Any appliance or door:** choose the type (washer, dryer, dishwasher,
   oven, refrigerator, door), then its sensors, then your phones.
 
-Everything after the sensors can be changed later with **Configure**.
+Alert settings can be changed later with **Configure** (grouped into
+sections: Laundry, Cooking, Fridge & freezer, Appliance health, Leak
+sensors, Speaker announcements, Quiet hours, Icon). To change which sensors
+an appliance uses — or have the GE sensors found again — use
+**⋮ → Reconfigure**.
 
 ## How it behaves
 
@@ -128,6 +132,23 @@ in GE setup.
   has expired, a critical alert if it reports a leak. Dishwasher: a reminder
   when the filter needs cleaning.
 
+### Quiet hours
+
+Set a start and end time (Configure → Quiet hours) and regular alerts —
+Done, laundry reminders, refills, filters — wait until quiet hours end.
+Only the latest of each is delivered, and anything dealt with overnight
+(e.g. you tapped *Laundry moved*) is dropped. Live Activities, critical
+alerts and cooking alerts (preheated, kitchen timer, probe) always come
+through. Held alerts don't survive a Home Assistant restart.
+
+### Fridge & freezer too warm
+
+If the fridge or freezer stays above its limit for 30 minutes — a door left
+ajar, a power cut — you get a **critical alert**, repeated every hour, then
+*back to normal* once it's cold again. Limits default to 45 °F / 7 °C for
+the fridge and 15 °F / -9 °C for the freezer. An optional notification when
+the ice bucket is full is off by default.
+
 ### Move the laundry (washers)
 
 15 minutes after the washer finishes, a reminder to move the laundry repeats
@@ -139,6 +160,11 @@ The finished alert and the reminders have two buttons:
 - **Start dryer** — starts the dryer (its **Remote Start** must be on; if it
   isn't, you're told so instead).
 - **Laundry moved** — stops the reminders and clears the washer's alerts.
+
+### Unload the dryer
+
+30 minutes after the dryer finishes, *Unload the dryer* (repeated once)
+until the dryer door opens or you tap **Unloaded**.
 
 ### Cooktop left on (ovens / ranges)
 

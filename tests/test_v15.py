@@ -14,6 +14,7 @@ from homeassistant import config_entries
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry as dr, entity_registry as er
 
+from tests.conftest import suggested_values
 from custom_components.appliance_live_activity.const import DOMAIN, EVENT_NOTIFICATION_ACTION
 from custom_components.appliance_live_activity.ge import discover_from_entity_ids
 
@@ -48,11 +49,7 @@ async def _setup(hass, device_id, notify_input):
     result = await hass.config_entries.flow.async_configure(result["flow_id"], {"next_step_id": "ge_home"})
     result = await hass.config_entries.flow.async_configure(result["flow_id"], {"source_device": device_id})
     assert result["step_id"] == "notify", result
-    suggested = {
-        str(k): k.description.get("suggested_value")
-        for k in result["data_schema"].schema
-        if getattr(k, "description", None)
-    }
+    suggested = suggested_values(result)
     result = await hass.config_entries.flow.async_configure(result["flow_id"], notify_input)
     await hass.async_block_till_done()
     return result, suggested

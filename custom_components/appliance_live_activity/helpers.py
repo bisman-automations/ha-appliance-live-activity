@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import re
 from collections.abc import Iterable
+from datetime import time
 
 from .const import (
     STATUS_COMPLETE,
@@ -123,3 +124,28 @@ def color_to_hex(value, default: str = "#03A9F4") -> str:
         text = value.strip()
         return text if text.startswith("#") else f"#{text}"
     return default
+
+
+def _parse_time(value: str | None) -> time | None:
+    if not value:
+        return None
+    try:
+        parts = [int(p) for p in str(value).split(":")]
+    except ValueError:
+        return None
+    while len(parts) < 3:
+        parts.append(0)
+    try:
+        return time(*parts[:3])
+    except ValueError:
+        return None
+
+
+def in_quiet_hours(now: time, start: str | None, end: str | None) -> bool:
+    """True if ``now`` is inside quiet hours (which may span midnight)."""
+    begin, finish = _parse_time(start), _parse_time(end)
+    if begin is None or finish is None or begin == finish:
+        return False
+    if begin < finish:
+        return begin <= now < finish
+    return now >= begin or now < finish

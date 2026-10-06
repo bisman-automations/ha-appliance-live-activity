@@ -50,8 +50,8 @@ async def oven(hass: HomeAssistant, enable_custom_integrations):
     result = await hass.config_entries.flow.async_configure(result["flow_id"], {"next_step_id": "ge_home"})
     result = await hass.config_entries.flow.async_configure(result["flow_id"], {"source_device": device.id})
     assert result["step_id"] == "notify"
-    schema_keys = [str(k) for k in result["data_schema"].schema]
-    assert "cooktop_alert_minutes" in schema_keys
+    cooking = result["data_schema"].schema["cooking"].schema.schema
+    assert "cooktop_alert_minutes" in [str(k) for k in cooking]
     result = await hass.config_entries.flow.async_configure(
         result["flow_id"],
         {

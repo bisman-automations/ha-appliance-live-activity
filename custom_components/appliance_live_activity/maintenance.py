@@ -6,6 +6,9 @@
 * **Refill reminders**: after a cycle finishes, one notification listing the
   supplies that are low (washer detergent tank, dishwasher pods / rinse
   aid, dryer sheets). Each supply is mentioned once until it's refilled.
+* **Fridge / freezer too warm** (e.g. a door left ajar or a power cut): a
+  critical alert once it has been above the limit for a while, repeated every
+  hour, then "back to normal". Optional ice-bucket-full notification.
 * **Filter**: fridge water filter -- a notification when it needs replacing
   or has expired, a critical alert if it reports a leak; dishwasher -- a
   notification when the filter needs cleaning.
@@ -22,7 +25,7 @@ from homeassistant.core import CALLBACK_TYPE, HomeAssistant, callback
 from homeassistant.helpers.event import async_track_state_change_event, async_track_time_interval
 from homeassistant.util import dt as dt_util
 
-from .const import SUPPLY_LOW_PERCENT, UNAVAILABLE_STATES, VENT_REPEAT_MINUTES
+from .const import SUPPLY_LOW_PERCENT, UNAVAILABLE_STATES, VENT_REPEAT_MINUTES, WARM_REPEAT_MINUTES
 from .notify import async_clear_tag, async_send_alert, async_speak
 
 if TYPE_CHECKING:
@@ -273,3 +276,105 @@ class FilterMonitor(_Base):
                 message="The dishwasher says its filter needs cleaning.",
                 level="active",
             )
+
+
+class FridgeMonitor(_Base):
+    """Fridge / freezer temperature limits and the ice bucket."""
+
+    def __init__(
+        self,
+        hass,
+        coordinator,
+        *,
+        zones: dict[str, tuple[str, float]],
+        warm_minutes: float,
+        ice_entity: str | None,
+    ):
+        super().__init__(
+            hass, coordinator, [e for e, _ in zones.values()] + ([ice_entity] if ice_entity else [])
+        )
+        self.zones = zones
+        self.warm_after = warm_minutes * 60
+        self.ice_entity = ice_entity
+        self._warm_since: dict[str, float] = {}
+        self._warm_alert: dict[str, float] = {}
+        self._ice_alerted = False
+
+    def _temp(self, entity_id: str) -> tuple[float | None, str]:
+        state = self.hass.states.get(entity_id)
+        if state is None:
+            return None, ""
+        try:
+            return float(state.state), state.attributes.get(ATTR_UNIT_OF_MEASUREMENT) or "°"
+        except ValueError:
+            return None, ""
+
+    @property
+    def too_warm(self) -> list[str]:
+        return sorted(self._warm_alert)
+
+    async def async_evaluate(self) -> None:
+        now = dt_util.utcnow().timestamp()
+        for zone, (entity_id, limit) in self.zones.items():
+            temp, unit = self._temp(entity_id)
+            if temp is None:
+                continue  # unavailable (e.g. a power cut): keep the current state
+            tag = f"{self.coordinator.notification_tag}_{zone}_warm"
+            label = "Fridge" if zone == "fridge" else "Freezer"
+            if temp <= limit:
+                self._warm_since.pop(zone, None)
+                if self._warm_alert.pop(zone, None) is not None and self.coordinator.devices:
+                    await async_send_alert(
+                        self.hass,
+                        self.coordinator,
+                        tag=tag,
+                        title=f"✅ {self.coordinator.name}: {label.lower()} back to {round(temp)}{unit}",
+                        message=f"The {label.lower()} is cold again.",
+                        level="active",
+                        deferrable=False,
+                    )
+                    self.coordinator.async_update_listeners()
+                continue
+            since = self._warm_since.setdefault(zone, now)
+            if now - since < self.warm_after:
+                continue
+            last = self._warm_alert.get(zone)
+            if last is not None and now - last < WARM_REPEAT_MINUTES * 60 - 1:
+                continue
+            self._warm_alert[zone] = now
+            minutes = round((now - since) / 60)
+            _LOGGER.warning("%s: %s at %s for %s min", self.coordinator.name, zone, temp, minutes)
+            if self.coordinator.devices:
+                await async_send_alert(
+                    self.hass,
+                    self.coordinator,
+                    tag=tag,
+                    title=f"🌡️ {self.coordinator.name}: {label.lower()} too warm",
+                    message=f"The {label.lower()} has been at {round(temp)}{unit} for {minutes} min "
+                    f"(limit {round(limit)}{unit}). Check the door and the power.",
+                    level="critical",
+                )
+            self.coordinator.async_update_listeners()
+
+        if self.ice_entity:
+            state = self.hass.states.get(self.ice_entity)
+            text = state.state.strip().lower() if state else ""
+            if text in UNAVAILABLE_STATES or text == "n/a":
+                return
+            full = text in ("full", "on", "true")
+            tag = f"{self.coordinator.notification_tag}_ice"
+            if full and not self._ice_alerted:
+                self._ice_alerted = True
+                if self.coordinator.devices:
+                    await async_send_alert(
+                        self.hass,
+                        self.coordinator,
+                        tag=tag,
+                        title=f"🧊 {self.coordinator.name}: ice bucket full",
+                        message="The ice bucket is full.",
+                        level="passive",
+                    )
+            elif not full and self._ice_alerted:
+                self._ice_alerted = False
+                if self.coordinator.devices:
+                    await async_clear_tag(self.hass, self.coordinator, tag)

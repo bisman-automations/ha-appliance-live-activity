@@ -59,12 +59,38 @@ def notify_services_for_device(hass: HomeAssistant, device_id: str) -> list[str]
     return services
 
 
+def _deferrable(payload: dict[str, Any]) -> bool:
+    """Regular, non-critical alerts can wait for the end of quiet hours.
+    Live Activities and critical alerts never wait."""
+    data = payload.get("data") or {}
+    if payload.get("message") == "clear_notification" or data.get("live_update"):
+        return False
+    return (data.get("push") or {}).get("interruption-level") != "critical"
+
+
 async def _async_send(
     hass: HomeAssistant,
     coordinator: ApplianceCoordinator,
     payload: dict[str, Any],
     devices: list[str] | None = None,
+    deferrable: bool | None = None,
 ) -> None:
+    tag = (payload.get("data") or {}).get("tag")
+    if payload.get("message") == "clear_notification":
+        coordinator.drop_deferred(tag)
+    elif (_deferrable(payload) if deferrable is None else deferrable) and coordinator.quiet_now():
+        coordinator.defer(tag, payload, devices)
+        return
+    await async_deliver(hass, coordinator, payload, devices)
+
+
+async def async_deliver(
+    hass: HomeAssistant,
+    coordinator: ApplianceCoordinator,
+    payload: dict[str, Any],
+    devices: list[str] | None = None,
+) -> None:
+    """Send now (quiet hours already checked)."""
     targets = list(dict.fromkeys(coordinator.devices if devices is None else devices))
     if payload.get("message") != "clear_notification":
         # Tapping the notification / Live Activity opens the appliance's device
@@ -227,6 +253,7 @@ async def async_send_dryer_remote_off(hass: HomeAssistant, coordinator: Applianc
                 "priority": "high",
             },
         },
+        deferrable=False,
     )
 
 
@@ -426,6 +453,7 @@ async def async_send_preheated(
                 "priority": "high",
             },
         },
+        deferrable=False,
     )
 
 
@@ -484,6 +512,7 @@ async def async_send_leak_cleared(
             "data": {"tag": tag},
         },
         devices,
+        deferrable=False,
     )
 
 
@@ -498,14 +527,25 @@ async def async_send_move_reminder(
     minutes_ago: int,
     actions: list[dict[str, str]] | None = None,
 ) -> None:
-    """Time-sensitive reminder that wet laundry is still in the washer."""
+    """Time-sensitive reminder that laundry is still in the washer / dryer."""
+    if coordinator.appliance_type == "dryer":
+        title = "🧺 Unload the dryer"
+        message = (
+            f"{coordinator.name} finished {minutes_ago} min ago — "
+            "unload it before the clothes wrinkle."
+        )
+    else:
+        title = "🧺 Move the laundry"
+        message = (
+            f"{coordinator.name} finished {minutes_ago} min ago — "
+            "move it to the dryer before it starts to smell."
+        )
     await _async_send(
         hass,
         coordinator,
         {
-            "title": "🧺 Move the laundry",
-            "message": f"{coordinator.name} finished {minutes_ago} min ago — "
-            "move it to the dryer before it starts to smell.",
+            "title": title,
+            "message": message,
             "data": _with_actions(
                 {
                     "tag": tag,
@@ -585,6 +625,7 @@ async def async_send_alert(
     level: str = "time-sensitive",
     devices: list[str] | None = None,
     actions: list[dict[str, str]] | None = None,
+    deferrable: bool | None = None,
 ) -> None:
     """A regular notification at the given interruption level."""
     data: dict[str, Any] = {"tag": tag, **LEVELS[level]}
@@ -593,4 +634,5 @@ async def async_send_alert(
         coordinator,
         {"title": title, "message": message, "data": _with_actions(data, actions)},
         devices,
+        deferrable,
     )
