@@ -124,8 +124,9 @@ in GE setup.
 - **Refill reminders** — after a cycle, one notification listing what's low:
   detergent tank, dishwasher pods or rinse aid, dryer sheets (3 or fewer by
   default, or 25 % for tank levels). Each is mentioned once until refilled.
-- **Water filter** — a reminder when the fridge's filter needs replacing or
-  has expired; a critical alert if it reports a leak.
+- **Filters** — fridge: a reminder when the water filter needs replacing or
+  has expired, a critical alert if it reports a leak. Dishwasher: a reminder
+  when the filter needs cleaning.
 
 ### Move the laundry (washers)
 

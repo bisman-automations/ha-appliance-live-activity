@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.6.1
+
+### Changed
+- **Dishwasher filter** has its own **Filter sensor** field instead of being
+  picked with the refill supplies. GE dishwashers' "Reminders Clean Filter"
+  is found automatically, and you get a "clean the filter" reminder when it
+  turns on. If you'd added it to the refill supplies in 1.6.0, it's moved to
+  the Filter field for you.
+- Clearer labels for the refill reminder fields.
+
 ## 1.6.0
 
 ### Added

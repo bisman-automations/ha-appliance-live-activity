@@ -6,8 +6,9 @@
 * **Refill reminders**: after a cycle finishes, one notification listing the
   supplies that are low (washer detergent tank, dishwasher pods / rinse
   aid, dryer sheets). Each supply is mentioned once until it's refilled.
-* **Water filter** (fridge): a notification when the filter needs replacing
-  or has expired, a critical alert if the filter reports a leak.
+* **Filter**: fridge water filter -- a notification when it needs replacing
+  or has expired, a critical alert if it reports a leak; dishwasher -- a
+  notification when the filter needs cleaning.
 """
 from __future__ import annotations
 
@@ -161,8 +162,8 @@ class SupplyMonitor(_Base):
         result = []
         for entity_id in self.entities:
             state = self.hass.states.get(entity_id)
-            if state is None:
-                continue
+            if state is None or entity_id.endswith("_clean_filter"):
+                continue  # a filter reminder, not a supply
             unit = state.attributes.get(ATTR_UNIT_OF_MEASUREMENT)
             if not supply_low(state.state, unit, self.low):
                 continue
@@ -199,8 +200,12 @@ class SupplyMonitor(_Base):
         )
 
 
+CLEAN_FILTER_STATES = {"on", "true", "yes", "clean", "dirty", "replace"}
+
+
 class FilterMonitor(_Base):
-    """Fridge water filter status ('Replace', 'Expired', 'Leak Detected')."""
+    """Fridge water filter ('Replace', 'Expired', 'Leak Detected') or the
+    dishwasher's 'clean filter' reminder."""
 
     def __init__(self, hass, coordinator, entity: str):
         super().__init__(hass, coordinator, [entity])
@@ -215,6 +220,9 @@ class FilterMonitor(_Base):
     async def async_evaluate(self) -> None:
         status = self.status
         if status in UNAVAILABLE_STATES or status == "n/a":
+            return
+        if self.coordinator.appliance_type == "dishwasher":
+            await self._async_dishwasher(status in CLEAN_FILTER_STATES)
             return
         if status not in ("replace", "expired", "leak detected"):
             if self._alerted is not None:
@@ -243,5 +251,25 @@ class FilterMonitor(_Base):
                 title=f"🚰 {self.coordinator.name}: replace the water filter",
                 message="The water filter has expired." if status == "expired"
                 else "The water filter is due to be replaced.",
+                level="active",
+            )
+
+    async def _async_dishwasher(self, needs_cleaning: bool) -> None:
+        if not needs_cleaning:
+            if self._alerted is not None:
+                self._alerted = None
+                if self.coordinator.devices:
+                    await async_clear_tag(self.hass, self.coordinator, self.tag)
+            return
+        if self._alerted is not None:
+            return
+        self._alerted = "clean"
+        if self.coordinator.devices:
+            await async_send_alert(
+                self.hass,
+                self.coordinator,
+                tag=self.tag,
+                title=f"🧽 {self.coordinator.name}: clean the filter",
+                message="The dishwasher says its filter needs cleaning.",
                 level="active",
             )

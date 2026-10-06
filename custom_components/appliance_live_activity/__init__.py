@@ -10,10 +10,12 @@ from . import appliances  # noqa: F401  (import registers all appliance plugins)
 from .const import (
     CONF_APPLIANCE_TYPE,
     CONF_DELAY_ENTITY,
+    CONF_FILTER_ENTITY,
     CONF_GE_DISCOVERY,
     CONF_OVEN_CAVITY,
     CONF_SOURCE,
     CONF_SOURCE_DEVICE,
+    CONF_SUPPLY_ENTITIES,
     DOMAIN,
     DOOR_TYPES,
     PLATFORMS,
@@ -32,7 +34,7 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
 
 
 # Bump when GE discovery learns new entities, so existing entries pick them up
-GE_DISCOVERY_VERSION = 2
+GE_DISCOVERY_VERSION = 3
 
 
 def _async_backfill_ge(hass: HomeAssistant, entry: ConfigEntry) -> None:
@@ -59,9 +61,25 @@ def _async_backfill_ge(hass: HomeAssistant, entry: ConfigEntry) -> None:
     hass.config_entries.async_update_entry(entry, data=new)
 
 
+def _async_move_filter_out_of_supplies(hass: HomeAssistant, entry: ConfigEntry) -> None:
+    """A dishwasher 'clean filter' reminder picked as a refill supply belongs in
+    the Filter field (1.6.0 put both in one picker)."""
+    for source, update in (("data", "data"), ("options", "options")):
+        stored = getattr(entry, source)
+        supplies = list(stored.get(CONF_SUPPLY_ENTITIES) or [])
+        filters = [e for e in supplies if e.endswith("_clean_filter")]
+        if not filters:
+            continue
+        new = {**stored, CONF_SUPPLY_ENTITIES: [e for e in supplies if e not in filters] or None}
+        if not stored.get(CONF_FILTER_ENTITY):
+            new[CONF_FILTER_ENTITY] = filters[0]
+        hass.config_entries.async_update_entry(entry, **{update: new})
+
+
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     hass.data.setdefault(DOMAIN, {})
     _async_backfill_ge(hass, entry)
+    _async_move_filter_out_of_supplies(hass, entry)
     cfg = {**entry.data, **entry.options}
     coordinator_cls = (
         DoorCoordinator

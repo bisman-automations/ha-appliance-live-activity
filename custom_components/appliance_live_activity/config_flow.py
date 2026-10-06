@@ -89,7 +89,7 @@ from .const import (
 )
 from .ge import async_discover, async_has_ge_devices, device_name
 
-GE_DISCOVERY_VERSION = 2  # keep in sync with __init__.GE_DISCOVERY_VERSION
+GE_DISCOVERY_VERSION = 3  # keep in sync with __init__.GE_DISCOVERY_VERSION
 from .helpers import hex_to_rgb, slugify_tag
 
 AUTO = "auto"
@@ -202,9 +202,6 @@ def _behaviour_fields(appliance_type: str, current: dict[str, Any], has_cooktop:
                 vol.Optional(CONF_ALERT_LIGHTS): selector.EntitySelector(
                     selector.EntitySelectorConfig(domain="light", multiple=True)
                 ),
-                vol.Optional(CONF_FILTER_ENTITY): selector.EntitySelector(
-                    selector.EntitySelectorConfig(domain="sensor")
-                ),
             }
         )
     else:
@@ -235,6 +232,10 @@ def _behaviour_fields(appliance_type: str, current: dict[str, Any], has_cooktop:
                     ): _number(0, 50, 1, "left"),
                 }
             )
+    if appliance_type in ("refrigerator", "dishwasher"):
+        fields[vol.Optional(CONF_FILTER_ENTITY)] = selector.EntitySelector(
+            selector.EntitySelectorConfig(domain=["sensor", "binary_sensor"])
+        )
     if appliance_type == "dryer":
         fields[vol.Optional(CONF_VENT_ENTITY)] = selector.EntitySelector(
             selector.EntitySelectorConfig(domain="binary_sensor")

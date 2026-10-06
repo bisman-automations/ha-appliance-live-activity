@@ -86,10 +86,10 @@
           "dryer_start_entity": "Dryer start button (adds a \"Start dryer\" button)",
           "snooze_minutes": "Snooze button on critical alerts (0 = no button)",
           "combine_laundry": "One Live Activity for the washer and dryer",
-          "supply_entities": "Supply sensors for refill reminders",
-          "supply_low": "Remind when this many (loads, pods, sheets) are left",
+          "supply_entities": "Refill reminders: supply sensors",
+          "supply_low": "Refill reminder when this many are left",
           "vent_entity": "Blocked vent sensor",
-          "filter_entity": "Water filter status sensor"
+          "filter_entity": "Filter sensor"
         },
         "data_description": {
           "finished_alert": "Changing a Live Activity to Done doesn't always alert you; this does.",
@@ -106,9 +106,10 @@
           "dryer_start_entity": "The alerts get \"Start dryer\" and \"Laundry moved\" buttons. Start dryer presses this button; the dryer's Remote Start must be on.",
           "snooze_minutes": "Pauses the critical alerts for this long while the door stays open. The Live Activity stays.",
           "combine_laundry": "Washing → move to the dryer → drying → done, all in one \"Laundry\" Live Activity. iOS limits how many Live Activities you can have at once.",
-          "supply_entities": "After a cycle, one reminder listing what's low (detergent tank, pods, rinse aid, dryer sheets). Each is mentioned once until it's refilled. Percentages count as low at 25 % or less.",
+          "supply_entities": "Detergent tank, pods, rinse aid, dryer sheets. After a cycle you get one reminder listing what's low, mentioned once until it's refilled. Percentages count as low at 25 % or less. Filter reminders go in Filter sensor.",
           "vent_entity": "Critical alert while the dryer reports a blocked vent (a fire risk), repeated every 30 minutes.",
-          "filter_entity": "A reminder when the filter needs replacing, and a critical alert if it reports a leak."
+          "filter_entity": "Fridge: a reminder when the water filter needs replacing, and a critical alert if it reports a leak. Dishwasher: a reminder when the filter needs cleaning.",
+          "supply_low": "Loads of detergent, pods or dryer sheets."
         }
       },
       "oven_cavity": {
@@ -158,10 +159,10 @@
           "dryer_start_entity": "Dryer start button (adds a \"Start dryer\" button)",
           "snooze_minutes": "Snooze button on critical alerts (0 = no button)",
           "combine_laundry": "One Live Activity for the washer and dryer",
-          "supply_entities": "Supply sensors for refill reminders",
-          "supply_low": "Remind when this many (loads, pods, sheets) are left",
+          "supply_entities": "Refill reminders: supply sensors",
+          "supply_low": "Refill reminder when this many are left",
           "vent_entity": "Blocked vent sensor",
-          "filter_entity": "Water filter status sensor"
+          "filter_entity": "Filter sensor"
         },
         "data_description": {
           "preheat_alert": "A time-sensitive alert when the oven reaches its set temperature. The Live Activity shows the temperature climbing while it preheats.",
@@ -172,9 +173,10 @@
           "dryer_start_entity": "The alerts get \"Start dryer\" and \"Laundry moved\" buttons. Start dryer presses this button; the dryer's Remote Start must be on.",
           "snooze_minutes": "Pauses the critical alerts for this long while the door stays open. The Live Activity stays.",
           "combine_laundry": "Washing → move to the dryer → drying → done, all in one \"Laundry\" Live Activity. iOS limits how many Live Activities you can have at once.",
-          "supply_entities": "After a cycle, one reminder listing what's low (detergent tank, pods, rinse aid, dryer sheets). Each is mentioned once until it's refilled. Percentages count as low at 25 % or less.",
+          "supply_entities": "Detergent tank, pods, rinse aid, dryer sheets. After a cycle you get one reminder listing what's low, mentioned once until it's refilled. Percentages count as low at 25 % or less. Filter reminders go in Filter sensor.",
           "vent_entity": "Critical alert while the dryer reports a blocked vent (a fire risk), repeated every 30 minutes.",
-          "filter_entity": "A reminder when the filter needs replacing, and a critical alert if it reports a leak."
+          "filter_entity": "Fridge: a reminder when the water filter needs replacing, and a critical alert if it reports a leak. Dishwasher: a reminder when the filter needs cleaning.",
+          "supply_low": "Loads of detergent, pods or dryer sheets."
         }
       }
     }

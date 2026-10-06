@@ -208,6 +208,8 @@ def discover_from_entity_ids(entity_ids: list[str], cavity: str | None = None) -
         tumble_entity=_first(ids, r"^sensor\..*_tumble_status$"),
         vent_entity=_first(ids, r"^binary_sensor\..*_blocked_vent(_fault)?$"),
         supply_entities=_supplies(ids, appliance_type),
+        # GE dishwashers: "Reminders Clean Filter"
+        filter_entity=_first(ids, r"^sensor\..*_clean_filter$") if appliance_type == "dishwasher" else None,
         cavities=cavities,
         cavity=cavity,
         prefix=entity_prefix(ids),

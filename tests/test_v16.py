@@ -508,4 +508,4 @@ async def test_existing_entry_backfills_v16(hass: HomeAssistant, phone):
     await hass.async_block_till_done()
     assert entry.data["timer_entity"] == "sensor.kitchen_oven_kitchen_timer"
     assert "probe_entity" not in entry.data  # cleared in Configure: left alone
-    assert entry.data["ge_discovery"] == 2
+    assert entry.data["ge_discovery"] == 3
