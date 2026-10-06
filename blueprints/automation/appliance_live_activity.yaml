@@ -1,28 +1,425 @@
+# GE Appliance Live Activity (SmartHQ)
+# Home Assistant automation blueprint
+#
+# Live Activities (iOS) / Live Updates (Android) for GE appliances using the
+# GE Home Appliances (SmartHQ) integration: https://github.com/simbaja/ha_gehome
+#
+# Pick ONE GE appliance device. The blueprint finds its state, cycle,
+# sub-cycle, time-remaining, end-of-cycle and door entities automatically.
+#
+# Requires: iOS 17.2+ / Android 16+ Companion app, Home Assistant 2026.7+
+# Part of: https://github.com/donavanbecker/ha-appliance-live-activity
 blueprint:
-  name: Appliance Live Activity - Manual Refresh
+  name: GE Appliance Live Activity (SmartHQ)
   description: >
-    Optional helper for the Appliance Live Activity integration. The
-    integration already tracks appliance state changes and refreshes every
-    minute on its own -- most users do not need this blueprint at all.
-    Use it only if you want to force an extra refresh on a custom trigger,
-    such as a button press or Home Assistant startup.
+    Shows a Live Activity on your phone while a GE washer, dryer, dishwasher or
+    oven is running: current phase, cycle, a live countdown and a progress bar.
+    Pick the appliance device and your phones — the GE Home (SmartHQ) entities
+    are found automatically.
+
+
+    • Updates only when something actually changes (phase, state, or the time
+    estimate jumps), and lets the phone run the countdown itself, so iOS doesn't
+    throttle it.
+
+    • Shows "Done" when the cycle finishes, optionally sends a regular alert, and
+    dismisses the Live Activity when the door is opened (or after a delay).
+
+    • Resumes after a Home Assistant restart.
+
+
+    Need multiple appliances, dashboard sensors or other brands? Use the
+    Appliance Live Activity integration (ha-appliance-live-activity).
   domain: automation
+  author: donavanbecker
+  source_url: https://github.com/donavanbecker/ha-appliance-live-activity/blob/main/blueprints/automation/ha-appliance-live-activity/ge_appliance_live_activity.yaml
+  homeassistant:
+    min_version: "2026.7.0"
   input:
-    appliance_entry:
+    appliance_section:
       name: Appliance
-      description: The Appliance Live Activity entry to refresh.
-      selector:
-        config_entry:
-          integration: appliance_live_activity
-    refresh_trigger:
-      name: Refresh Trigger
-      description: Whatever should cause a manual refresh (button, event, HA start, etc).
-      selector:
-        trigger: {}
+      icon: mdi:washing-machine
+      input:
+        appliance:
+          name: GE appliance
+          description: The washer, dryer, dishwasher or oven device from GE Home (SmartHQ).
+          selector:
+            device:
+              filter:
+                - integration: ge_home
+        appliance_name:
+          name: Display name (optional)
+          description: Shown as the Live Activity title. Blank = the device name.
+          default: ""
+          selector:
+            text:
+        appliance_type:
+          name: Appliance type
+          description: Usually detected automatically from the device's entities.
+          default: auto
+          selector:
+            select:
+              options:
+                - { label: Detect automatically, value: auto }
+                - { label: Washer, value: washer }
+                - { label: Dryer, value: dryer }
+                - { label: Dishwasher, value: dishwasher }
+                - { label: Oven, value: oven }
 
-trigger: !input refresh_trigger
+    notify_section:
+      name: Notifications
+      icon: mdi:cellphone-message
+      input:
+        phones:
+          name: Phones
+          description: Companion app devices that should show the Live Activity.
+          selector:
+            device:
+              multiple: true
+              filter:
+                - integration: mobile_app
+        icon_color:
+          name: Icon color
+          default: "#2196F3"
+          selector:
+            text:
+        finished_alert:
+          name: Also send a regular "finished" alert
+          description: A Live Activity changing to "Done" doesn't always alert you; this does.
+          default: true
+          selector:
+            boolean:
+        dismiss_after:
+          name: Dismiss the finished Live Activity after
+          description: It is also dismissed as soon as the appliance door is opened.
+          default:
+            minutes: 30
+          selector:
+            duration:
 
-action:
-  - service: appliance_live_activity.update
-    data:
-      entry_id: !input appliance_entry
+    states_section:
+      name: State matching (advanced)
+      icon: mdi:state-machine
+      collapsed: true
+      input:
+        idle_states:
+          name: Idle states (exact match)
+          description: Appliance states that mean "not running". Add your own if needed.
+          default: [Off, Ready, Standby, Low Power, Power Up, Power Off, Idle, N/A, "---", Delay Run, Delay Start, Delay]
+          selector:
+            select:
+              multiple: true
+              custom_value: true
+              options: [Off, Ready, Standby, Low Power, Power Up, Power Off, Idle, N/A, "---", Delay Run, Delay Start, Delay]
+        paused_keywords:
+          name: Paused keywords
+          description: A state containing any of these is treated as paused.
+          default: [Pause]
+          selector:
+            select:
+              multiple: true
+              custom_value: true
+              options: [Pause]
+        done_keywords:
+          name: Finished keywords
+          description: A state containing any of these is treated as finished.
+          default: [End Of Cycle, Done, Complete, Finished]
+          selector:
+            select:
+              multiple: true
+              custom_value: true
+              options: [End Of Cycle, Done, Complete, Finished]
+
+mode: restart
+max_exceeded: silent
+
+# Trigger templates can only see trigger_variables, so the inputs they need
+# are bound here.
+trigger_variables:
+  dev_tv: !input appliance
+  idle_tv: !input idle_states
+  done_tv: !input done_keywords
+
+triggers:
+  # Appliance becomes active (running or paused). Pausing and resuming does not
+  # re-fire this, so progress isn't reset mid-cycle.
+  - trigger: template
+    id: active
+    value_template: >
+      {% set e = device_entities(dev_tv) %}
+      {% set c = (e | select('search', '^sensor\..*_operating_mode$') | list)
+               + (e | select('search', '^sensor\..*_current_state$') | list)
+               + (e | select('search', '^sensor\..*_state$')
+                    | reject('search', '_(cycle|current)_state$') | list) %}
+      {% set se = c | first | default('') %}
+      {% set s = (states(se) | lower) if se else 'unavailable' %}
+      {% set idle = (idle_tv | map('lower') | list) + ['unknown', 'unavailable', ''] %}
+      {{ se != '' and s not in idle
+         and (done_tv | map('lower') | select('in', s) | list | count) == 0 }}
+  # Resume after a restart or reload if a cycle is already running
+  - trigger: homeassistant
+    event: start
+    id: resume
+  - trigger: event
+    event_type: automation_reloaded
+    id: resume
+
+variables:
+  dev: !input appliance
+  name_in: !input appliance_name
+  type_in: !input appliance_type
+  phones: !input phones
+  icon_color: !input icon_color
+  finished_alert: !input finished_alert
+  dismiss_after: !input dismiss_after
+  idle_list: >
+    {{ ((idle_tv | map('lower') | list) + ['unknown', 'unavailable', '']) }}
+  pause_list: !input paused_keywords
+  done_list: !input done_keywords
+
+  ents: "{{ device_entities(dev) }}"
+  kind: >
+    {% set e = ents %}
+    {% if type_in != 'auto' %}{{ type_in }}
+    {% elif e | select('search', '_operating_mode$') | list | count %}dishwasher
+    {% elif e | select('search', '_sub_cycle$') | list | count %}
+      {{ 'dryer' if e | select('search', '_(dryness|tumble|sheet_)') | list | count else 'washer' }}
+    {% elif e | select('search', '_cook_mode$') | list | count %}oven
+    {% else %}appliance{% endif %}
+
+  state_ent: >
+    {% set e = ents %}
+    {% set c = (e | select('search', '^sensor\..*_operating_mode$') | list)
+             + (e | select('search', '^sensor\..*_current_state$') | list)
+             + (e | select('search', '^sensor\..*_state$')
+                  | reject('search', '_(cycle|current)_state$') | list) %}
+    {{ c | first | default('') }}
+  phase_ent: >
+    {% set e = ents %}
+    {{ ((e | select('search', '^sensor\..*_sub_cycle$') | list)
+        + (e | select('search', '^sensor\..*_cook_mode$') | list)
+        + (e | select('search', '^sensor\..*_cycle_state$') | list)) | first | default('') }}
+  cycle_ent: >
+    {% set e = ents %}
+    {{ ((e | select('search', '^sensor\..*_cycle_name$') | list)
+        + (e | select('search', '^sensor\..*_cycle$') | reject('search', '_sub_cycle$') | list))
+       | first | default('') }}
+  rem_ent: >
+    {% set e = ents %}
+    {{ ((e | select('search', '^sensor\..*_cook_time_remaining$') | list)
+        + (e | select('search', '^sensor\..*_time_remaining$')
+             | reject('search', '_(delay|cook)_time_remaining$') | list)) | first | default('') }}
+  eoc_ent: >
+    {{ ents | select('search', '^binary_sensor\..*_end_of_cycle$') | first | default('') }}
+  door_ent: >
+    {{ ents | select('search', '^binary_sensor\..*_door$') | first | default('') }}
+  temp_ent: >
+    {{ ents | select('search', '^sensor\..*_display_temperature$') | first | default('') }}
+
+  title: "{{ name_in if name_in else (device_attr(dev, 'name_by_user') or device_attr(dev, 'name')) }}"
+  icon: >
+    {{ {'washer': 'mdi:washing-machine', 'dryer': 'mdi:tumble-dryer',
+        'dishwasher': 'mdi:dishwasher', 'oven': 'mdi:stove'}.get(kind, 'mdi:home') }}
+  tag: "ge_live_{{ dev[:16] }}"
+  done_tag: "ge_done_{{ dev[:16] }}"
+  notify_services: >
+    {% set ids = [phones] if phones is string else (phones or []) %}
+    {{ ids | select | map('device_attr', 'name') | select | map('slugify')
+       | map('regex_replace', '^', 'notify.mobile_app_') | list }}
+  dismiss_seconds: >
+    {% set d = dismiss_after %}
+    {% if d is mapping %}
+      {{ (d.hours | default(0)) * 3600 + (d.minutes | default(0)) * 60 + (d.seconds | default(0)) }}
+    {% else %}{{ as_timedelta(d).total_seconds() | int(1800) }}{% endif %}
+
+conditions:
+  - condition: template
+    value_template: "{{ state_ent != '' and notify_services | count > 0 }}"
+
+actions:
+  # Starting minutes for the progress bar (if restarted mid-cycle, progress
+  # starts from the current estimate)
+  - variables:
+      total_min: >
+        {% if rem_ent %}
+          {% set v = states(rem_ent) | float(0) %}
+          {% set u = state_attr(rem_ent, 'unit_of_measurement') %}
+          {{ (v * 60 if u == 'h' else (v / 60 if u == 's' else v)) | round(1) }}
+        {% else %}0{% endif %}
+      last_rem: 0
+      # Defined here so the loop's updates are visible to `until` and to the
+      # steps after the loop (variables in an outer scope are updated in place).
+      status: idle
+      rem: 0
+      snap_state: ""
+      snap_phase: ""
+      snap_ts: 0
+
+  # Nothing running (e.g. a restart while idle)? Then there's nothing to do.
+  - condition: template
+    value_template: >
+      {% set s = states(state_ent) | lower %}
+      {{ s not in idle_list
+         and not (eoc_ent and is_state(eoc_ent, 'on'))
+         and (done_list | map('lower') | select('in', s) | list | count) == 0 }}
+
+  # ---------------------------------------------------------------
+  # Live loop: send an update, then wait until something changes
+  # ---------------------------------------------------------------
+  - repeat:
+      sequence:
+        - variables:
+            snap_state: "{{ states(state_ent) }}"
+            snap_phase: "{{ states(phase_ent) if phase_ent else '' }}"
+            snap_ts: "{{ now().timestamp() }}"
+            rem: >
+              {% if rem_ent %}
+                {% set v = states(rem_ent) | float(0) %}
+                {% set u = state_attr(rem_ent, 'unit_of_measurement') %}
+                {{ (v * 60 if u == 'h' else (v / 60 if u == 's' else v)) | round(1) }}
+              {% else %}0{% endif %}
+            status: >
+              {% set s = states(state_ent) | lower %}
+              {% if s in idle_list %}idle
+              {% elif eoc_ent and is_state(eoc_ent, 'on') %}done
+              {% elif done_list | map('lower') | select('in', s) | list | count %}done
+              {% elif pause_list | map('lower') | select('in', s) | list | count %}paused
+              {% else %}running{% endif %}
+
+        - if:
+            - condition: template
+              value_template: "{{ status in ['running', 'paused'] }}"
+          then:
+            - variables:
+                phase_txt: >
+                  {% set p = snap_phase %}
+                  {{ p if p and p | lower not in ['---', 'n/a', 'unknown', 'unavailable', 'off']
+                     else snap_state }}
+                cycle_txt: >
+                  {% set c = states(cycle_ent) if cycle_ent else '' %}
+                  {{ c if c and c | lower not in ['---', 'n/a', 'unknown', 'unavailable'] else '' }}
+                temp_txt: >
+                  {% set t = states(temp_ent) | int(0) if temp_ent else 0 %}
+                  {{ (t ~ '°') if t > 0 else '' }}
+                progress: >
+                  {{ (((total_min - rem) / total_min) * 100) | round(0) | int
+                     if total_min > 0 and rem <= total_min else 0 }}
+                payload: >
+                  {% set d = {'tag': tag, 'live_update': true,
+                              'notification_icon': 'mdi:pause-circle' if status == 'paused' else icon,
+                              'notification_icon_color': icon_color,
+                              'critical_text': 'Paused' if status == 'paused' else phase_txt} %}
+                  {% if total_min > 0 %}
+                    {% set d = dict(d, progress=progress, progress_max=100) %}
+                  {% endif %}
+                  {% if status == 'running' and rem > 0 %}
+                    {% set d = dict(d, chronometer=true, when=(rem * 60) | int, when_relative=true) %}
+                  {% endif %}
+                  {{ d }}
+            - repeat:
+                for_each: "{{ notify_services }}"
+                sequence:
+                  - continue_on_error: true
+                    action: "{{ repeat.item }}"
+                    data:
+                      title: "{{ title }}"
+                      message: >
+                        {{ ('Paused' if status == 'paused' else phase_txt) }}{{ ' · ' ~ cycle_txt if cycle_txt else '' }}{{ ' · ' ~ temp_txt if temp_txt else '' }}{{ (' · ' ~ (rem | round(0) | int) ~ ' min left') if rem > 0 else '' }}
+                      data: "{{ payload }}"
+
+            # Wait for a real change: state, phase, or the time estimate
+            # drifting more than 3 minutes from the phone's countdown.
+            - wait_for_trigger:
+                - trigger: template
+                  value_template: >
+                    {% set r = 0 %}
+                    {% if rem_ent %}
+                      {% set v = states(rem_ent) | float(0) %}
+                      {% set u = state_attr(rem_ent, 'unit_of_measurement') %}
+                      {% set r = v * 60 if u == 'h' else (v / 60 if u == 's' else v) %}
+                    {% endif %}
+                    {% set expected = rem - (now().timestamp() - snap_ts | float(0)) / 60 %}
+                    {{ states(state_ent) != snap_state
+                       or (phase_ent != '' and states(phase_ent) != snap_phase)
+                       or (rem_ent != '' and status == 'running' and (r - expected) | abs > 3)
+                       or (eoc_ent != '' and is_state(eoc_ent, 'on')) }}
+              timeout:
+                hours: 1
+              continue_on_timeout: true
+
+        - variables:
+            last_rem: "{{ rem if status in ['running', 'paused'] else last_rem }}"
+      until:
+        - condition: template
+          value_template: "{{ status not in ['running', 'paused'] }}"
+
+  # ---------------------------------------------------------------
+  # Finished or cancelled
+  # ---------------------------------------------------------------
+  - variables:
+      end_status: >
+        {% set s = states(state_ent) | lower %}
+        {% if eoc_ent and is_state(eoc_ent, 'on') %}done
+        {% elif done_list | map('lower') | select('in', s) | list | count %}done
+        {% elif last_rem | float(0) <= 5 %}done
+        {% else %}cancelled{% endif %}
+
+  - choose:
+      - conditions:
+          - condition: template
+            value_template: "{{ end_status == 'done' }}"
+        sequence:
+          - repeat:
+              for_each: "{{ notify_services }}"
+              sequence:
+                - continue_on_error: true
+                  action: "{{ repeat.item }}"
+                  data:
+                    title: "{{ title }}"
+                    message: "Done{{ ' · ' ~ states(cycle_ent) if cycle_ent and states(cycle_ent) | lower not in ['---', 'n/a', 'unknown', 'unavailable'] else '' }}"
+                    data:
+                      tag: "{{ tag }}"
+                      live_update: true
+                      critical_text: Done
+                      progress: 100
+                      progress_max: 100
+                      notification_icon: mdi:check-circle
+                      notification_icon_color: "#4CAF50"
+          - if:
+              - condition: template
+                value_template: "{{ finished_alert }}"
+            then:
+              - repeat:
+                  for_each: "{{ notify_services }}"
+                  sequence:
+                    - continue_on_error: true
+                      action: "{{ repeat.item }}"
+                      data:
+                        title: "✅ {{ title }} finished"
+                        message: >
+                          {{ {'washer': 'Time to move the laundry.',
+                              'dryer': 'Laundry is dry.',
+                              'dishwasher': 'Dishes are clean.',
+                              'oven': 'Cooking is done.'}.get(kind, 'Cycle complete.') }}
+                        data:
+                          tag: "{{ done_tag }}"
+                          push:
+                            interruption-level: time-sensitive
+          # Dismiss when the door opens or after the delay
+          - wait_for_trigger:
+              - trigger: template
+                value_template: "{{ door_ent != '' and is_state(door_ent, 'on') }}"
+            timeout:
+              seconds: "{{ dismiss_seconds }}"
+            continue_on_timeout: true
+
+  # Remove the Live Activity
+  - repeat:
+      for_each: "{{ notify_services }}"
+      sequence:
+        - continue_on_error: true
+          action: "{{ repeat.item }}"
+          data:
+            message: clear_notification
+            data:
+              tag: "{{ tag }}"
