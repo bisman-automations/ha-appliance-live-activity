@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.2.1
+
+### Fixed
+- **"Config flow could not be loaded: Invalid handler specified"**: the
+  1.2.0 release was tagged from a commit that was missing `appliance.py`,
+  `helpers.py`, `services.py`, `services.yaml` and the washer, dryer,
+  dishwasher and oven plugins, so the integration failed to import. This
+  release contains the complete integration.
+- Added the CI workflow and `.gitignore`; removed stray `.DS_Store` files.
+
 ## 1.2.0
 
 ### Added
