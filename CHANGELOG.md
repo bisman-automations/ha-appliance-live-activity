@@ -1,5 +1,30 @@
 # Changelog
 
+## 1.5.0
+
+### Added
+- **Delayed start Live Activity**: when a washer, dryer, dishwasher or oven
+  is waiting on a delayed start, a Live Activity shows "Scheduled · Delayed
+  start · starts at 3:45 PM" with a countdown to the start, then turns into
+  the normal cycle countdown when it starts (or ends if the delay is
+  cancelled). GE delay sensors are found automatically (also for appliances
+  set up with an earlier version). Can be turned off in Configure.
+- **Buttons on alerts** (on the notification, not the Live Activity — iOS
+  doesn't allow buttons on Live Activities):
+  - **Start dryer** on the washer's finished alert and move-the-laundry
+    reminder: presses the dryer's start button. If the dryer's Remote Start
+    isn't on, you get a notification saying so instead. The GE dryer's start
+    button is found automatically.
+  - **Laundry moved**: stops the reminders and removes the finished alert and
+    Live Activity.
+  - **Silence until dry** on leak alerts: stops the repeats and announcements
+    until the sensor is dry; a new leak alerts again.
+  - **Snooze 10 min** on fridge / door critical alerts: pauses the critical
+    alerts while the door stays open (the Live Activity stays). The snooze
+    length is in Configure; 0 removes the button.
+- Status sensor: `delayed` state with a `starts_at` attribute, and a
+  `snoozed_until` attribute for doors.
+
 ## 1.4.0
 
 ### Added

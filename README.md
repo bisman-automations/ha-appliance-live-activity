@@ -7,7 +7,7 @@ Assistant — plus critical alerts when something is left open or left on.
 
 | Appliance | What you get |
 |---|---|
-| **Washer, dryer, dishwasher** | Live Activity with the current phase, cycle, a live countdown and progress bar → **Done** → dismissed when the door opens. Washers also remind you to **move the laundry** |
+| **Washer, dryer, dishwasher** | Live Activity with the current phase, cycle, a live countdown and progress bar → **Done** → dismissed when the door opens. **Delayed starts** count down to the start. Washers also remind you to **move the laundry**, with **Start dryer** / **Laundry moved** buttons |
 | **Oven** | Live Activity while **preheating** (temperature climbing) and cooking + **preheated** alert + **cooktop left-on** critical alerts |
 | **Any appliance** | **Water leak** critical alerts from leak sensors |
 | **Refrigerator / freezer** | Live Activity while a door is open → **critical alerts** if it stays open → **Closed** |
@@ -61,6 +61,9 @@ Everything after the sensors can be changed later with **Configure**.
   time-sensitive "finished" alert, and the Live Activity ends when the door
   opens (or after 30 minutes).
 - **Cancelled** cycles (stopped with time left) just end the activity.
+- **Delayed start:** while the appliance waits to start, the Live Activity
+  shows *Scheduled · starts at 3:45 PM* and counts down to the start, then
+  switches to the cycle countdown. Cancelling the delay ends it.
 
 ### Oven preheat
 
@@ -73,7 +76,8 @@ when the oven turns off.
 
 Add leak sensors to any appliance. The moment one detects water you get a
 **critical alert** (and a speaker announcement if configured), repeated every
-5 minutes until it's dry, then "leak cleared". Sensors named after the
+5 minutes until it's dry, then "leak cleared". **Silence until dry** on the
+alert stops the repeats; a new leak alerts again. Sensors named after the
 appliance, like a "Kitchen Dishwasher Leak Sensor", are picked automatically
 in GE setup.
 
@@ -82,6 +86,12 @@ in GE setup.
 15 minutes after the washer finishes, a reminder to move the laundry repeats
 every 15 minutes (up to 3 times) until the washer door opens or the dryer
 starts. The GE dryer is found automatically.
+
+The finished alert and the reminders have two buttons:
+
+- **Start dryer** — starts the dryer (its **Remote Start** must be on; if it
+  isn't, you're told so instead).
+- **Laundry moved** — stops the reminders and clears the washer's alerts.
 
 ### Cooktop left on (ovens / ranges)
 
@@ -99,10 +109,16 @@ starts. The GE dryer is found automatically.
    open, naming the door ("Freezer Door is open").
 2. Still open after **5 minutes** → it turns red and **critical alerts**
    repeat **every minute** until it's closed.
+   **Snooze 10 min** on the alert pauses them (the Live Activity stays).
    Optional **escalation** after a number of alerts: extra phones get the
    alerts, speakers announce it, and chosen lights turn red.
 3. Closed → alerts removed, lights restored, the Live Activity shows
    **Closed · was open N min** for a minute, then goes away.
+
+### Buttons
+
+iOS doesn't allow buttons on Live Activities, so buttons are on the regular
+alerts (long-press or swipe down on the notification to see them).
 
 ### Tapping a notification
 

@@ -3,6 +3,8 @@
 * Any selected moisture sensor turns on -> **critical** alert right away
   (bypasses Silent / Focus) and an optional speaker announcement.
 * Repeats every ``repeat_minutes`` (default 5) while still wet.
+* **Silence** button stops the repeats (and announcements) until the sensors
+  are dry; a new leak after that alerts again.
 * All sensors dry -> the critical alert is replaced with "leak cleared".
 """
 from __future__ import annotations
@@ -12,11 +14,12 @@ from datetime import timedelta
 from typing import TYPE_CHECKING
 
 from homeassistant.const import ATTR_FRIENDLY_NAME, STATE_ON
-from homeassistant.core import CALLBACK_TYPE, HomeAssistant, callback
+from homeassistant.core import CALLBACK_TYPE, Event, HomeAssistant, callback
 from homeassistant.helpers.event import async_track_state_change_event, async_track_time_interval
 from homeassistant.util import dt as dt_util
 
-from .notify import async_send_leak, async_send_leak_cleared, async_speak
+from .const import ACTION_SILENCE_LEAK, EVENT_NOTIFICATION_ACTION
+from .notify import async_clear_tag, async_send_leak, async_send_leak_cleared, async_speak
 
 if TYPE_CHECKING:
     from .coordinator import ApplianceCoordinator
@@ -48,8 +51,10 @@ class LeakMonitor:
         self.speakers = speakers
         self.extra_devices = extra_devices
         self.tag = f"{coordinator.notification_tag}_leak"
+        self.silence_action = coordinator.action_id(ACTION_SILENCE_LEAK)
 
         self._last_alert: float | None = None
+        self._silenced = False
         self._unsubs: list[CALLBACK_TYPE] = []
 
     @property
@@ -79,6 +84,9 @@ class LeakMonitor:
             async_track_state_change_event(self.hass, self.entities, self._handle_change)
         )
         self._unsubs.append(async_track_time_interval(self.hass, self._handle_change, TICK))
+        self._unsubs.append(
+            self.hass.bus.async_listen(EVENT_NOTIFICATION_ACTION, self._handle_action)
+        )
         await self.async_evaluate()
 
     async def async_unload(self) -> None:
@@ -90,10 +98,21 @@ class LeakMonitor:
     def _handle_change(self, _event=None) -> None:
         self.hass.async_create_task(self.async_evaluate())
 
+    @callback
+    def _handle_action(self, event: Event) -> None:
+        if event.data.get("action") != self.silence_action or self._last_alert is None:
+            return
+        _LOGGER.info("%s: leak alerts silenced until dry", self.coordinator.name)
+        self._silenced = True
+        self.hass.async_create_task(
+            async_clear_tag(self.hass, self.coordinator, self.tag, self.devices)
+        )
+
     async def async_evaluate(self) -> None:
         now = dt_util.utcnow().timestamp()
         wet = self.wet
         if not wet:
+            self._silenced = False
             if self._last_alert is not None:
                 self._last_alert = None
                 await async_send_leak_cleared(
@@ -102,6 +121,8 @@ class LeakMonitor:
                 self.coordinator.async_update_listeners()
             return
 
+        if self._silenced:
+            return
         if self._last_alert is not None and now - self._last_alert < self.repeat - 1:
             return
         first = self._last_alert is None
@@ -109,7 +130,12 @@ class LeakMonitor:
         labels = [self._label(e) for e in wet]
         _LOGGER.warning("%s: water leak detected by %s", self.coordinator.name, ", ".join(wet))
         await async_send_leak(
-            self.hass, self.coordinator, tag=self.tag, sensors=labels, devices=self.devices
+            self.hass,
+            self.coordinator,
+            tag=self.tag,
+            sensors=labels,
+            devices=self.devices,
+            actions=[{"action": self.silence_action, "title": "Silence until dry"}],
         )
         await async_speak(
             self.hass,

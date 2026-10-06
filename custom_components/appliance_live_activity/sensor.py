@@ -41,7 +41,7 @@ class _ApplianceBaseSensor(CoordinatorEntity, SensorEntity):
 
 
 class ApplianceStatusSensor(_ApplianceBaseSensor):
-    """Current status: idle / running / paused / complete, with phase details."""
+    """Current status: idle / delayed / running / paused / complete, with phase details."""
 
     def __init__(self, coordinator, entry: ConfigEntry) -> None:
         super().__init__(coordinator, entry)
@@ -73,6 +73,16 @@ class ApplianceStatusSensor(_ApplianceBaseSensor):
                     "cooktop_on_minutes": round(self.coordinator.cooktop.minutes_on, 1),
                 }
                 if getattr(self.coordinator, "cooktop", None) is not None
+                else {}
+            ),
+            **(
+                {"starts_at": self.coordinator.data["starts_at"]}
+                if self.coordinator.data.get("starts_at")
+                else {}
+            ),
+            **(
+                {"snoozed_until": self.coordinator.data["snoozed_until"]}
+                if self.coordinator.data.get("snoozed_until")
                 else {}
             ),
             **(

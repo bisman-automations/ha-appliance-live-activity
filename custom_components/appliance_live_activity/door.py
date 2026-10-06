@@ -30,7 +30,10 @@ from homeassistant.helpers.event import (
     async_track_time_interval,
 )
 
+from typing import Any
+
 from .const import (
+    ACTION_SNOOZE_DOOR,
     CLOSED_DISPLAY_SECONDS,
     CONF_CRITICAL_AFTER_MINUTES,
     CONF_ALERT_LIGHTS,
@@ -40,6 +43,7 @@ from .const import (
     CONF_ESCALATE_AFTER,
     CONF_ESCALATION_DEVICES,
     CONF_OPEN_DELAY_SECONDS,
+    CONF_SNOOZE_MINUTES,
     CONF_SPEAKERS,
     CONF_STATE_ENTITY,
     CONF_TTS_ENTITY,
@@ -47,6 +51,7 @@ from .const import (
     DEFAULT_CRITICAL_REPEAT_MINUTES,
     DEFAULT_ESCALATE_AFTER,
     DEFAULT_OPEN_DELAY_SECONDS,
+    DEFAULT_SNOOZE_MINUTES,
     STATUS_IDLE,
     STATUS_RUNNING,
 )
@@ -87,6 +92,8 @@ class DoorCoordinator(ApplianceCoordinator):
         self.alert_lights: list[str] = list(cfg.get(CONF_ALERT_LIGHTS) or [])
         self.tts_entity: str | None = cfg.get(CONF_TTS_ENTITY) or None
         self.speakers: list[str] = list(cfg.get(CONF_SPEAKERS) or [])
+        self.snooze_minutes = float(cfg.get(CONF_SNOOZE_MINUTES, DEFAULT_SNOOZE_MINUTES) or 0)
+        self._snooze_until: float | None = None
         self._critical_count = 0
         self._lights_scene: str = f"scene.{self.notification_tag}_lights"
         self._lights_saved = False
@@ -113,6 +120,40 @@ class DoorCoordinator(ApplianceCoordinator):
     @callback
     def _handle_door_event(self, _event: Event) -> None:
         self.hass.async_create_task(self.async_evaluate(send=True))
+
+    # ------------------------------------------------------------------
+    # Snooze button on the critical alert
+    # ------------------------------------------------------------------
+    def _critical_actions(self) -> list[dict[str, str]] | None:
+        if self.snooze_minutes <= 0:
+            return None
+        return [
+            {
+                "action": self.action_id(ACTION_SNOOZE_DOOR),
+                "title": f"Snooze {round(self.snooze_minutes)} min",
+            }
+        ]
+
+    def _action_handlers(self) -> dict[str, Any]:
+        if self.snooze_minutes <= 0:
+            return {}
+        return {self.action_id(ACTION_SNOOZE_DOOR): self._async_snooze}
+
+    async def _async_snooze(self) -> None:
+        """Pause critical alerts (the Live Activity stays) while the door is open."""
+        if self._open_since is None:
+            return
+        self._snooze_until = dt_util.utcnow().timestamp() + self.snooze_minutes * 60
+        _LOGGER.debug("%s: door alerts snoozed for %s min", self.name, self.snooze_minutes)
+        if self._last_critical is not None:
+            await async_clear_tag(
+                self.hass, self, self.critical_tag, self.devices + self.escalation_devices
+            )
+        await self.async_evaluate(send=True)
+
+    @property
+    def snoozed(self) -> bool:
+        return self._snooze_until is not None and dt_util.utcnow().timestamp() < self._snooze_until
 
     # ------------------------------------------------------------------
     def _is_open(self, entity_id: str) -> bool:
@@ -150,15 +191,23 @@ class DoorCoordinator(ApplianceCoordinator):
                     )
                     self._sent_signature = signature
                     self._activity_started = True
-                if critical and (
-                    self._last_critical is None or now - self._last_critical >= self.critical_repeat - 1
+                if critical and not self.snoozed and (
+                    self._last_critical is None
+                    or now - self._last_critical >= self.critical_repeat - 1
+                    or self._snooze_until is not None
                 ):
+                    self._snooze_until = None
                     self._critical_count += 1
                     escalated = self._critical_count > self.escalate_after
                     minutes_open = round(elapsed / 60)
                     devices = self.devices + (self.escalation_devices if escalated else [])
                     await async_send_door_critical(
-                        self.hass, self, labels=labels, minutes_open=minutes_open, devices=devices
+                        self.hass,
+                        self,
+                        labels=labels,
+                        minutes_open=minutes_open,
+                        devices=devices,
+                        actions=self._critical_actions(),
                     )
                     self._last_critical = now
                     if escalated:
@@ -179,6 +228,9 @@ class DoorCoordinator(ApplianceCoordinator):
                     "remaining": 0,
                     "progress": 0,
                     "open_minutes": round(elapsed / 60, 1),
+                    "snoozed_until": (
+                        dt_util.utc_from_timestamp(self._snooze_until) if self.snoozed else None
+                    ),
                 }
             )
             return
@@ -198,6 +250,7 @@ class DoorCoordinator(ApplianceCoordinator):
         self._activity_started = False
         self._sent_signature = None
         self._last_critical = None
+        self._snooze_until = None
         self._critical_count = 0
         self.async_set_updated_data(
             {"status": STATUS_IDLE, "phase": "", "cycle": "", "remaining": 0, "progress": 0}

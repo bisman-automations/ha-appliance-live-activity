@@ -7,7 +7,17 @@ from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.typing import ConfigType
 
 from . import appliances  # noqa: F401  (import registers all appliance plugins)
-from .const import CONF_APPLIANCE_TYPE, DOMAIN, DOOR_TYPES, PLATFORMS
+from .const import (
+    CONF_APPLIANCE_TYPE,
+    CONF_DELAY_ENTITY,
+    CONF_DRYER_START_ENTITY,
+    CONF_SOURCE,
+    CONF_SOURCE_DEVICE,
+    DOMAIN,
+    DOOR_TYPES,
+    PLATFORMS,
+    SOURCE_GE_HOME,
+)
 from .coordinator import ApplianceCoordinator
 from .door import DoorCoordinator
 from .services import async_setup_services, async_unload_services
@@ -20,8 +30,30 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     return True
 
 
+def _async_backfill_ge(hass: HomeAssistant, entry: ConfigEntry) -> None:
+    """GE appliances set up before 1.5.0: find the entities added since then
+    (delay sensor, dryer start button) once, without another setup."""
+    if entry.data.get(CONF_SOURCE) != SOURCE_GE_HOME or CONF_DELAY_ENTITY in entry.data:
+        return
+    device_id = entry.data.get(CONF_SOURCE_DEVICE)
+    if not device_id:
+        return
+    from .ge import async_discover  # noqa: PLC0415
+
+    found = async_discover(hass, device_id)
+    new = {**entry.data, CONF_DELAY_ENTITY: found.delay_entity}
+    if (
+        entry.data.get(CONF_APPLIANCE_TYPE) == "washer"
+        and CONF_DRYER_START_ENTITY not in entry.options
+        and found.dryer_start_entity
+    ):
+        new[CONF_DRYER_START_ENTITY] = found.dryer_start_entity
+    hass.config_entries.async_update_entry(entry, data=new)
+
+
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     hass.data.setdefault(DOMAIN, {})
+    _async_backfill_ge(hass, entry)
     cfg = {**entry.data, **entry.options}
     coordinator_cls = (
         DoorCoordinator

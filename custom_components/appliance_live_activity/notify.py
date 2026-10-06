@@ -152,7 +152,18 @@ async def async_send_done(hass: HomeAssistant, coordinator: ApplianceCoordinator
     )
 
 
-async def async_send_finished_alert(hass: HomeAssistant, coordinator: ApplianceCoordinator) -> None:
+def _with_actions(data: dict[str, Any], actions: list[dict[str, str]] | None) -> dict[str, Any]:
+    """Add notification buttons (they come back as mobile_app_notification_action)."""
+    if actions:
+        data["actions"] = list(actions)
+    return data
+
+
+async def async_send_finished_alert(
+    hass: HomeAssistant,
+    coordinator: ApplianceCoordinator,
+    actions: list[dict[str, str]] | None = None,
+) -> None:
     """A regular, time-sensitive alert -- a Live Activity update doesn't always alert."""
     await _async_send(
         hass,
@@ -160,8 +171,55 @@ async def async_send_finished_alert(hass: HomeAssistant, coordinator: ApplianceC
         {
             "title": f"✅ {coordinator.name} finished",
             "message": coordinator.definition.finished_alert_message,
+            "data": _with_actions(
+                {
+                    "tag": f"{coordinator.notification_tag}_done",
+                    "push": {"interruption-level": "time-sensitive"},
+                    "ttl": 0,
+                    "priority": "high",
+                },
+                actions,
+            ),
+        },
+    )
+
+
+async def async_send_delayed(
+    hass: HomeAssistant,
+    coordinator: ApplianceCoordinator,
+    *,
+    cycle: str,
+    starts_in: float,
+    starts_at: str,
+) -> None:
+    """Live Activity for a delayed start: counts down to when the cycle starts."""
+    message = _join("Delayed start", cycle, f"starts at {starts_at}" if starts_at else "")
+    data: dict[str, Any] = {
+        "tag": coordinator.notification_tag,
+        "live_update": True,
+        "critical_text": "Scheduled",
+        "notification_icon": "mdi:timer-sand",
+        "notification_icon_color": coordinator.icon_color,
+        "color": coordinator.icon_color,
+    }
+    if starts_in > 0:
+        data["chronometer"] = True
+        data["when"] = int(starts_in * 60)
+        data["when_relative"] = True
+    await _async_send(hass, coordinator, {"title": coordinator.name, "message": message, "data": data})
+
+
+async def async_send_dryer_remote_off(hass: HomeAssistant, coordinator: ApplianceCoordinator) -> None:
+    """'Start dryer' was tapped but the dryer isn't accepting remote starts."""
+    await _async_send(
+        hass,
+        coordinator,
+        {
+            "title": "🧺 Couldn't start the dryer",
+            "message": "Remote start is off. Close the dryer door and press Remote Start "
+            "on the dryer, then try again.",
             "data": {
-                "tag": f"{coordinator.notification_tag}_done",
+                "tag": f"{coordinator.notification_tag}_dryer",
                 "push": {"interruption-level": "time-sensitive"},
                 "ttl": 0,
                 "priority": "high",
@@ -230,6 +288,7 @@ async def async_send_door_critical(
     labels: list[str],
     minutes_open: int,
     devices: list[str] | None = None,
+    actions: list[dict[str, str]] | None = None,
 ) -> None:
     """Critical alert (bypasses Silent / Focus on iOS, alarm stream on Android)."""
     doors = _door_text(labels)
@@ -239,16 +298,19 @@ async def async_send_door_critical(
         {
             "title": f"🚨 {coordinator.name}: {doors} open",
             "message": f"Open for {minutes_open} min — please close it.",
-            "data": {
-                "tag": f"{coordinator.notification_tag}_critical",
-                "push": {
-                    "interruption-level": "critical",
-                    "sound": {"name": "default", "critical": 1, "volume": 1.0},
+            "data": _with_actions(
+                {
+                    "tag": f"{coordinator.notification_tag}_critical",
+                    "push": {
+                        "interruption-level": "critical",
+                        "sound": {"name": "default", "critical": 1, "volume": 1.0},
+                    },
+                    "ttl": 0,
+                    "priority": "high",
+                    "channel": "alarm_stream",
                 },
-                "ttl": 0,
-                "priority": "high",
-                "channel": "alarm_stream",
-            },
+                actions,
+            ),
         },
         devices,
     )
@@ -375,6 +437,7 @@ async def async_send_leak(
     tag: str,
     sensors: list[str],
     devices: list[str] | None = None,
+    actions: list[dict[str, str]] | None = None,
 ) -> None:
     """Critical leak alert (bypasses Silent / Focus)."""
     where = _door_text(sensors)
@@ -384,16 +447,19 @@ async def async_send_leak(
         {
             "title": f"💧 Water leak: {coordinator.name}",
             "message": f"{where} detected water. Check it now.",
-            "data": {
-                "tag": tag,
-                "push": {
-                    "interruption-level": "critical",
-                    "sound": {"name": "default", "critical": 1, "volume": 1.0},
+            "data": _with_actions(
+                {
+                    "tag": tag,
+                    "push": {
+                        "interruption-level": "critical",
+                        "sound": {"name": "default", "critical": 1, "volume": 1.0},
+                    },
+                    "ttl": 0,
+                    "priority": "high",
+                    "channel": "alarm_stream",
                 },
-                "ttl": 0,
-                "priority": "high",
-                "channel": "alarm_stream",
-            },
+                actions,
+            ),
         },
         devices,
     )
@@ -423,7 +489,12 @@ async def async_send_leak_cleared(
 # Washer -> dryer reminder
 # ----------------------------------------------------------------------
 async def async_send_move_reminder(
-    hass: HomeAssistant, coordinator: ApplianceCoordinator, *, tag: str, minutes_ago: int
+    hass: HomeAssistant,
+    coordinator: ApplianceCoordinator,
+    *,
+    tag: str,
+    minutes_ago: int,
+    actions: list[dict[str, str]] | None = None,
 ) -> None:
     """Time-sensitive reminder that wet laundry is still in the washer."""
     await _async_send(
@@ -433,11 +504,14 @@ async def async_send_move_reminder(
             "title": "🧺 Move the laundry",
             "message": f"{coordinator.name} finished {minutes_ago} min ago — "
             "move it to the dryer before it starts to smell.",
-            "data": {
-                "tag": tag,
-                "push": {"interruption-level": "time-sensitive"},
-                "ttl": 0,
-                "priority": "high",
-            },
+            "data": _with_actions(
+                {
+                    "tag": tag,
+                    "push": {"interruption-level": "time-sensitive"},
+                    "ttl": 0,
+                    "priority": "high",
+                },
+                actions,
+            ),
         },
     )

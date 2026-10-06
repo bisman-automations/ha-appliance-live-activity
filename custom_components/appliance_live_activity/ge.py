@@ -18,10 +18,12 @@ from homeassistant.helpers import device_registry as dr, entity_registry as er
 from .const import (
     CONF_COOKTOP_ENTITIES,
     CONF_CYCLE_ENTITY,
+    CONF_DELAY_ENTITY,
     CONF_DONE_ENTITY,
     CONF_DOOR_ENTITIES,
     CONF_DOOR_ENTITY,
     CONF_DRYER_ENTITY,
+    CONF_DRYER_START_ENTITY,
     CONF_LEAK_ENTITIES,
     CONF_PHASE_ENTITY,
     CONF_REMAINING_ENTITY,
@@ -49,6 +51,9 @@ class GEDiscovery:
     target_temperature_entity: str | None = None
     leak_entities: list[str] = field(default_factory=list)
     dryer_entity: str | None = None
+    dryer_start_entity: str | None = None
+    delay_entity: str | None = None
+    start_button: str | None = None
     prefix: str = ""
 
     def as_config(self) -> dict[str, str]:
@@ -63,6 +68,8 @@ class GEDiscovery:
             CONF_TEMPERATURE_ENTITY: self.temperature_entity,
             CONF_TARGET_TEMPERATURE_ENTITY: self.target_temperature_entity,
             CONF_DRYER_ENTITY: self.dryer_entity,
+            CONF_DRYER_START_ENTITY: self.dryer_start_entity,
+            CONF_DELAY_ENTITY: self.delay_entity,
         }
         result = {k: v for k, v in mapping.items() if v}
         if self.door_entities:
@@ -136,6 +143,11 @@ def discover_from_entity_ids(entity_ids: list[str]) -> GEDiscovery:
         temperature_entity=_first(ids, r"^sensor\..*_display_temperature$"),
         cooktop_entities=[e for e in ids if re.search(r"^binary_sensor\..*_cooktop_status$", e)],
         target_temperature_entity=_first(ids, r"^water_heater\..*_set_temperature$"),
+        # Washer / dryer / oven count down; GE dishwashers only report the
+        # chosen delay (hours)
+        delay_entity=_first(ids, r"^sensor\..*_delay_time_remaining$")
+        or _first(ids, r"^sensor\..*_delay_hours$"),
+        start_button=_first(ids, r"^button\..*_start_cycle$"),
         prefix=entity_prefix(ids),
     )
 
@@ -187,12 +199,15 @@ def async_discover(hass: HomeAssistant, device_id: str) -> GEDiscovery:
 
     # Washer: stop the "move the laundry" reminder when the GE dryer starts
     if found.appliance_type == "washer":
-        found.dryer_entity = async_find_ge_state_entity(hass, "dryer")
+        dryer = async_find_ge_appliance(hass, "dryer")
+        if dryer is not None:
+            found.dryer_entity = dryer.state_entity
+            found.dryer_start_entity = dryer.start_button
     return found
 
 
-def async_find_ge_state_entity(hass: HomeAssistant, appliance_type: str) -> str | None:
-    """State sensor of the first GE appliance of this type (e.g. the dryer)."""
+def async_find_ge_appliance(hass: HomeAssistant, appliance_type: str) -> GEDiscovery | None:
+    """Entities of the first GE appliance of this type (e.g. the dryer)."""
     dev_reg = dr.async_get(hass)
     ent_reg = er.async_get(hass)
     for entry in hass.config_entries.async_entries(GE_HOME_DOMAIN):
@@ -200,7 +215,26 @@ def async_find_ge_state_entity(hass: HomeAssistant, appliance_type: str) -> str 
             ids = [e.entity_id for e in er.async_entries_for_device(ent_reg, device.id)]
             found = discover_from_entity_ids(ids)
             if found.appliance_type == appliance_type and found.state_entity:
-                return found.state_entity
+                return found
+    return None
+
+
+def async_find_ge_state_entity(hass: HomeAssistant, appliance_type: str) -> str | None:
+    """State sensor of the first GE appliance of this type (e.g. the dryer)."""
+    found = async_find_ge_appliance(hass, appliance_type)
+    return found.state_entity if found else None
+
+
+def async_remote_status_entity(hass: HomeAssistant, entity_id: str) -> str | None:
+    """The 'remote start enabled' sensor on the same device as ``entity_id``
+    (GE: binary_sensor.<dryer>_remote_status)."""
+    ent_reg = er.async_get(hass)
+    entry = ent_reg.async_get(entity_id)
+    if entry is None or entry.device_id is None:
+        return None
+    for other in er.async_entries_for_device(ent_reg, entry.device_id):
+        if re.search(r"^binary_sensor\..*_remote_(status|enable|enabled)$", other.entity_id):
+            return other.entity_id
     return None
 
 

@@ -56,6 +56,12 @@ CONF_MOVE_REMINDER_MINUTES = "move_reminder_minutes"
 CONF_MOVE_REPEAT_MINUTES = "move_repeat_minutes"
 CONF_MOVE_MAX_REMINDERS = "move_max_reminders"
 CONF_DRYER_ENTITY = "dryer_entity"
+CONF_DRYER_START_ENTITY = "dryer_start_entity"
+# Delayed start
+CONF_DELAY_ENTITY = "delay_entity"
+CONF_DELAY_START = "delay_start"
+# Door alert snooze button (0 = no button)
+CONF_SNOOZE_MINUTES = "snooze_minutes"
 
 # Appliance types handled by the door monitor
 DOOR_TYPES = ("refrigerator", "door")
@@ -72,6 +78,7 @@ STATUS_IDLE = "idle"
 STATUS_RUNNING = "running"
 STATUS_PAUSED = "paused"
 STATUS_COMPLETE = "complete"
+STATUS_DELAYED = "delayed"
 
 # Behaviour tuning
 DEFAULT_DISMISS_MINUTES = 30
@@ -103,6 +110,16 @@ DEFAULT_LEAK_REPEAT_MINUTES = 5
 DEFAULT_MOVE_REMINDER_MINUTES = 15
 DEFAULT_MOVE_REPEAT_MINUTES = 15
 DEFAULT_MOVE_MAX_REMINDERS = 3
+
+# Door alert snooze
+DEFAULT_SNOOZE_MINUTES = 10
+
+# Notification action buttons (suffixes; the full action id is
+# "<NOTIFICATION TAG>_<SUFFIX>" so every appliance has its own)
+ACTION_START_DRYER = "START_DRYER"
+ACTION_LAUNDRY_MOVED = "LAUNDRY_MOVED"
+ACTION_SILENCE_LEAK = "SILENCE_LEAK"
+ACTION_SNOOZE_DOOR = "SNOOZE_DOOR"
 
 # Event fired by the Companion app when a notification action is tapped
 EVENT_NOTIFICATION_ACTION = "mobile_app_notification_action"

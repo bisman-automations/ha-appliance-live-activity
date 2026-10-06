@@ -36,6 +36,8 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 
 from .appliance import APPLIANCE_REGISTRY
 from .const import (
+    ACTION_LAUNDRY_MOVED,
+    ACTION_START_DRYER,
     CONF_ACTIVE_STATES,
     CONF_APPLIANCE_TYPE,
     CONF_COMPLETE_STATES,
@@ -43,11 +45,14 @@ from .const import (
     CONF_COOKTOP_ENTITIES,
     CONF_COOKTOP_REPEAT_MINUTES,
     CONF_CYCLE_ENTITY,
+    CONF_DELAY_ENTITY,
+    CONF_DELAY_START,
     CONF_DEVICES,
     CONF_DISMISS_MINUTES,
     CONF_DONE_ENTITY,
     CONF_DOOR_ENTITY,
     CONF_DRYER_ENTITY,
+    CONF_DRYER_START_ENTITY,
     CONF_ESCALATION_DEVICES,
     CONF_FINISHED_ALERT,
     CONF_ICON,
@@ -79,9 +84,11 @@ from .const import (
     DEFAULT_MOVE_REPEAT_MINUTES,
     DOMAIN,
     DRIFT_MINUTES,
+    EVENT_NOTIFICATION_ACTION,
     FINISHED_THRESHOLD_MINUTES,
     PREHEAT_TOLERANCE,
     STATUS_COMPLETE,
+    STATUS_DELAYED,
     STATUS_IDLE,
     STATUS_PAUSED,
     STATUS_RUNNING,
@@ -91,7 +98,9 @@ from .helpers import classify_state, color_to_hex, meaningful, to_minutes
 from .notify import (
     async_clear,
     async_clear_tag,
+    async_send_delayed,
     async_send_done,
+    async_send_dryer_remote_off,
     async_send_finished_alert,
     async_send_move_reminder,
     async_send_preheated,
@@ -147,7 +156,14 @@ class ApplianceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         )
         self.move_max: int = int(cfg.get(CONF_MOVE_MAX_REMINDERS, DEFAULT_MOVE_MAX_REMINDERS) or 1)
         self.dryer_entity: str | None = cfg.get(CONF_DRYER_ENTITY) or None
+        self.dryer_start_entity: str | None = (
+            cfg.get(CONF_DRYER_START_ENTITY) or None if self.appliance_type == "washer" else None
+        )
         self.move_tag = f"{self.notification_tag}_move"
+
+        # Delayed start ("Starts in 2 h")
+        self.delay_entity: str | None = cfg.get(CONF_DELAY_ENTITY) or None
+        self.delay_start: bool = cfg.get(CONF_DELAY_START, True) is not False
 
         # Extra monitors (cooktop, leak) that run alongside the Live Activity
         self.monitors: list[Any] = []
@@ -203,6 +219,11 @@ class ApplianceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._was_preheating = False
         self._preheat_start: float | None = None
 
+        # Delayed start (not persisted)
+        self._delay_target: float | None = None  # epoch the cycle should start
+        self._delay_value: str | None = None  # last delay sensor reading
+        self._delay_sent: tuple | None = None  # (cycle, target) on the phone
+
         # What the phone is currently showing (not persisted: after a
         # restart we always re-send once, which also resumes the activity)
         self._sent_signature: tuple | None = None
@@ -220,6 +241,19 @@ class ApplianceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             "remaining": 0,
             "progress": 0,
         }
+
+    def action_id(self, suffix: str) -> str:
+        """Notification button id, unique to this appliance."""
+        return f"{self.notification_tag}_{suffix}".upper()
+
+    def washer_actions(self) -> list[dict[str, str]]:
+        """Buttons on the washer's finished alert / move reminder."""
+        actions: list[dict[str, str]] = []
+        if self.dryer_start_entity:
+            actions.append({"action": self.action_id(ACTION_START_DRYER), "title": "Start dryer"})
+        if self.move_minutes > 0 or self.dryer_start_entity:
+            actions.append({"action": self.action_id(ACTION_LAUNDRY_MOVED), "title": "Laundry moved"})
+        return actions
 
     def tap_path(self) -> str:
         """Where tapping a notification / Live Activity goes in the app.
@@ -261,6 +295,7 @@ class ApplianceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 self.temperature_entity,
                 self.target_entity,
                 self.dryer_entity,
+                self.delay_entity,
             )
             if e
         ]
@@ -281,6 +316,9 @@ class ApplianceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         await self._async_setup_monitors()
 
     async def _async_setup_monitors(self) -> None:
+        self._unsubs.append(
+            self.hass.bus.async_listen(EVENT_NOTIFICATION_ACTION, self._handle_action)
+        )
         for monitor in self.monitors:
             await monitor.async_setup()
 
@@ -317,6 +355,54 @@ class ApplianceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     @callback
     def _handle_tick(self, _now=None) -> None:
         self.hass.async_create_task(self.async_evaluate(send=True))
+
+    @callback
+    def _handle_action(self, event: Event) -> None:
+        """A notification button was tapped on a phone."""
+        action = event.data.get("action")
+        if not action:
+            return
+        handler = self._action_handlers().get(action)
+        if handler is not None:
+            _LOGGER.debug("%s: notification action %s", self.name, action)
+            self.hass.async_create_task(handler())
+
+    def _action_handlers(self) -> dict[str, Any]:
+        if self.appliance_type != "washer":
+            return {}
+        return {
+            self.action_id(ACTION_LAUNDRY_MOVED): self._async_laundry_moved,
+            self.action_id(ACTION_START_DRYER): self._async_start_dryer,
+        }
+
+    async def _async_laundry_moved(self) -> None:
+        """'Laundry moved': stop reminders and remove the finished alert / activity."""
+        await self._async_cancel_move("laundry moved")
+        if self.devices:
+            await async_clear_tag(self.hass, self, f"{self.notification_tag}_done")
+        if self._dismiss_at is not None:
+            await self._async_dismiss()
+
+    async def _async_start_dryer(self) -> None:
+        """'Start dryer': press the dryer's start button (if it accepts remote starts)."""
+        if not self.dryer_start_entity:
+            return
+        from .ge import async_remote_status_entity  # noqa: PLC0415
+
+        remote = async_remote_status_entity(self.hass, self.dryer_start_entity)
+        if remote and self._state(remote) != STATE_ON:
+            _LOGGER.info("%s: dryer remote start is off; not starting it", self.name)
+            if self.devices:
+                await async_send_dryer_remote_off(self.hass, self)
+        else:
+            try:
+                await self.hass.services.async_call(
+                    "button", "press", target={"entity_id": self.dryer_start_entity}, blocking=True
+                )
+            except Exception:  # noqa: BLE001
+                _LOGGER.exception("Could not start the dryer (%s)", self.dryer_start_entity)
+        # Either way the laundry is in the dryer now
+        await self._async_laundry_moved()
 
     # ------------------------------------------------------------------
     # State reading
@@ -386,11 +472,20 @@ class ApplianceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         cycle = meaningful(self._state(self.cycle_entity))
         remaining = self._remaining_minutes()
 
+        delayed = False
         if status in ACTIVE:
+            self._delay_target = self._delay_value = self._delay_sent = None
             await self._async_on_active(status, phase, cycle, remaining, send, force, raw_state)
         else:
             await self._async_on_inactive(status, cycle, send)
+            delayed = self.delay_start and "delay" in raw_state.lower()
+            if delayed:
+                await self._async_on_delayed(cycle, send, force)
+            else:
+                await self._async_end_delay(send)
         await self._async_check_move(send)
+        if delayed:
+            status = STATUS_DELAYED
 
         progress = self._progress(remaining) if status in ACTIVE else (
             100 if status == STATUS_COMPLETE and self.definition.supports_progress else 0
@@ -406,8 +501,80 @@ class ApplianceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 # Dashboard sensors: only meaningful while a cycle is in progress
                 "time_remaining": round(remaining) if active else 0,
                 "finishes_at": self._finishes_at(remaining) if status == STATUS_RUNNING else None,
+                "starts_at": (
+                    dt_util.utc_from_timestamp(self._delay_target)
+                    if delayed and self._delay_target
+                    else None
+                ),
             }
         )
+
+    # ------------------------------------------------------------------
+    # Delayed start
+    # ------------------------------------------------------------------
+    def _delay_minutes(self) -> tuple[str | None, float]:
+        if not self.delay_entity:
+            return None, 0.0
+        state = self.hass.states.get(self.delay_entity)
+        if state is None:
+            return None, 0.0
+        return state.state, to_minutes(state.state, state.attributes.get(ATTR_UNIT_OF_MEASUREMENT))
+
+    def _clock(self, timestamp: float) -> str:
+        local = dt_util.as_local(dt_util.utc_from_timestamp(timestamp))
+        if self.hass.config.units.temperature_unit == "°F":
+            return local.strftime("%I:%M %p").lstrip("0")
+        return local.strftime("%H:%M")
+
+    async def _async_on_delayed(self, cycle: str, send: bool, force: bool) -> None:
+        """Waiting for a delayed start: Live Activity counting down to the start."""
+        if self._dismiss_at is not None:
+            # A new cycle was scheduled: the finished activity is replaced
+            self._cancel_dismiss()
+            self._dismiss_at = None
+            await self._async_save()
+        await self._async_cancel_move("new cycle scheduled")
+
+        now = dt_util.utcnow().timestamp()
+        value, minutes = self._delay_minutes()
+        # Recompute the start time only when the sensor reports something new:
+        # GE laundry / ovens count down, GE dishwashers only report the chosen
+        # delay, which must not push the start time forward every minute.
+        if value != self._delay_value or self._delay_target is None:
+            self._delay_value = value
+            target = now + minutes * 60 if minutes > 0 else None
+            if (
+                target is None
+                or self._delay_target is None
+                or abs(target - self._delay_target) > DRIFT_MINUTES * 60
+            ):
+                self._delay_target = target
+        if self._delay_target is not None and self._delay_target <= now:
+            # Should have started by now; keep showing "Scheduled" without a countdown
+            starts_in = 0.0
+        else:
+            starts_in = (self._delay_target - now) / 60 if self._delay_target else 0.0
+
+        if not send or not self.devices:
+            return
+        signature = (cycle, self._delay_target if starts_in > 0 else None)
+        if not force and signature == self._delay_sent:
+            return
+        await async_send_delayed(
+            self.hass,
+            self,
+            cycle=cycle,
+            starts_in=starts_in,
+            starts_at=self._clock(self._delay_target) if starts_in > 0 else "",
+        )
+        self._delay_sent = signature
+
+    async def _async_end_delay(self, send: bool) -> None:
+        """Delay cancelled (appliance turned off without starting)."""
+        sent = self._delay_sent is not None
+        self._delay_target = self._delay_value = self._delay_sent = None
+        if sent and send and self.devices and not self._in_cycle and self._dismiss_at is None:
+            await async_clear(self.hass, self)
 
     def _finishes_at(self, remaining: float) -> datetime | None:
         """Estimated end time, kept steady unless it moves by a minute or more."""
@@ -534,7 +701,11 @@ class ApplianceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             if finished and self.definition.supports_progress:
                 await async_send_done(self.hass, self, cycle)
                 if self.finished_alert:
-                    await async_send_finished_alert(self.hass, self)
+                    await async_send_finished_alert(
+                        self.hass,
+                        self,
+                        actions=self.washer_actions() if self.appliance_type == "washer" else None,
+                    )
                 self._dismiss_at = dt_util.utcnow().timestamp() + self.dismiss_minutes * 60
                 self._schedule_dismiss(self.dismiss_minutes * 60)
             else:
@@ -659,6 +830,7 @@ class ApplianceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 self,
                 tag=self.move_tag,
                 minutes_ago=round((now - self._move_since) / 60),
+                actions=self.washer_actions(),
             )
 
     async def _async_cancel_move(self, reason: str) -> None:

@@ -25,12 +25,15 @@ from .const import (
     CONF_CRITICAL_AFTER_MINUTES,
     CONF_CRITICAL_REPEAT_MINUTES,
     CONF_CYCLE_ENTITY,
+    CONF_DELAY_ENTITY,
+    CONF_DELAY_START,
     CONF_DEVICES,
     CONF_DISMISS_MINUTES,
     CONF_DONE_ENTITY,
     CONF_DOOR_ENTITIES,
     CONF_DOOR_ENTITY,
     CONF_DRYER_ENTITY,
+    CONF_DRYER_START_ENTITY,
     CONF_ESCALATE_AFTER,
     CONF_ESCALATION_DEVICES,
     CONF_FINISHED_ALERT,
@@ -47,6 +50,7 @@ from .const import (
     CONF_PHASE_ENTITY,
     CONF_PREHEAT_ALERT,
     CONF_REMAINING_ENTITY,
+    CONF_SNOOZE_MINUTES,
     CONF_SOURCE,
     CONF_SOURCE_DEVICE,
     CONF_SPEAKERS,
@@ -65,6 +69,7 @@ from .const import (
     DEFAULT_MOVE_REMINDER_MINUTES,
     DEFAULT_MOVE_REPEAT_MINUTES,
     DEFAULT_OPEN_DELAY_SECONDS,
+    DEFAULT_SNOOZE_MINUTES,
     DOMAIN,
     DOOR_TYPES,
     GE_HOME_DOMAIN,
@@ -142,6 +147,7 @@ def _announce_fields() -> dict:
 CLEARABLE = (
     CONF_LEAK_ENTITIES,
     CONF_DRYER_ENTITY,
+    CONF_DRYER_START_ENTITY,
     CONF_TTS_ENTITY,
     CONF_SPEAKERS,
     CONF_ESCALATION_DEVICES,
@@ -169,6 +175,10 @@ def _behaviour_fields(appliance_type: str, current: dict[str, Any], has_cooktop:
                     default=current.get(CONF_CRITICAL_REPEAT_MINUTES, DEFAULT_CRITICAL_REPEAT_MINUTES),
                 ): _number(1, 60, 1, "min"),
                 vol.Optional(
+                    CONF_SNOOZE_MINUTES,
+                    default=current.get(CONF_SNOOZE_MINUTES, DEFAULT_SNOOZE_MINUTES),
+                ): _number(0, 120, 5, "min"),
+                vol.Optional(
                     CONF_ESCALATE_AFTER,
                     default=current.get(CONF_ESCALATE_AFTER, DEFAULT_ESCALATE_AFTER),
                 ): _number(0, 50, 1, "alerts"),
@@ -188,6 +198,9 @@ def _behaviour_fields(appliance_type: str, current: dict[str, Any], has_cooktop:
                     CONF_DISMISS_MINUTES,
                     default=current.get(CONF_DISMISS_MINUTES, DEFAULT_DISMISS_MINUTES),
                 ): _dismiss_selector(),
+                vol.Optional(
+                    CONF_DELAY_START, default=current.get(CONF_DELAY_START, True)
+                ): selector.BooleanSelector(),
             }
         )
     if appliance_type == "oven":
@@ -211,6 +224,9 @@ def _behaviour_fields(appliance_type: str, current: dict[str, Any], has_cooktop:
                 ): _number(1, 10, 1, "reminders"),
                 vol.Optional(CONF_DRYER_ENTITY): selector.EntitySelector(
                     selector.EntitySelectorConfig(domain="sensor")
+                ),
+                vol.Optional(CONF_DRYER_START_ENTITY): selector.EntitySelector(
+                    selector.EntitySelectorConfig(domain="button")
                 ),
             }
         )
@@ -342,6 +358,7 @@ class ApplianceLiveActivityConfigFlow(ConfigFlow, domain=DOMAIN):
                 vol.Optional(CONF_REMAINING_ENTITY): sensor,
                 vol.Optional(CONF_DONE_ENTITY): binary,
                 vol.Optional(CONF_DOOR_ENTITY): binary,
+                vol.Optional(CONF_DELAY_ENTITY): sensor,
             }
         )
         if self._data[CONF_APPLIANCE_TYPE] == "oven":
