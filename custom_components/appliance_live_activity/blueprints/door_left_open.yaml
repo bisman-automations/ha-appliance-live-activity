@@ -1,0 +1,460 @@
+# Door Left Open – Live Activity + Critical Alerts
+# Home Assistant automation blueprint
+#
+# Works with any door binary_sensor: GE Home (SmartHQ) fridge/freezer doors,
+# garage doors, contact sensors…
+#
+# Requires: iOS 17.2+ / Android 16+ Companion app, Home Assistant 2026.7+
+# Part of: https://github.com/donavanbecker/ha-appliance-live-activity
+blueprint:
+  name: Door Left Open – Live Activity + Critical Alerts
+  description: >
+    While a door (freezer, fridge, garage…) is open:
+
+
+    1. **Live Activity** on your Lock Screen counting how long it's been open.
+
+    2. Still open after a few minutes → **critical alerts** (bypass Silent /
+    Focus on iOS, alarm stream on Android), repeated until it's closed. Optional
+    escalation to more phones, speaker announcements and red lights.
+
+    3. Closed → alerts are removed, the Live Activity shows **Closed** for a
+    minute, then goes away.
+
+
+    Quick grabs (shorter than the start delay) don't start a Live Activity —
+    iOS limits how many can be started.
+
+
+    iOS: allow Critical Alerts for the Companion app in iOS Settings.
+  domain: automation
+  author: donavanbecker
+  source_url: https://github.com/donavanbecker/ha-appliance-live-activity/blob/main/blueprints/automation/door_left_open.yaml
+  homeassistant:
+    min_version: "2026.7.0"
+  input:
+    door_section:
+      name: Door
+      icon: mdi:door-open
+      input:
+        door_sensors:
+          name: Door sensor(s)
+          description: One automation can watch several doors; each gets its own Live Activity.
+          selector:
+            entity:
+              domain: binary_sensor
+              multiple: true
+        door_name:
+          name: Friendly name (optional)
+          description: Used in messages, e.g. "Freezer". Blank = the sensor's name.
+          default: ""
+          selector:
+            text:
+        open_delay:
+          name: Start the Live Activity after open for
+          default:
+            seconds: 30
+          selector:
+            duration:
+        critical_after:
+          name: Switch to critical alerts after open for
+          description: Counted from when the door opened.
+          default:
+            minutes: 5
+          selector:
+            duration:
+        repeat_interval:
+          name: Repeat critical alerts every
+          default:
+            minutes: 1
+          selector:
+            duration:
+        max_alerts:
+          name: Maximum critical alerts (0 = until closed)
+          default: 0
+          selector:
+            number:
+              min: 0
+              max: 100
+              mode: box
+        closed_display:
+          name: Show "Closed" for
+          default:
+            minutes: 1
+          selector:
+            duration:
+
+    notify_section:
+      name: Notifications
+      icon: mdi:cellphone-message
+      input:
+        notify_devices:
+          name: Phones to notify
+          selector:
+            device:
+              filter:
+                - integration: mobile_app
+              multiple: true
+        critical:
+          name: Critical alerts
+          description: Bypass Silent / Do Not Disturb (iOS critical, Android alarm stream). Off = time-sensitive.
+          default: true
+          selector:
+            boolean:
+        snooze_minutes:
+          name: Snooze button length (minutes, 0 = no button)
+          description: >
+            Off by default so the alert can't be silenced while the door is open.
+            Use only if someone needs to leave it open on purpose (e.g. defrosting).
+          default: 0
+          selector:
+            number:
+              min: 0
+              max: 30
+              unit_of_measurement: min
+        closed_message:
+          name: Also send a separate "closed" notification
+          description: The Live Activity already shows "Closed"; this adds a regular notification.
+          default: false
+          selector:
+            boolean:
+
+    escalation_section:
+      name: Escalation
+      icon: mdi:alarm-light
+      collapsed: true
+      input:
+        escalate_after:
+          name: Escalate after this many critical alerts (0 = never)
+          default: 1
+          selector:
+            number:
+              min: 0
+              max: 50
+              mode: box
+        escalation_devices:
+          name: Additional phones to notify when escalated
+          default: []
+          selector:
+            device:
+              filter:
+                - integration: mobile_app
+              multiple: true
+        tts_entity:
+          name: TTS engine
+          default: ""
+          selector:
+            entity:
+              domain: tts
+        tts_media_players:
+          name: Speakers to announce on
+          default: []
+          selector:
+            entity:
+              domain: media_player
+              multiple: true
+        alert_lights:
+          name: Lights to turn red (restored when closed)
+          default: []
+          selector:
+            entity:
+              domain: light
+              multiple: true
+
+mode: parallel
+max: 10
+
+triggers:
+  - trigger: state
+    entity_id: !input door_sensors
+    to: "on"
+    for: !input open_delay
+  # Pick back up if HA restarts or the automation reloads while a door is open
+  - trigger: homeassistant
+    event: start
+  - trigger: event
+    event_type: automation_reloaded
+
+variables:
+  door_name_in: !input door_name
+  notify_devices: !input notify_devices
+  escalation_devices: !input escalation_devices
+  critical: !input critical
+  snooze_minutes: !input snooze_minutes
+  escalate_after: !input escalate_after
+  tts_entity: !input tts_entity
+  tts_media_players: !input tts_media_players
+  alert_lights: !input alert_lights
+  max_alerts: !input max_alerts
+  send_closed: !input closed_message
+  door_sensors: !input door_sensors
+  critical_after: !input critical_after
+  closed_display: !input closed_display
+  door: >
+    {{ trigger.entity_id if trigger.platform == 'state'
+       else (door_sensors | select('is_state', 'on') | first | default('')) }}
+  door_label: "{{ door_name_in if door_name_in else state_attr(door, 'friendly_name') }}"
+  door_slug: "{{ door | replace('.', '_') }}"
+  live_tag: "door_live_{{ door_slug }}"
+  tag: "door_open_{{ door_slug }}"
+  snooze_action: "SNOOZE_{{ door_slug | upper }}"
+  scene_id: "door_alert_{{ door_slug }}"
+  base_services: >
+    {{ notify_devices | map('device_attr', 'name') | select | map('slugify')
+       | map('regex_replace', '^', 'notify.mobile_app_') | list }}
+  all_services: >
+    {{ (notify_devices + escalation_devices) | unique | map('device_attr', 'name') | select
+       | map('slugify') | map('regex_replace', '^', 'notify.mobile_app_') | list }}
+  critical_after_s: >
+    {% set d = critical_after %}
+    {% if d is mapping %}
+      {{ (d.hours | default(0)) * 3600 + (d.minutes | default(0)) * 60 + (d.seconds | default(0)) }}
+    {% else %}{{ as_timedelta(d).total_seconds() | int(300) }}{% endif %}
+  closed_display_s: >
+    {% set d = closed_display %}
+    {% if d is mapping %}
+      {{ (d.hours | default(0)) * 3600 + (d.minutes | default(0)) * 60 + (d.seconds | default(0)) }}
+    {% else %}{{ as_timedelta(d).total_seconds() | int(60) }}{% endif %}
+
+conditions:
+  - condition: template
+    value_template: "{{ door != '' and is_state(door, 'on') }}"
+
+actions:
+  # On restart, give the delay a chance in case the door is just being closed
+  - if:
+      - condition: template
+        value_template: "{{ trigger.platform != 'state' }}"
+    then:
+      - wait_template: "{{ is_state(door, 'off') }}"
+        timeout: !input open_delay
+        continue_on_timeout: true
+      - condition: template
+        value_template: "{{ is_state(door, 'on') }}"
+
+  - variables:
+      opened_ts: "{{ states[door].last_changed.timestamp() | int }}"
+
+  # ------------------------------------------------------------
+  # 1. Live Activity, counting up from when the door opened
+  # ------------------------------------------------------------
+  - repeat:
+      for_each: "{{ base_services }}"
+      sequence:
+        - continue_on_error: true
+          action: "{{ repeat.item }}"
+          data:
+            title: "{{ door_label }}"
+            message: "{{ door_label }} is open"
+            data:
+              tag: "{{ live_tag }}"
+              live_update: true
+              critical_text: Open
+              notification_icon: mdi:door-open
+              notification_icon_color: "#FF9800"
+              color: "#FF9800"
+              chronometer: true
+              when: "{{ opened_ts }}"
+
+  # Wait until it's been open for "critical after" (or it closes first)
+  - wait_template: "{{ is_state(door, 'off') }}"
+    timeout:
+      seconds: "{{ [critical_after_s | int - (now().timestamp() - opened_ts | int), 1] | max | int }}"
+    continue_on_timeout: true
+
+  # ------------------------------------------------------------
+  # 2. Still open -> critical alerts until closed
+  # ------------------------------------------------------------
+  - if:
+      - condition: template
+        value_template: "{{ is_state(door, 'on') }}"
+    then:
+      - repeat:
+          for_each: "{{ base_services }}"
+          sequence:
+            - continue_on_error: true
+              action: "{{ repeat.item }}"
+              data:
+                title: "{{ door_label }}"
+                message: "{{ door_label }} is still open"
+                data:
+                  tag: "{{ live_tag }}"
+                  live_update: true
+                  critical_text: Still open
+                  notification_icon: mdi:alert-circle
+                  notification_icon_color: "#F44336"
+                  color: "#F44336"
+                  chronometer: true
+                  when: "{{ opened_ts }}"
+
+      - repeat:
+          sequence:
+            - variables:
+                alert_number: "{{ repeat.index }}"
+                escalated: "{{ escalate_after | int > 0 and repeat.index > escalate_after | int }}"
+                minutes_open: "{{ ((now().timestamp() - opened_ts | int) / 60) | round }}"
+                targets: "{{ all_services if escalated else base_services }}"
+
+            # Phones
+            - repeat:
+                for_each: "{{ targets }}"
+                sequence:
+                  - continue_on_error: true
+                    action: "{{ repeat.item }}"
+                    data:
+                      title: "{{ '🚨' if escalated else '⚠️' }} {{ door_label }} is open"
+                      message: "Open for {{ minutes_open }} min."
+                      data:
+                        tag: "{{ tag }}"
+                        actions: >
+                          {{ [{'action': snooze_action, 'title': 'Snooze ' ~ snooze_minutes ~ ' min'}]
+                             if snooze_minutes | int > 0 else [] }}
+                        # iOS
+                        push: >
+                          {{ {'interruption-level': 'critical',
+                              'sound': {'name': 'default', 'critical': 1, 'volume': 1.0}}
+                             if critical else {'interruption-level': 'time-sensitive'} }}
+                        # Android
+                        ttl: 0
+                        priority: high
+                        channel: "{{ 'alarm_stream' if critical else 'Door alerts' }}"
+
+            # Speakers
+            - if:
+                - condition: template
+                  value_template: "{{ escalated and tts_entity != '' and tts_media_players | length > 0 }}"
+              then:
+                - continue_on_error: true
+                  action: tts.speak
+                  target:
+                    entity_id: "{{ tts_entity }}"
+                  data:
+                    media_player_entity_id: "{{ tts_media_players }}"
+                    message: "The {{ door_label }} has been open for {{ minutes_open }} minutes."
+
+            # Lights (snapshot once, on first escalation)
+            - if:
+                - condition: template
+                  value_template: >
+                    {{ alert_lights | length > 0 and escalate_after | int > 0
+                       and alert_number == escalate_after | int + 1 }}
+              then:
+                - action: scene.create
+                  data:
+                    scene_id: "{{ scene_id }}"
+                    snapshot_entities: "{{ alert_lights }}"
+                - continue_on_error: true
+                  action: light.turn_on
+                  target:
+                    entity_id: "{{ alert_lights }}"
+                  data:
+                    rgb_color: [255, 0, 0]
+                    brightness_pct: 100
+
+            # Wait for close, snooze, or next interval
+            - if:
+                - condition: template
+                  value_template: "{{ is_state(door, 'on') }}"
+              then:
+                - wait_for_trigger:
+                    - trigger: template
+                      value_template: "{{ is_state(door, 'off') }}"
+                    - trigger: event
+                      event_type: mobile_app_notification_action
+                      event_data:
+                        action: "{{ snooze_action }}"
+                  timeout: !input repeat_interval
+                  continue_on_timeout: true
+                - if:
+                    - condition: template
+                      value_template: "{{ wait.trigger is not none and wait.trigger.idx == '1' }}"
+                  then:
+                    - wait_template: "{{ is_state(door, 'off') }}"
+                      timeout:
+                        minutes: "{{ snooze_minutes | int }}"
+                      continue_on_timeout: true
+          until:
+            - condition: template
+              value_template: >
+                {{ is_state(door, 'off')
+                   or (max_alerts | int > 0 and repeat.index >= max_alerts | int) }}
+
+  # ------------------------------------------------------------
+  # 3. Clean up
+  # ------------------------------------------------------------
+  - repeat:
+      for_each: "{{ all_services }}"
+      sequence:
+        - continue_on_error: true
+          action: "{{ repeat.item }}"
+          data:
+            message: clear_notification
+            data:
+              tag: "{{ tag }}"
+
+  - if:
+      - condition: template
+        value_template: >
+          {{ states.scene | selectattr('entity_id', 'eq', 'scene.' ~ scene_id) | list | count > 0 }}
+    then:
+      - continue_on_error: true
+        action: scene.turn_on
+        target:
+          entity_id: "scene.{{ scene_id }}"
+      - continue_on_error: true
+        action: scene.delete
+        target:
+          entity_id: "scene.{{ scene_id }}"
+
+  # Max alerts reached but still open: leave the Live Activity showing "open"
+  - condition: template
+    value_template: "{{ is_state(door, 'off') }}"
+
+  - variables:
+      minutes_open: "{{ ((now().timestamp() - opened_ts | int) / 60) | round }}"
+
+  - repeat:
+      for_each: "{{ base_services }}"
+      sequence:
+        - continue_on_error: true
+          action: "{{ repeat.item }}"
+          data:
+            title: "{{ door_label }}"
+            message: "Closed · was open {{ minutes_open }} min"
+            data:
+              tag: "{{ live_tag }}"
+              live_update: true
+              critical_text: Closed
+              notification_icon: mdi:check-circle
+              notification_icon_color: "#4CAF50"
+              color: "#4CAF50"
+
+  - if:
+      - condition: template
+        value_template: "{{ send_closed }}"
+    then:
+      - repeat:
+          for_each: "{{ all_services }}"
+          sequence:
+            - continue_on_error: true
+              action: "{{ repeat.item }}"
+              data:
+                title: "✅ {{ door_label }} closed"
+                message: "All good now."
+
+  # Show "Closed" briefly; re-opening in the meantime starts a new run
+  - delay:
+      seconds: "{{ closed_display_s | int }}"
+
+  - condition: template
+    value_template: "{{ is_state(door, 'off') }}"
+
+  - repeat:
+      for_each: "{{ all_services }}"
+      sequence:
+        - continue_on_error: true
+          action: "{{ repeat.item }}"
+          data:
+            message: clear_notification
+            data:
+              tag: "{{ live_tag }}"

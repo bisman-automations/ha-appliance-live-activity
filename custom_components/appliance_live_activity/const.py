@@ -30,6 +30,11 @@ CONF_NOTIFICATION_TAG = "notification_tag"
 CONF_DEVICES = "devices"
 CONF_FINISHED_ALERT = "finished_alert"
 CONF_DISMISS_MINUTES = "dismiss_minutes"
+# Door monitoring (refrigerator / freezer)
+CONF_DOOR_ENTITIES = "door_entities"
+CONF_OPEN_DELAY_SECONDS = "open_delay_seconds"
+CONF_CRITICAL_AFTER_MINUTES = "critical_after_minutes"
+CONF_CRITICAL_REPEAT_MINUTES = "critical_repeat_minutes"
 
 # Setup sources
 SOURCE_GE_HOME = "ge_home"
@@ -52,6 +57,12 @@ DRIFT_MINUTES = 3
 # If an appliance stops with this many minutes (or fewer) left, treat it as
 # finished rather than cancelled (for appliances without an end-of-cycle signal).
 FINISHED_THRESHOLD_MINUTES = 5
+
+# Door monitoring defaults
+DEFAULT_OPEN_DELAY_SECONDS = 30  # ignore quick grabs; saves iOS push-to-start budget
+DEFAULT_CRITICAL_AFTER_MINUTES = 5
+DEFAULT_CRITICAL_REPEAT_MINUTES = 1
+CLOSED_DISPLAY_SECONDS = 60  # show "Closed" this long before ending the activity
 
 # States that always mean "not running", regardless of appliance type.
 UNAVAILABLE_STATES = {"", "unknown", "unavailable", "none"}

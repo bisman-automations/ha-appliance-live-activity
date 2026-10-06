@@ -57,6 +57,11 @@ class ApplianceStatusSensor(_ApplianceBaseSensor):
             "phase": self.coordinator.data.get("phase"),
             "cycle": self.coordinator.data.get("cycle"),
             "remaining_minutes": self.coordinator.data.get("remaining"),
+            **(
+                {"open_minutes": self.coordinator.data["open_minutes"]}
+                if "open_minutes" in self.coordinator.data
+                else {}
+            ),
         }
 
 

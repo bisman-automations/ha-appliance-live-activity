@@ -17,13 +17,14 @@ persisted, so a Home Assistant restart resumes cleanly without helpers.
 from __future__ import annotations
 
 import logging
-import time
+
 from datetime import timedelta
 from typing import Any
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import ATTR_UNIT_OF_MEASUREMENT, STATE_ON
 from homeassistant.core import CALLBACK_TYPE, Event, HomeAssistant, callback
+from homeassistant.util import dt as dt_util
 from homeassistant.helpers.event import (
     async_call_later,
     async_track_state_change_event,
@@ -163,7 +164,7 @@ class ApplianceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         )
 
         if self._dismiss_at is not None:
-            self._schedule_dismiss(max(0.0, self._dismiss_at - time.time()))
+            self._schedule_dismiss(max(0.0, self._dismiss_at - dt_util.utcnow().timestamp()))
 
         await self.async_evaluate(send=True)
 
@@ -305,7 +306,7 @@ class ApplianceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
         temperature = self._temperature_text()
         signature = (status, phase, cycle, temperature if self.appliance_type == "oven" else "")
-        now = time.time()
+        now = dt_util.utcnow().timestamp()
         expected = self._sent_remaining - (now - self._sent_at) / 60
         drifted = (
             status == STATUS_RUNNING
@@ -352,7 +353,7 @@ class ApplianceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 await async_send_done(self.hass, self, cycle)
                 if self.finished_alert:
                     await async_send_finished_alert(self.hass, self)
-                self._dismiss_at = time.time() + self.dismiss_minutes * 60
+                self._dismiss_at = dt_util.utcnow().timestamp() + self.dismiss_minutes * 60
                 self._schedule_dismiss(self.dismiss_minutes * 60)
             else:
                 # Cancelled, or a door that closed: just end the activity

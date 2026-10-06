@@ -18,22 +18,29 @@ from homeassistant.helpers import selector
 from .appliance import APPLIANCE_REGISTRY
 from .const import (
     CONF_APPLIANCE_TYPE,
+    CONF_CRITICAL_AFTER_MINUTES,
+    CONF_CRITICAL_REPEAT_MINUTES,
     CONF_CYCLE_ENTITY,
     CONF_DEVICES,
     CONF_DISMISS_MINUTES,
     CONF_DONE_ENTITY,
+    CONF_DOOR_ENTITIES,
     CONF_DOOR_ENTITY,
     CONF_FINISHED_ALERT,
     CONF_ICON,
     CONF_ICON_COLOR,
     CONF_NAME,
     CONF_NOTIFICATION_TAG,
+    CONF_OPEN_DELAY_SECONDS,
     CONF_PHASE_ENTITY,
     CONF_REMAINING_ENTITY,
     CONF_SOURCE,
     CONF_SOURCE_DEVICE,
     CONF_STATE_ENTITY,
+    DEFAULT_CRITICAL_AFTER_MINUTES,
+    DEFAULT_CRITICAL_REPEAT_MINUTES,
     DEFAULT_DISMISS_MINUTES,
+    DEFAULT_OPEN_DELAY_SECONDS,
     DOMAIN,
     GE_HOME_DOMAIN,
     SOURCE_GE_HOME,
@@ -72,6 +79,41 @@ def _dismiss_selector() -> selector.NumberSelector:
             min=0, max=240, step=5, unit_of_measurement="min", mode=selector.NumberSelectorMode.BOX
         )
     )
+
+
+def _number(min_: float, max_: float, step: float, unit: str) -> selector.NumberSelector:
+    return selector.NumberSelector(
+        selector.NumberSelectorConfig(
+            min=min_, max=max_, step=step, unit_of_measurement=unit, mode=selector.NumberSelectorMode.BOX
+        )
+    )
+
+
+def _behaviour_fields(appliance_type: str, current: dict[str, Any]) -> dict:
+    """Alert settings: doors (refrigerator) vs cycles (everything else)."""
+    if appliance_type == "refrigerator":
+        return {
+            vol.Optional(
+                CONF_OPEN_DELAY_SECONDS,
+                default=current.get(CONF_OPEN_DELAY_SECONDS, DEFAULT_OPEN_DELAY_SECONDS),
+            ): _number(0, 600, 5, "s"),
+            vol.Optional(
+                CONF_CRITICAL_AFTER_MINUTES,
+                default=current.get(CONF_CRITICAL_AFTER_MINUTES, DEFAULT_CRITICAL_AFTER_MINUTES),
+            ): _number(1, 120, 1, "min"),
+            vol.Optional(
+                CONF_CRITICAL_REPEAT_MINUTES,
+                default=current.get(CONF_CRITICAL_REPEAT_MINUTES, DEFAULT_CRITICAL_REPEAT_MINUTES),
+            ): _number(1, 60, 1, "min"),
+        }
+    return {
+        vol.Optional(
+            CONF_FINISHED_ALERT, default=current.get(CONF_FINISHED_ALERT, True)
+        ): selector.BooleanSelector(),
+        vol.Optional(
+            CONF_DISMISS_MINUTES, default=current.get(CONF_DISMISS_MINUTES, DEFAULT_DISMISS_MINUTES)
+        ): _dismiss_selector(),
+    }
 
 
 class ApplianceLiveActivityConfigFlow(ConfigFlow, domain=DOMAIN):
@@ -173,6 +215,18 @@ class ApplianceLiveActivityConfigFlow(ConfigFlow, domain=DOMAIN):
                 vol.Optional(CONF_DOOR_ENTITY): binary,
             }
         )
+        if self._data[CONF_APPLIANCE_TYPE] == "refrigerator":
+            # Doors only: the state entity is the first door, add more here
+            schema = vol.Schema(
+                {
+                    vol.Required(CONF_STATE_ENTITY): selector.EntitySelector(
+                        selector.EntitySelectorConfig(domain=["binary_sensor", "sensor"])
+                    ),
+                    vol.Optional(CONF_DOOR_ENTITIES): selector.EntitySelector(
+                        selector.EntitySelectorConfig(domain="binary_sensor", multiple=True)
+                    ),
+                }
+            )
         return self.async_show_form(step_id="entities", data_schema=schema)
 
     # ------------------------------------------------------------------
@@ -193,8 +247,7 @@ class ApplianceLiveActivityConfigFlow(ConfigFlow, domain=DOMAIN):
         schema = vol.Schema(
             {
                 vol.Required(CONF_DEVICES, default=[]): _phones_selector(),
-                vol.Optional(CONF_FINISHED_ALERT, default=True): selector.BooleanSelector(),
-                vol.Optional(CONF_DISMISS_MINUTES, default=DEFAULT_DISMISS_MINUTES): _dismiss_selector(),
+                **_behaviour_fields(self._data[CONF_APPLIANCE_TYPE], {}),
                 vol.Optional(CONF_ICON, default=definition.icon): selector.IconSelector(),
                 vol.Optional(CONF_ICON_COLOR, default=definition.color): selector.TextSelector(),
                 vol.Optional(CONF_NOTIFICATION_TAG, default=default_tag): selector.TextSelector(),
@@ -220,13 +273,7 @@ class ApplianceLiveActivityOptionsFlow(OptionsFlow):
         schema = vol.Schema(
             {
                 vol.Required(CONF_DEVICES, default=current.get(CONF_DEVICES, [])): _phones_selector(),
-                vol.Optional(
-                    CONF_FINISHED_ALERT, default=current.get(CONF_FINISHED_ALERT, True)
-                ): selector.BooleanSelector(),
-                vol.Optional(
-                    CONF_DISMISS_MINUTES,
-                    default=current.get(CONF_DISMISS_MINUTES, DEFAULT_DISMISS_MINUTES),
-                ): _dismiss_selector(),
+                **_behaviour_fields(current[CONF_APPLIANCE_TYPE], current),
                 vol.Optional(
                     CONF_ICON, default=current.get(CONF_ICON) or definition.icon
                 ): selector.IconSelector(),

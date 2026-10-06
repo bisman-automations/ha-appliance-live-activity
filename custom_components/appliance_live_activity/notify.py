@@ -165,3 +165,99 @@ async def async_clear(hass: HomeAssistant, coordinator: ApplianceCoordinator) ->
         coordinator,
         {"message": "clear_notification", "data": {"tag": coordinator.notification_tag}},
     )
+
+
+# ----------------------------------------------------------------------
+# Door monitoring (refrigerator / freezer)
+# ----------------------------------------------------------------------
+def _door_text(labels: list[str]) -> str:
+    if not labels:
+        return "Door"
+    if len(labels) == 1:
+        return labels[0]
+    return ", ".join(labels[:-1]) + " & " + labels[-1]
+
+
+async def async_send_door_open(
+    hass: HomeAssistant,
+    coordinator: ApplianceCoordinator,
+    *,
+    labels: list[str],
+    opened_at: float,
+    critical: bool,
+) -> None:
+    """Live Activity counting up from when the door opened."""
+    doors = _door_text(labels)
+    color = "#F44336" if critical else coordinator.icon_color
+    data: dict[str, Any] = {
+        "tag": coordinator.notification_tag,
+        "live_update": True,
+        "critical_text": "Still open" if critical else "Open",
+        "notification_icon": "mdi:fridge-alert" if critical else "mdi:door-open",
+        "notification_icon_color": color,
+        "color": color,
+        # Count up from the moment the door opened
+        "chronometer": True,
+        "when": int(opened_at),
+    }
+    await _async_send(
+        hass,
+        coordinator,
+        {
+            "title": coordinator.name,
+            "message": f"{doors} {'are' if len(labels) > 1 else 'is'} open",
+            "data": data,
+        },
+    )
+
+
+async def async_send_door_critical(
+    hass: HomeAssistant, coordinator: ApplianceCoordinator, *, labels: list[str], minutes_open: int
+) -> None:
+    """Critical alert (bypasses Silent / Focus on iOS, alarm stream on Android)."""
+    doors = _door_text(labels)
+    await _async_send(
+        hass,
+        coordinator,
+        {
+            "title": f"🚨 {coordinator.name}: {doors} open",
+            "message": f"Open for {minutes_open} min — please close it.",
+            "data": {
+                "tag": f"{coordinator.notification_tag}_critical",
+                "push": {
+                    "interruption-level": "critical",
+                    "sound": {"name": "default", "critical": 1, "volume": 1.0},
+                },
+                "ttl": 0,
+                "priority": "high",
+                "channel": "alarm_stream",
+            },
+        },
+    )
+
+
+async def async_send_door_closed(
+    hass: HomeAssistant, coordinator: ApplianceCoordinator, *, minutes_open: int
+) -> None:
+    """Show 'Closed' on the Live Activity (it is ended a minute later)."""
+    await _async_send(
+        hass,
+        coordinator,
+        {
+            "title": coordinator.name,
+            "message": f"Closed · was open {minutes_open} min" if minutes_open else "Closed",
+            "data": {
+                "tag": coordinator.notification_tag,
+                "live_update": True,
+                "critical_text": "Closed",
+                "notification_icon": "mdi:check-circle",
+                "notification_icon_color": "#4CAF50",
+                "color": "#4CAF50",
+            },
+        },
+    )
+
+
+async def async_clear_tag(hass: HomeAssistant, coordinator: ApplianceCoordinator, tag: str) -> None:
+    """Remove a notification by tag."""
+    await _async_send(hass, coordinator, {"message": "clear_notification", "data": {"tag": tag}})

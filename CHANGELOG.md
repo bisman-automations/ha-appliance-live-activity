@@ -6,6 +6,12 @@
 - **GE Home Appliances (SmartHQ) automatic setup**: pick the GE device and
   its state, sub-cycle, cycle, time-remaining, end-of-cycle, door and oven
   temperature entities are discovered automatically.
+- **Door monitoring** for refrigerators / freezers: Live Activity counting
+  up while a door is open (after a 30 s start delay), critical alerts every
+  minute after 5 minutes until it's closed, then "Closed" for a minute before
+  the activity ends. GE fridges get all doors automatically.
+- **Door Left Open blueprint** (`blueprints/automation/door_left_open.yaml`)
+  for any door sensor, with snooze, escalation, TTS and red lights.
 - **GE blueprint** (`blueprints/automation/ge_appliance_live_activity.yaml`)
   for using GE appliances without the integration. The integration also
   installs it, and keeps it updated unless you've edited it.
