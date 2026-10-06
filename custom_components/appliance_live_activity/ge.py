@@ -6,19 +6,20 @@ appliance, not six sensors. ha_gehome names entities
 ``sensor.kitchen_dishwasher_operating_mode``, so suffix matching works for
 both friendly-named and serial-named devices.
 
-The same rules are used by blueprints/automation/ge_appliance_live_activity.yaml.
 """
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry as dr, entity_registry as er
 
 from .const import (
+    CONF_COOKTOP_ENTITIES,
     CONF_CYCLE_ENTITY,
     CONF_DONE_ENTITY,
+    CONF_DOOR_ENTITIES,
     CONF_DOOR_ENTITY,
     CONF_PHASE_ENTITY,
     CONF_REMAINING_ENTITY,
@@ -40,6 +41,8 @@ class GEDiscovery:
     done_entity: str | None = None
     door_entity: str | None = None
     temperature_entity: str | None = None
+    door_entities: list[str] = field(default_factory=list)
+    cooktop_entities: list[str] = field(default_factory=list)
 
     def as_config(self) -> dict[str, str]:
         """Config-entry keys for every entity that was found."""
@@ -52,7 +55,12 @@ class GEDiscovery:
             CONF_DOOR_ENTITY: self.door_entity,
             CONF_TEMPERATURE_ENTITY: self.temperature_entity,
         }
-        return {k: v for k, v in mapping.items() if v}
+        result = {k: v for k, v in mapping.items() if v}
+        if self.door_entities:
+            result[CONF_DOOR_ENTITIES] = list(self.door_entities)
+        if self.cooktop_entities:
+            result[CONF_COOKTOP_ENTITIES] = list(self.cooktop_entities)
+        return result
 
 
 def _first(entity_ids: list[str], pattern: str, exclude: str | None = None) -> str | None:
@@ -81,8 +89,13 @@ def discover_from_entity_ids(entity_ids: list[str]) -> GEDiscovery:
         appliance_type = None
 
     if appliance_type == "refrigerator":
-        door = _first(ids, r"^binary_sensor\..*_door$", r"_(freezer|left|right)_door$")
-        return GEDiscovery(appliance_type=appliance_type, state_entity=door, door_entity=door)
+        # Every door: fridge (single or left/right) and freezer
+        doors = [e for e in ids if re.search(r"^binary_sensor\..*_door$", e)]
+        return GEDiscovery(
+            appliance_type=appliance_type,
+            state_entity=doors[0] if doors else None,
+            door_entities=doors,
+        )
 
     state = (
         _first(ids, r"^sensor\..*_operating_mode$")
@@ -109,6 +122,7 @@ def discover_from_entity_ids(entity_ids: list[str]) -> GEDiscovery:
         done_entity=_first(ids, r"^binary_sensor\..*_end_of_cycle$"),
         door_entity=_first(ids, r"^binary_sensor\..*_door$"),
         temperature_entity=_first(ids, r"^sensor\..*_display_temperature$"),
+        cooktop_entities=[e for e in ids if re.search(r"^binary_sensor\..*_cooktop_status$", e)],
     )
 
 

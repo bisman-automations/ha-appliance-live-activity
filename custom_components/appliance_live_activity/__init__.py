@@ -7,9 +7,9 @@ from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.typing import ConfigType
 
 from . import appliances  # noqa: F401  (import registers all appliance plugins)
-from .blueprint_installer import async_install_blueprints
-from .const import DOMAIN, PLATFORMS
+from .const import CONF_APPLIANCE_TYPE, DOMAIN, DOOR_TYPES, PLATFORMS
 from .coordinator import ApplianceCoordinator
+from .door import DoorCoordinator
 from .services import async_setup_services, async_unload_services
 
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
@@ -22,11 +22,13 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     hass.data.setdefault(DOMAIN, {})
-    if not hass.data[DOMAIN]:
-        # First entry loaded: install/update the bundled blueprints once
-        await async_install_blueprints(hass)
-
-    coordinator = ApplianceCoordinator(hass, entry)
+    cfg = {**entry.data, **entry.options}
+    coordinator_cls = (
+        DoorCoordinator
+        if cfg.get(CONF_APPLIANCE_TYPE) in DOOR_TYPES
+        else ApplianceCoordinator
+    )
+    coordinator = coordinator_cls(hass, entry)
     await coordinator.async_setup()
     hass.data[DOMAIN][entry.entry_id] = coordinator
 

@@ -1,18 +1,16 @@
-"""Refrigerator appliance definition.
+"""Refrigerator / freezer appliance definition.
 
-Fridges don't run "cycles" the way a washer or oven does, so this plugin
-disables progress-bar math (supports_progress=False) and uses the Live
-Activity to show that a door is open. Point state_entity at a door
-binary_sensor ("on" = open) or a door status sensor ("Open"/"Closed").
-Only listed states count as open, so unrecognised states never start
-an activity.
+Fridges don't run cycles; this type uses DoorCoordinator (door.py):
+a Live Activity while a door is open, critical alerts if it stays open,
+then "Closed" for a minute. Point it at one or more door binary sensors
+("on" = open) or door status sensors ("Open"/"Closed").
 """
 from ..appliance import ApplianceDefinition, register
 
 register(
     ApplianceDefinition(
         key="refrigerator",
-        display_name="Refrigerator",
+        display_name="Refrigerator / Freezer",
         icon="mdi:fridge",
         color="#03A9F4",
         active_states=["on", "Open", "Door Open"],
@@ -21,7 +19,7 @@ register(
         idle_states=["off", "Closed", "Door Closed"],
         running_message="Door Open",
         paused_message="Paused",
-        complete_message="Door Closed",
+        complete_message="Closed",
         finished_alert_message="Door closed.",
         supports_progress=False,
         unknown_is_running=False,

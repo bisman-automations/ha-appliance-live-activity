@@ -1,7 +1,7 @@
 {
   "domain": "appliance_live_activity",
   "name": "Appliance Live Activity",
-  "after_dependencies": ["automation", "mobile_app"],
+  "after_dependencies": ["mobile_app", "tts"],
   "codeowners": ["@donavanbecker"],
   "config_flow": true,
   "documentation": "https://github.com/donavanbecker/ha-appliance-live-activity",
@@ -9,5 +9,5 @@
   "iot_class": "calculated",
   "issue_tracker": "https://github.com/donavanbecker/ha-appliance-live-activity/issues",
   "requirements": [],
-  "version": "1.1.0"
+  "version": "1.2.0"
 }

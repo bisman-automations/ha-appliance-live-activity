@@ -57,6 +57,19 @@ class ApplianceStatusSensor(_ApplianceBaseSensor):
             "phase": self.coordinator.data.get("phase"),
             "cycle": self.coordinator.data.get("cycle"),
             "remaining_minutes": self.coordinator.data.get("remaining"),
+            **(
+                {"open_minutes": self.coordinator.data["open_minutes"]}
+                if "open_minutes" in self.coordinator.data
+                else {}
+            ),
+            **(
+                {
+                    "cooktop_on": self.coordinator.cooktop.is_on,
+                    "cooktop_on_minutes": round(self.coordinator.cooktop.minutes_on, 1),
+                }
+                if getattr(self.coordinator, "cooktop", None) is not None
+                else {}
+            ),
         }
 
 

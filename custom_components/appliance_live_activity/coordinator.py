@@ -17,13 +17,14 @@ persisted, so a Home Assistant restart resumes cleanly without helpers.
 from __future__ import annotations
 
 import logging
-import time
+
 from datetime import timedelta
 from typing import Any
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import ATTR_UNIT_OF_MEASUREMENT, STATE_ON
 from homeassistant.core import CALLBACK_TYPE, Event, HomeAssistant, callback
+from homeassistant.util import dt as dt_util
 from homeassistant.helpers.event import (
     async_call_later,
     async_track_state_change_event,
@@ -37,6 +38,9 @@ from .const import (
     CONF_ACTIVE_STATES,
     CONF_APPLIANCE_TYPE,
     CONF_COMPLETE_STATES,
+    CONF_COOKTOP_ALERT_MINUTES,
+    CONF_COOKTOP_ENTITIES,
+    CONF_COOKTOP_REPEAT_MINUTES,
     CONF_CYCLE_ENTITY,
     CONF_DEVICES,
     CONF_DISMISS_MINUTES,
@@ -51,8 +55,12 @@ from .const import (
     CONF_PAUSE_STATES,
     CONF_PHASE_ENTITY,
     CONF_REMAINING_ENTITY,
+    CONF_SPEAKERS,
     CONF_STATE_ENTITY,
     CONF_TEMPERATURE_ENTITY,
+    CONF_TTS_ENTITY,
+    DEFAULT_COOKTOP_ALERT_MINUTES,
+    DEFAULT_COOKTOP_REPEAT_MINUTES,
     DEFAULT_DISMISS_MINUTES,
     DOMAIN,
     DRIFT_MINUTES,
@@ -102,6 +110,22 @@ class ApplianceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.devices: list[str] = cfg.get(CONF_DEVICES) or []
         self.finished_alert: bool = cfg.get(CONF_FINISHED_ALERT, True)
         self.dismiss_minutes: float = float(cfg.get(CONF_DISMISS_MINUTES, DEFAULT_DISMISS_MINUTES))
+
+        # Cooktop left-on alerts (ovens / ranges)
+        self.cooktop = None
+        cooktop_entities = list(cfg.get(CONF_COOKTOP_ENTITIES) or [])
+        if cooktop_entities:
+            from .cooktop import CooktopMonitor  # noqa: PLC0415 - avoids import cycle
+
+            self.cooktop = CooktopMonitor(
+                hass,
+                self,
+                entities=cooktop_entities,
+                alert_minutes=float(cfg.get(CONF_COOKTOP_ALERT_MINUTES, DEFAULT_COOKTOP_ALERT_MINUTES)),
+                repeat_minutes=float(cfg.get(CONF_COOKTOP_REPEAT_MINUTES, DEFAULT_COOKTOP_REPEAT_MINUTES)),
+                tts_entity=cfg.get(CONF_TTS_ENTITY) or None,
+                speakers=list(cfg.get(CONF_SPEAKERS) or []),
+            )
 
         self._store: Store[dict[str, Any]] = Store(
             hass, STORAGE_VERSION, f"{DOMAIN}_{entry.entry_id}"
@@ -163,15 +187,19 @@ class ApplianceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         )
 
         if self._dismiss_at is not None:
-            self._schedule_dismiss(max(0.0, self._dismiss_at - time.time()))
+            self._schedule_dismiss(max(0.0, self._dismiss_at - dt_util.utcnow().timestamp()))
 
         await self.async_evaluate(send=True)
+        if self.cooktop is not None:
+            await self.cooktop.async_setup()
 
     async def async_unload(self) -> None:
         for unsub in self._unsubs:
             unsub()
         self._unsubs.clear()
         self._cancel_dismiss()
+        if self.cooktop is not None:
+            await self.cooktop.async_unload()
 
     # ------------------------------------------------------------------
     # Event handlers
@@ -305,7 +333,7 @@ class ApplianceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
         temperature = self._temperature_text()
         signature = (status, phase, cycle, temperature if self.appliance_type == "oven" else "")
-        now = time.time()
+        now = dt_util.utcnow().timestamp()
         expected = self._sent_remaining - (now - self._sent_at) / 60
         drifted = (
             status == STATUS_RUNNING
@@ -352,7 +380,7 @@ class ApplianceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 await async_send_done(self.hass, self, cycle)
                 if self.finished_alert:
                     await async_send_finished_alert(self.hass, self)
-                self._dismiss_at = time.time() + self.dismiss_minutes * 60
+                self._dismiss_at = dt_util.utcnow().timestamp() + self.dismiss_minutes * 60
                 self._schedule_dismiss(self.dismiss_minutes * 60)
             else:
                 # Cancelled, or a door that closed: just end the activity

@@ -19,23 +19,6 @@ jobs:
         with:
           category: integration
 
-  blueprints-in-sync:
-    name: Bundled blueprints match blueprints/automation
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Compare copies
-        run: |
-          status=0
-          for f in custom_components/appliance_live_activity/blueprints/*.yaml; do
-            src="blueprints/automation/$(basename "$f")"
-            if ! cmp -s "$f" "$src"; then
-              echo "::error file=$f::Out of sync with $src — run scripts/sync_blueprints.sh"
-              status=1
-            fi
-          done
-          exit $status
-
   tests:
     runs-on: ubuntu-latest
     steps:

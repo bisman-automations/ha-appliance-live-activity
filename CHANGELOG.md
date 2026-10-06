@@ -1,20 +1,40 @@
 # Changelog
 
+## 1.2.0
+
+### Added
+- **Door monitoring** for refrigerators / freezers: after a door has been
+  open 30 s, a Live Activity counts up how long it's been open. After 5
+  minutes it turns red and **critical alerts** repeat every minute until the
+  door is closed. On close the alerts are removed and the Live Activity shows
+  "Closed · was open N min" for a minute, then ends. GE fridges get every door
+  (fridge left/right, freezer) automatically.
+- **Door** appliance type for garage, patio, gate and other doors, using the
+  same flow.
+- **Escalation** for doors: after N critical alerts, extra phones get the
+  alerts, speakers announce it, and chosen lights turn red (restored on close).
+- **Cooktop left-on alerts** for ovens (from the "Critical Gas Cooktop Left
+  On Alert" blueprint): critical alert after 30 min with an **Acknowledge**
+  button, repeating every 15 min, optional speaker announcement, removed when
+  the cooktop turns off. GE ovens' cooktop sensor is found automatically.
+- Options for all door and cooktop timings, escalation and announcements.
+
+### Changed
+- Everything lives in the integration: the repo no longer ships blueprints,
+  and the blueprint installer was removed.
+
 ## 1.1.0
 
 ### Added
 - **GE Home Appliances (SmartHQ) automatic setup**: pick the GE device and
   its state, sub-cycle, cycle, time-remaining, end-of-cycle, door and oven
   temperature entities are discovered automatically.
-- **GE blueprint** (`blueprints/automation/ge_appliance_live_activity.yaml`)
-  for using GE appliances without the integration. The integration also
-  installs it, and keeps it updated unless you've edited it.
 - Native countdown on the phone (`chronometer` / `when` / `when_relative`).
 - "Finished" handling: *Done* state, optional time-sensitive alert, and the
   Live Activity is ended when the door opens or after a configurable delay.
 - Optional end-of-cycle and door entities for manually configured appliances.
 - Options: finished alert and dismiss delay.
-- Tests and a CI workflow (hassfest, HACS validation, blueprint sync check).
+- Tests and a CI workflow (hassfest, HACS validation, pytest).
 
 ### Fixed
 - **Notifications were never sent**: phones were looked up by notify
