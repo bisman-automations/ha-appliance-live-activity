@@ -6,11 +6,12 @@ from homeassistant.const import Platform
 DOMAIN = "appliance_live_activity"
 STORAGE_VERSION = 1
 
-PLATFORMS: list[Platform] = [Platform.SENSOR]
+PLATFORMS: list[Platform] = [Platform.SENSOR, Platform.NUMBER]
 
 # Config keys
 CONF_SOURCE = "source"
 CONF_SOURCE_DEVICE = "source_device"
+CONF_GE_DISCOVERY = "ge_discovery"
 CONF_APPLIANCE_TYPE = "appliance_type"
 CONF_NAME = "name"
 CONF_STATE_ENTITY = "state_entity"
@@ -62,6 +63,19 @@ CONF_DELAY_ENTITY = "delay_entity"
 CONF_DELAY_START = "delay_start"
 # Door alert snooze button (0 = no button)
 CONF_SNOOZE_MINUTES = "snooze_minutes"
+# Oven extras
+CONF_OVEN_CAVITY = "oven_cavity"
+CONF_TIMER_ENTITY = "timer_entity"
+CONF_PROBE_ENTITY = "probe_entity"
+# Dryer extras
+CONF_TUMBLE_ENTITY = "tumble_entity"
+CONF_VENT_ENTITY = "vent_entity"
+# Washer + dryer share one Live Activity
+CONF_COMBINE_LAUNDRY = "combine_laundry"
+# Refill reminders / maintenance
+CONF_SUPPLY_ENTITIES = "supply_entities"
+CONF_SUPPLY_LOW = "supply_low"
+CONF_FILTER_ENTITY = "filter_entity"
 
 # Appliance types handled by the door monitor
 DOOR_TYPES = ("refrigerator", "door")
@@ -113,6 +127,14 @@ DEFAULT_MOVE_MAX_REMINDERS = 3
 
 # Door alert snooze
 DEFAULT_SNOOZE_MINUTES = 10
+
+# Refill reminders: a count (loads, pods, sheets) at or below this is "low";
+# a percentage at or below SUPPLY_LOW_PERCENT is "low"
+DEFAULT_SUPPLY_LOW = 3
+SUPPLY_LOW_PERCENT = 25
+
+# Blocked dryer vent: repeat the critical alert this often while it's flagged
+VENT_REPEAT_MINUTES = 30
 
 # Notification action buttons (suffixes; the full action id is
 # "<NOTIFICATION TAG>_<SUFFIX>" so every appliance has its own)

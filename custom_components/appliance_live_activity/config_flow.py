@@ -24,6 +24,7 @@ from .const import (
     CONF_COOKTOP_REPEAT_MINUTES,
     CONF_CRITICAL_AFTER_MINUTES,
     CONF_CRITICAL_REPEAT_MINUTES,
+    CONF_COMBINE_LAUNDRY,
     CONF_CYCLE_ENTITY,
     CONF_DELAY_ENTITY,
     CONF_DELAY_START,
@@ -36,7 +37,9 @@ from .const import (
     CONF_DRYER_START_ENTITY,
     CONF_ESCALATE_AFTER,
     CONF_ESCALATION_DEVICES,
+    CONF_FILTER_ENTITY,
     CONF_FINISHED_ALERT,
+    CONF_GE_DISCOVERY,
     CONF_ICON,
     CONF_ICON_COLOR,
     CONF_LEAK_ENTITIES,
@@ -47,17 +50,24 @@ from .const import (
     CONF_NAME,
     CONF_NOTIFICATION_TAG,
     CONF_OPEN_DELAY_SECONDS,
+    CONF_OVEN_CAVITY,
     CONF_PHASE_ENTITY,
     CONF_PREHEAT_ALERT,
+    CONF_PROBE_ENTITY,
     CONF_REMAINING_ENTITY,
     CONF_SNOOZE_MINUTES,
     CONF_SOURCE,
     CONF_SOURCE_DEVICE,
     CONF_SPEAKERS,
     CONF_STATE_ENTITY,
+    CONF_SUPPLY_ENTITIES,
+    CONF_SUPPLY_LOW,
     CONF_TARGET_TEMPERATURE_ENTITY,
     CONF_TEMPERATURE_ENTITY,
+    CONF_TIMER_ENTITY,
     CONF_TTS_ENTITY,
+    CONF_TUMBLE_ENTITY,
+    CONF_VENT_ENTITY,
     DEFAULT_COOKTOP_ALERT_MINUTES,
     DEFAULT_COOKTOP_REPEAT_MINUTES,
     DEFAULT_CRITICAL_AFTER_MINUTES,
@@ -70,6 +80,7 @@ from .const import (
     DEFAULT_MOVE_REPEAT_MINUTES,
     DEFAULT_OPEN_DELAY_SECONDS,
     DEFAULT_SNOOZE_MINUTES,
+    DEFAULT_SUPPLY_LOW,
     DOMAIN,
     DOOR_TYPES,
     GE_HOME_DOMAIN,
@@ -77,6 +88,8 @@ from .const import (
     SOURCE_MANUAL,
 )
 from .ge import async_discover, async_has_ge_devices, device_name
+
+GE_DISCOVERY_VERSION = 2  # keep in sync with __init__.GE_DISCOVERY_VERSION
 from .helpers import hex_to_rgb, slugify_tag
 
 AUTO = "auto"
@@ -152,6 +165,9 @@ CLEARABLE = (
     CONF_SPEAKERS,
     CONF_ESCALATION_DEVICES,
     CONF_ALERT_LIGHTS,
+    CONF_SUPPLY_ENTITIES,
+    CONF_FILTER_ENTITY,
+    CONF_VENT_ENTITY,
 )
 
 
@@ -186,6 +202,9 @@ def _behaviour_fields(appliance_type: str, current: dict[str, Any], has_cooktop:
                 vol.Optional(CONF_ALERT_LIGHTS): selector.EntitySelector(
                     selector.EntitySelectorConfig(domain="light", multiple=True)
                 ),
+                vol.Optional(CONF_FILTER_ENTITY): selector.EntitySelector(
+                    selector.EntitySelectorConfig(domain="sensor")
+                ),
             }
         )
     else:
@@ -202,6 +221,23 @@ def _behaviour_fields(appliance_type: str, current: dict[str, Any], has_cooktop:
                     CONF_DELAY_START, default=current.get(CONF_DELAY_START, True)
                 ): selector.BooleanSelector(),
             }
+        )
+        if appliance_type in ("washer", "dryer", "dishwasher"):
+            fields.update(
+                {
+                    vol.Optional(CONF_SUPPLY_ENTITIES): selector.EntitySelector(
+                        selector.EntitySelectorConfig(
+                            domain=["sensor", "number", "binary_sensor"], multiple=True
+                        )
+                    ),
+                    vol.Optional(
+                        CONF_SUPPLY_LOW, default=current.get(CONF_SUPPLY_LOW, DEFAULT_SUPPLY_LOW)
+                    ): _number(0, 50, 1, "left"),
+                }
+            )
+    if appliance_type == "dryer":
+        fields[vol.Optional(CONF_VENT_ENTITY)] = selector.EntitySelector(
+            selector.EntitySelectorConfig(domain="binary_sensor")
         )
     if appliance_type == "oven":
         fields[
@@ -228,6 +264,9 @@ def _behaviour_fields(appliance_type: str, current: dict[str, Any], has_cooktop:
                 vol.Optional(CONF_DRYER_START_ENTITY): selector.EntitySelector(
                     selector.EntitySelectorConfig(domain="button")
                 ),
+                vol.Optional(
+                    CONF_COMBINE_LAUNDRY, default=current.get(CONF_COMBINE_LAUNDRY, True)
+                ): selector.BooleanSelector(),
             }
         )
     if has_cooktop:
@@ -292,19 +331,17 @@ class ApplianceLiveActivityConfigFlow(ConfigFlow, domain=DOMAIN):
             elif appliance_type not in APPLIANCE_REGISTRY:
                 errors[CONF_APPLIANCE_TYPE] = "unknown_type"
             else:
-                await self.async_set_unique_id(f"{GE_HOME_DOMAIN}_{device_id}")
-                self._abort_if_unique_id_configured()
-                name = (user_input.get(CONF_NAME) or "").strip() or (
-                    device_name(self.hass, device_id) or APPLIANCE_REGISTRY[appliance_type].display_name
-                )
+                name = (user_input.get(CONF_NAME) or "").strip()
                 self._data = {
                     CONF_SOURCE: SOURCE_GE_HOME,
                     CONF_SOURCE_DEVICE: device_id,
                     CONF_APPLIANCE_TYPE: appliance_type,
                     CONF_NAME: name,
-                    **found.as_config(),
                 }
-                return await self.async_step_notify()
+                if appliance_type == "oven" and found.cavities:
+                    # Double oven: one entry per oven
+                    return await self.async_step_oven_cavity()
+                return await self._async_ge_finish(None)
 
         schema = vol.Schema(
             {
@@ -322,6 +359,50 @@ class ApplianceLiveActivityConfigFlow(ConfigFlow, domain=DOMAIN):
             data_schema=self.add_suggested_values_to_schema(schema, user_input or {}),
             errors=errors,
         )
+
+    async def async_step_oven_cavity(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Double oven: choose the upper or lower oven."""
+        if user_input is not None:
+            return await self._async_ge_finish(user_input[CONF_OVEN_CAVITY])
+        configured = {
+            entry.data.get(CONF_OVEN_CAVITY)
+            for entry in self._async_current_entries(include_ignore=False)
+            if entry.data.get(CONF_SOURCE_DEVICE) == self._data[CONF_SOURCE_DEVICE]
+        }
+        options = [
+            selector.SelectOptionDict(value=c, label=f"{c.title()} oven")
+            for c in ("upper", "lower")
+            if c not in configured
+        ]
+        if not options:
+            return self.async_abort(reason="already_configured")
+        schema = vol.Schema(
+            {
+                vol.Required(CONF_OVEN_CAVITY, default=options[0]["value"]): selector.SelectSelector(
+                    selector.SelectSelectorConfig(options=options)
+                )
+            }
+        )
+        return self.async_show_form(step_id="oven_cavity", data_schema=schema)
+
+    async def _async_ge_finish(self, cavity: str | None) -> ConfigFlowResult:
+        device_id = self._data[CONF_SOURCE_DEVICE]
+        appliance_type = self._data[CONF_APPLIANCE_TYPE]
+        found = async_discover(self.hass, device_id, cavity)
+        unique = f"{GE_HOME_DOMAIN}_{device_id}" + (f"_{cavity}" if cavity else "")
+        await self.async_set_unique_id(unique)
+        self._abort_if_unique_id_configured()
+        name = self._data.get(CONF_NAME) or (
+            device_name(self.hass, device_id) or APPLIANCE_REGISTRY[appliance_type].display_name
+        )
+        if cavity and not self._data.get(CONF_NAME):
+            name = f"{name} {cavity.title()}"
+        self._data.update(
+            {CONF_NAME: name, **found.as_config(), CONF_GE_DISCOVERY: GE_DISCOVERY_VERSION}
+        )
+        return await self.async_step_notify()
 
     # ------------------------------------------------------------------
     # Manual (any brand)
@@ -375,8 +456,12 @@ class ApplianceLiveActivityConfigFlow(ConfigFlow, domain=DOMAIN):
                             domain=["water_heater", "climate", "number", "sensor"]
                         )
                     ),
+                    vol.Optional(CONF_TIMER_ENTITY): sensor,
+                    vol.Optional(CONF_PROBE_ENTITY): sensor,
                 }
             )
+        if self._data[CONF_APPLIANCE_TYPE] == "dryer":
+            schema = schema.extend({vol.Optional(CONF_TUMBLE_ENTITY): sensor})
         if self._data[CONF_APPLIANCE_TYPE] in DOOR_TYPES:
             # Doors only: the state entity is the first door, add more here
             schema = vol.Schema(

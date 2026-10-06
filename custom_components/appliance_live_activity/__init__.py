@@ -10,7 +10,8 @@ from . import appliances  # noqa: F401  (import registers all appliance plugins)
 from .const import (
     CONF_APPLIANCE_TYPE,
     CONF_DELAY_ENTITY,
-    CONF_DRYER_START_ENTITY,
+    CONF_GE_DISCOVERY,
+    CONF_OVEN_CAVITY,
     CONF_SOURCE,
     CONF_SOURCE_DEVICE,
     DOMAIN,
@@ -30,24 +31,31 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     return True
 
 
+# Bump when GE discovery learns new entities, so existing entries pick them up
+GE_DISCOVERY_VERSION = 2
+
+
 def _async_backfill_ge(hass: HomeAssistant, entry: ConfigEntry) -> None:
-    """GE appliances set up before 1.5.0: find the entities added since then
-    (delay sensor, dryer start button) once, without another setup."""
-    if entry.data.get(CONF_SOURCE) != SOURCE_GE_HOME or CONF_DELAY_ENTITY in entry.data:
+    """GE appliances set up with an older version: add the entities discovery
+    has learned since (delay sensor, dryer start button, kitchen timer,
+    probe...) once, without another setup. Nothing the user set or cleared
+    in Configure is touched."""
+    if entry.data.get(CONF_SOURCE) != SOURCE_GE_HOME:
+        return
+    if entry.data.get(CONF_GE_DISCOVERY, 0) >= GE_DISCOVERY_VERSION:
         return
     device_id = entry.data.get(CONF_SOURCE_DEVICE)
     if not device_id:
         return
     from .ge import async_discover  # noqa: PLC0415
 
-    found = async_discover(hass, device_id)
-    new = {**entry.data, CONF_DELAY_ENTITY: found.delay_entity}
-    if (
-        entry.data.get(CONF_APPLIANCE_TYPE) == "washer"
-        and CONF_DRYER_START_ENTITY not in entry.options
-        and found.dryer_start_entity
-    ):
-        new[CONF_DRYER_START_ENTITY] = found.dryer_start_entity
+    found = async_discover(hass, device_id, entry.data.get(CONF_OVEN_CAVITY))
+    new = dict(entry.data)
+    for key, value in found.as_config().items():
+        if key not in entry.data and key not in entry.options:
+            new[key] = value
+    new.setdefault(CONF_DELAY_ENTITY, None)
+    new[CONF_GE_DISCOVERY] = GE_DISCOVERY_VERSION
     hass.config_entries.async_update_entry(entry, data=new)
 
 

@@ -86,6 +86,24 @@ class ApplianceStatusSensor(_ApplianceBaseSensor):
                 else {}
             ),
             **(
+                {"kitchen_timer_minutes": round(self.coordinator.timer.remaining)}
+                if getattr(self.coordinator, "timer", None) is not None
+                else {}
+            ),
+            **(
+                {
+                    "probe_temperature": self.coordinator.probe.temperature or None,
+                    "probe_target": self.coordinator.probe.target or None,
+                }
+                if getattr(self.coordinator, "probe", None) is not None
+                else {}
+            ),
+            **(
+                {"vent_blocked": self.coordinator.vent.blocked}
+                if getattr(self.coordinator, "vent", None) is not None
+                else {}
+            ),
+            **(
                 {"leak_detected": bool(self.coordinator.leak.wet)}
                 if getattr(self.coordinator, "leak", None) is not None
                 else {}

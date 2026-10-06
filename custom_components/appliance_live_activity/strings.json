@@ -41,14 +41,20 @@
           "cooktop_entities": "Cooktop on/off sensors",
           "temperature_entity": "Oven temperature sensor",
           "target_temperature_entity": "Oven set temperature (thermostat or sensor)",
-          "delay_entity": "Delay time remaining sensor"
+          "delay_entity": "Delay time remaining sensor",
+          "timer_entity": "Kitchen timer sensor",
+          "probe_entity": "Meat probe temperature sensor",
+          "tumble_entity": "Extended tumble sensor"
         },
         "data_description": {
           "remaining_entity": "Hours, minutes or seconds — the unit is read from the sensor.",
           "done_entity": "Turns on when a cycle finishes. Optional, but makes 'Done' detection exact.",
           "door_entity": "Opening the door dismisses a finished Live Activity.",
           "cooktop_entities": "Turns on cooktop left-on alerts.",
-          "delay_entity": "While a delayed start is waiting, the Live Activity counts down to the start."
+          "delay_entity": "While a delayed start is waiting, the Live Activity counts down to the start.",
+          "timer_entity": "A timer set on the oven gets its own countdown Live Activity and a \"Timer done\" alert.",
+          "probe_entity": "Live Activity with the probe temperature. Set the target with the appliance's Probe Target number.",
+          "tumble_entity": "Shows \"tumbling to prevent wrinkles\" after the cycle until the door opens."
         }
       },
       "notify": {
@@ -78,7 +84,12 @@
           "leak_repeat_minutes": "Repeat leak alerts every",
           "delay_start": "Live Activity while a delayed start is waiting",
           "dryer_start_entity": "Dryer start button (adds a \"Start dryer\" button)",
-          "snooze_minutes": "Snooze button on critical alerts (0 = no button)"
+          "snooze_minutes": "Snooze button on critical alerts (0 = no button)",
+          "combine_laundry": "One Live Activity for the washer and dryer",
+          "supply_entities": "Supply sensors for refill reminders",
+          "supply_low": "Remind when this many (loads, pods, sheets) are left",
+          "vent_entity": "Blocked vent sensor",
+          "filter_entity": "Water filter status sensor"
         },
         "data_description": {
           "finished_alert": "Changing a Live Activity to Done doesn't always alert you; this does.",
@@ -93,7 +104,18 @@
           "tts_entity": "Used for leak, cooktop and door announcements.",
           "delay_start": "Counts down to when the cycle starts (\"Scheduled · starts at 3:45 PM\"), then switches to the normal countdown.",
           "dryer_start_entity": "The alerts get \"Start dryer\" and \"Laundry moved\" buttons. Start dryer presses this button; the dryer's Remote Start must be on.",
-          "snooze_minutes": "Pauses the critical alerts for this long while the door stays open. The Live Activity stays."
+          "snooze_minutes": "Pauses the critical alerts for this long while the door stays open. The Live Activity stays.",
+          "combine_laundry": "Washing → move to the dryer → drying → done, all in one \"Laundry\" Live Activity. iOS limits how many Live Activities you can have at once.",
+          "supply_entities": "After a cycle, one reminder listing what's low (detergent tank, pods, rinse aid, dryer sheets). Each is mentioned once until it's refilled. Percentages count as low at 25 % or less.",
+          "vent_entity": "Critical alert while the dryer reports a blocked vent (a fire risk), repeated every 30 minutes.",
+          "filter_entity": "A reminder when the filter needs replacing, and a critical alert if it reports a leak."
+        }
+      },
+      "oven_cavity": {
+        "title": "Double oven",
+        "description": "This is a double oven. Choose which oven to set up, then add the integration again for the other one.",
+        "data": {
+          "oven_cavity": "Oven"
         }
       }
     },
@@ -134,7 +156,12 @@
           "leak_repeat_minutes": "Repeat leak alerts every",
           "delay_start": "Live Activity while a delayed start is waiting",
           "dryer_start_entity": "Dryer start button (adds a \"Start dryer\" button)",
-          "snooze_minutes": "Snooze button on critical alerts (0 = no button)"
+          "snooze_minutes": "Snooze button on critical alerts (0 = no button)",
+          "combine_laundry": "One Live Activity for the washer and dryer",
+          "supply_entities": "Supply sensors for refill reminders",
+          "supply_low": "Remind when this many (loads, pods, sheets) are left",
+          "vent_entity": "Blocked vent sensor",
+          "filter_entity": "Water filter status sensor"
         },
         "data_description": {
           "preheat_alert": "A time-sensitive alert when the oven reaches its set temperature. The Live Activity shows the temperature climbing while it preheats.",
@@ -143,7 +170,11 @@
           "tts_entity": "Used for leak, cooktop and door announcements.",
           "delay_start": "Counts down to when the cycle starts (\"Scheduled · starts at 3:45 PM\"), then switches to the normal countdown.",
           "dryer_start_entity": "The alerts get \"Start dryer\" and \"Laundry moved\" buttons. Start dryer presses this button; the dryer's Remote Start must be on.",
-          "snooze_minutes": "Pauses the critical alerts for this long while the door stays open. The Live Activity stays."
+          "snooze_minutes": "Pauses the critical alerts for this long while the door stays open. The Live Activity stays.",
+          "combine_laundry": "Washing → move to the dryer → drying → done, all in one \"Laundry\" Live Activity. iOS limits how many Live Activities you can have at once.",
+          "supply_entities": "After a cycle, one reminder listing what's low (detergent tank, pods, rinse aid, dryer sheets). Each is mentioned once until it's refilled. Percentages count as low at 25 % or less.",
+          "vent_entity": "Critical alert while the dryer reports a blocked vent (a fire risk), repeated every 30 minutes.",
+          "filter_entity": "A reminder when the filter needs replacing, and a critical alert if it reports a leak."
         }
       }
     }

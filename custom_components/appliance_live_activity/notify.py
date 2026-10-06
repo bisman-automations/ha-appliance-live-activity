@@ -108,7 +108,7 @@ async def async_send_progress(
         f"{minutes_left} min left" if minutes_left > 0 else "",
     )
     data: dict[str, Any] = {
-        "tag": coordinator.notification_tag,
+        "tag": coordinator.activity_tag,
         "live_update": True,
         "critical_text": headline,
         "notification_icon": "mdi:pause-circle" if paused else coordinator.icon,
@@ -124,14 +124,16 @@ async def async_send_progress(
         data["when"] = int(remaining * 60)
         data["when_relative"] = True
     await _async_send(
-        hass, coordinator, {"title": coordinator.name, "message": message, "data": data}
+        hass, coordinator, {"title": coordinator.activity_title, "message": message, "data": data}
     )
 
 
-async def async_send_done(hass: HomeAssistant, coordinator: ApplianceCoordinator, cycle: str) -> None:
+async def async_send_done(
+    hass: HomeAssistant, coordinator: ApplianceCoordinator, cycle: str, note: str = ""
+) -> None:
     """Switch the Live Activity to its finished state."""
     data: dict[str, Any] = {
-        "tag": coordinator.notification_tag,
+        "tag": coordinator.activity_tag,
         "live_update": True,
         "critical_text": "Done",
         "notification_icon": "mdi:check-circle",
@@ -145,8 +147,8 @@ async def async_send_done(hass: HomeAssistant, coordinator: ApplianceCoordinator
         hass,
         coordinator,
         {
-            "title": coordinator.name,
-            "message": _join(coordinator.definition.complete_message, cycle),
+            "title": coordinator.activity_title,
+            "message": _join(coordinator.definition.complete_message, cycle, note),
             "data": data,
         },
     )
@@ -195,7 +197,7 @@ async def async_send_delayed(
     """Live Activity for a delayed start: counts down to when the cycle starts."""
     message = _join("Delayed start", cycle, f"starts at {starts_at}" if starts_at else "")
     data: dict[str, Any] = {
-        "tag": coordinator.notification_tag,
+        "tag": coordinator.activity_tag,
         "live_update": True,
         "critical_text": "Scheduled",
         "notification_icon": "mdi:timer-sand",
@@ -206,7 +208,7 @@ async def async_send_delayed(
         data["chronometer"] = True
         data["when"] = int(starts_in * 60)
         data["when_relative"] = True
-    await _async_send(hass, coordinator, {"title": coordinator.name, "message": message, "data": data})
+    await _async_send(hass, coordinator, {"title": coordinator.activity_title, "message": message, "data": data})
 
 
 async def async_send_dryer_remote_off(hass: HomeAssistant, coordinator: ApplianceCoordinator) -> None:
@@ -233,7 +235,7 @@ async def async_clear(hass: HomeAssistant, coordinator: ApplianceCoordinator) ->
     await _async_send(
         hass,
         coordinator,
-        {"message": "clear_notification", "data": {"tag": coordinator.notification_tag}},
+        {"message": "clear_notification", "data": {"tag": coordinator.activity_tag}},
     )
 
 
@@ -514,4 +516,81 @@ async def async_send_move_reminder(
                 actions,
             ),
         },
+    )
+
+
+# ----------------------------------------------------------------------
+# Generic helpers (kitchen timer, probe, maintenance alerts)
+# ----------------------------------------------------------------------
+async def async_send_live(
+    hass: HomeAssistant,
+    coordinator: ApplianceCoordinator,
+    *,
+    tag: str,
+    title: str,
+    message: str,
+    critical_text: str,
+    icon: str,
+    color: str | None = None,
+    progress: int | None = None,
+    countdown_minutes: float | None = None,
+) -> None:
+    """Start or update an extra Live Activity (its own tag)."""
+    color = color or coordinator.icon_color
+    data: dict[str, Any] = {
+        "tag": tag,
+        "live_update": True,
+        "critical_text": critical_text,
+        "notification_icon": icon,
+        "notification_icon_color": color,
+        "color": color,
+    }
+    if progress is not None:
+        data["progress"] = max(0, min(100, int(progress)))
+        data["progress_max"] = 100
+    if countdown_minutes is not None and countdown_minutes > 0:
+        data["chronometer"] = True
+        data["when"] = int(countdown_minutes * 60)
+        data["when_relative"] = True
+    await _async_send(hass, coordinator, {"title": title, "message": message, "data": data})
+
+
+LEVELS = {
+    "passive": {"push": {"interruption-level": "passive"}},
+    "active": {},
+    "time-sensitive": {
+        "push": {"interruption-level": "time-sensitive"},
+        "ttl": 0,
+        "priority": "high",
+    },
+    "critical": {
+        "push": {
+            "interruption-level": "critical",
+            "sound": {"name": "default", "critical": 1, "volume": 1.0},
+        },
+        "ttl": 0,
+        "priority": "high",
+        "channel": "alarm_stream",
+    },
+}
+
+
+async def async_send_alert(
+    hass: HomeAssistant,
+    coordinator: ApplianceCoordinator,
+    *,
+    tag: str,
+    title: str,
+    message: str,
+    level: str = "time-sensitive",
+    devices: list[str] | None = None,
+    actions: list[dict[str, str]] | None = None,
+) -> None:
+    """A regular notification at the given interruption level."""
+    data: dict[str, Any] = {"tag": tag, **LEVELS[level]}
+    await _async_send(
+        hass,
+        coordinator,
+        {"title": title, "message": message, "data": _with_actions(data, actions)},
+        devices,
     )

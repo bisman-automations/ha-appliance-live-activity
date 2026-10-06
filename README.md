@@ -7,10 +7,10 @@ Assistant — plus critical alerts when something is left open or left on.
 
 | Appliance | What you get |
 |---|---|
-| **Washer, dryer, dishwasher** | Live Activity with the current phase, cycle, a live countdown and progress bar → **Done** → dismissed when the door opens. **Delayed starts** count down to the start. Washers also remind you to **move the laundry**, with **Start dryer** / **Laundry moved** buttons |
-| **Oven** | Live Activity while **preheating** (temperature climbing) and cooking + **preheated** alert + **cooktop left-on** critical alerts |
+| **Washer, dryer, dishwasher** | Live Activity with the current phase, cycle, a live countdown and progress bar → **Done** → dismissed when the door opens. **Delayed starts** count down to the start. Washer and dryer share **one Live Activity per load**. Reminders to **move the laundry** (with **Start dryer** / **Laundry moved** buttons), **refill** detergent, pods and dryer sheets, and a critical alert for a **blocked dryer vent** |
+| **Oven** | Live Activity while **preheating** and cooking, plus separate ones for the **kitchen timer** and the **meat probe** + **preheated** alert + **cooktop left-on** critical alerts. Double ovens supported |
 | **Any appliance** | **Water leak** critical alerts from leak sensors |
-| **Refrigerator / freezer** | Live Activity while a door is open → **critical alerts** if it stays open → **Closed** |
+| **Refrigerator / freezer** | Live Activity while a door is open → **critical alerts** if it stays open → **Closed**, plus **water filter** reminders |
 | **Any door** (garage, patio, gate…) | Same as the fridge, for any door sensor |
 
 **GE Home Appliances (SmartHQ)** appliances are set up automatically — pick
@@ -27,11 +27,17 @@ Everything is in the integration — no blueprints, helpers or YAML needed.
 
 ## Install via HACS
 
-1. HACS → ⋮ → **Custom repositories** → add
-   `https://github.com/donavanbecker/ha-appliance-live-activity`, category
-   **Integration**.
+[![Open your Home Assistant instance and open this repository in HACS.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=bisman-automations&repository=ha-appliance-live-activity&category=integration)
+
+1. Click the button above (or HACS → ⋮ → **Custom repositories** → add
+   `https://github.com/bisman-automations/ha-appliance-live-activity`, category
+   **Integration**).
 2. Install **Appliance Live Activity** and restart Home Assistant.
-3. Settings → Devices & services → **Add integration** → *Appliance Live Activity*.
+3. Add the integration:
+
+   [![Open your Home Assistant instance and start setting up Appliance Live Activity.](https://my.home-assistant.io/badges/config_flow_start.svg)](https://my.home-assistant.io/redirect/config_flow_start/?domain=appliance_live_activity)
+
+   or Settings → Devices & services → **Add integration** → *Appliance Live Activity*.
 
 ## Setup
 
@@ -39,8 +45,11 @@ Add one entry per appliance.
 
 - **GE appliance (SmartHQ) — automatic:** choose the GE device. State,
   sub-cycle, cycle, time remaining, end-of-cycle, door, oven temperature,
-  cooktop and every fridge/freezer door are found automatically. Then
-  choose your phones and alert settings.
+  cooktop, kitchen timer, meat probe, delay timer, dryer start button,
+  blocked-vent sensor, supply levels, water filter and every fridge/freezer
+  door are found automatically. Then choose your phones and alert settings.
+  For a **double oven**, choose the upper or lower oven, then add the
+  integration again for the other one.
 - **Any appliance or door:** choose the type (washer, dryer, dishwasher,
   oven, refrigerator, door), then its sensors, then your phones.
 
@@ -65,6 +74,33 @@ Everything after the sensors can be changed later with **Configure**.
   shows *Scheduled · starts at 3:45 PM* and counts down to the start, then
   switches to the cycle countdown. Cancelling the delay ends it.
 
+### Laundry: one Live Activity per load
+
+The washer and dryer share a single **Laundry** Live Activity: washing →
+*Wash Complete · move to the dryer* → drying → *Dry Complete*. Opening the
+washer door to move the load keeps it up; the dryer takes it over when it
+starts. It ends when the dryer door opens (or after the dismiss delay).
+Turn it off in the washer's **Configure** to get two separate activities.
+
+### Dryer wrinkle tumble
+
+If the dryer finishes into extended tumble, the Live Activity shows
+*Dry Complete · tumbling to prevent wrinkles* and stays up until you open
+the door.
+
+### Oven kitchen timer
+
+A timer set on the oven gets its own Live Activity counting down, then a
+time-sensitive **Timer done** alert. Cancelling the timer ends it.
+
+### Meat probe
+
+While the probe is plugged in, a Live Activity shows its temperature. GE
+ovens don't report the probe target, so set it on the appliance's
+**Probe Target** number (e.g. from a dashboard) — then it shows
+*Probe 128°F → 145°F* with a progress bar, and you get an alert when it's
+reached. 0 = just show the temperature. Unplugging the probe ends it.
+
 ### Oven preheat
 
 When the oven is preheating, the Live Activity shows the temperature climbing
@@ -80,6 +116,16 @@ Add leak sensors to any appliance. The moment one detects water you get a
 alert stops the repeats; a new leak alerts again. Sensors named after the
 appliance, like a "Kitchen Dishwasher Leak Sensor", are picked automatically
 in GE setup.
+
+### Appliance health
+
+- **Blocked dryer vent** — a critical alert (it's a fire risk) while the
+  dryer reports it, repeated every 30 minutes.
+- **Refill reminders** — after a cycle, one notification listing what's low:
+  detergent tank, dishwasher pods or rinse aid, dryer sheets (3 or fewer by
+  default, or 25 % for tank levels). Each is mentioned once until refilled.
+- **Water filter** — a reminder when the fridge's filter needs replacing or
+  has expired; a critical alert if it reports a leak.
 
 ### Move the laundry (washers)
 
@@ -130,6 +176,7 @@ Home Assistant app (the GE appliance's own page for GE setups).
 - **Status** and **Progress** sensors per appliance, plus **Time Left** and
   **Finishes At** for washers, dryers, dishwashers and ovens (status attributes include
   phase, cycle, remaining minutes, door open minutes and cooktop on-time).
+- **Probe Target** number for ovens with a meat probe.
 - `appliance_live_activity.update` re-sends an appliance's Live Activity.
 
 ## Adding an appliance type

@@ -24,6 +24,13 @@ from .const import (
     CONF_DOOR_ENTITY,
     CONF_DRYER_ENTITY,
     CONF_DRYER_START_ENTITY,
+    CONF_FILTER_ENTITY,
+    CONF_OVEN_CAVITY,
+    CONF_PROBE_ENTITY,
+    CONF_SUPPLY_ENTITIES,
+    CONF_TIMER_ENTITY,
+    CONF_TUMBLE_ENTITY,
+    CONF_VENT_ENTITY,
     CONF_LEAK_ENTITIES,
     CONF_PHASE_ENTITY,
     CONF_REMAINING_ENTITY,
@@ -54,6 +61,15 @@ class GEDiscovery:
     dryer_start_entity: str | None = None
     delay_entity: str | None = None
     start_button: str | None = None
+    timer_entity: str | None = None
+    probe_entity: str | None = None
+    tumble_entity: str | None = None
+    vent_entity: str | None = None
+    filter_entity: str | None = None
+    supply_entities: list[str] = field(default_factory=list)
+    # Double ovens: ["upper", "lower"] (set up one entry per oven)
+    cavities: list[str] = field(default_factory=list)
+    cavity: str | None = None
     prefix: str = ""
 
     def as_config(self) -> dict[str, str]:
@@ -70,6 +86,12 @@ class GEDiscovery:
             CONF_DRYER_ENTITY: self.dryer_entity,
             CONF_DRYER_START_ENTITY: self.dryer_start_entity,
             CONF_DELAY_ENTITY: self.delay_entity,
+            CONF_TIMER_ENTITY: self.timer_entity,
+            CONF_PROBE_ENTITY: self.probe_entity,
+            CONF_TUMBLE_ENTITY: self.tumble_entity,
+            CONF_VENT_ENTITY: self.vent_entity,
+            CONF_FILTER_ENTITY: self.filter_entity,
+            CONF_OVEN_CAVITY: self.cavity,
         }
         result = {k: v for k, v in mapping.items() if v}
         if self.door_entities:
@@ -78,6 +100,8 @@ class GEDiscovery:
             result[CONF_COOKTOP_ENTITIES] = list(self.cooktop_entities)
         if self.leak_entities:
             result[CONF_LEAK_ENTITIES] = list(self.leak_entities)
+        if self.supply_entities:
+            result[CONF_SUPPLY_ENTITIES] = list(self.supply_entities)
         return result
 
 
@@ -88,9 +112,39 @@ def _first(entity_ids: list[str], pattern: str, exclude: str | None = None) -> s
     return None
 
 
-def discover_from_entity_ids(entity_ids: list[str]) -> GEDiscovery:
-    """Pure discovery logic (no Home Assistant objects) so it can be unit tested."""
+CAVITIES = ("upper", "lower")
+
+
+def oven_cavities(entity_ids: list[str]) -> list[str]:
+    """['upper', 'lower'] for a GE double oven, else []."""
+    found = [
+        cavity
+        for cavity in CAVITIES
+        if any(re.search(rf"^sensor\..*{cavity}_oven_current_state$", e) for e in entity_ids)
+    ]
+    return found if len(found) == 2 else []
+
+
+def discover_from_entity_ids(entity_ids: list[str], cavity: str | None = None) -> GEDiscovery:
+    """Pure discovery logic (no Home Assistant objects) so it can be unit tested.
+
+    ``cavity`` picks one oven of a double oven ("upper" / "lower").
+    """
     ids = sorted(entity_ids)
+    cavities = oven_cavities(ids)
+    if cavities:
+        cavity = cavity if cavity in cavities else cavities[0]
+        other = next(c for c in cavities if c != cavity)
+        # The other oven's entities -- and, for the lower oven, the cooktop
+        # (it belongs to the range, alerted once by the upper oven's entry)
+        ids = [
+            e
+            for e in ids
+            if f"{other}_oven_" not in e
+            and not (cavity == "lower" and e.endswith("_cooktop_status"))
+        ]
+    else:
+        cavity = None
 
     def has(pattern: str) -> bool:
         return any(re.search(pattern, e) for e in ids)
@@ -113,6 +167,7 @@ def discover_from_entity_ids(entity_ids: list[str]) -> GEDiscovery:
             appliance_type=appliance_type,
             state_entity=doors[0] if doors else None,
             door_entities=doors,
+            filter_entity=_first(ids, r"^sensor\..*water_filter_status$"),
             prefix=entity_prefix(ids),
         )
 
@@ -148,8 +203,33 @@ def discover_from_entity_ids(entity_ids: list[str]) -> GEDiscovery:
         delay_entity=_first(ids, r"^sensor\..*_delay_time_remaining$")
         or _first(ids, r"^sensor\..*_delay_hours$"),
         start_button=_first(ids, r"^button\..*_start_cycle$"),
+        timer_entity=_first(ids, r"^sensor\..*_kitchen_timer$"),
+        probe_entity=_first(ids, r"^sensor\..*_probe_display_temp$"),
+        tumble_entity=_first(ids, r"^sensor\..*_tumble_status$"),
+        vent_entity=_first(ids, r"^binary_sensor\..*_blocked_vent(_fault)?$"),
+        supply_entities=_supplies(ids, appliance_type),
+        cavities=cavities,
+        cavity=cavity,
         prefix=entity_prefix(ids),
     )
+
+
+def _supplies(ids: list[str], appliance_type: str | None) -> list[str]:
+    """Detergent, pods, rinse aid and dryer-sheet sensors for refill reminders."""
+    patterns = {
+        "washer": [r"^sensor\..*_smart_dispense_loads_left$", r"^sensor\..*_tank_status$"],
+        "dishwasher": [r"^(number|sensor)\..*_pods_remaining(_value)?$", r"^sensor\..*_add_rinse_aid$"],
+        "dryer": [r"^(number|sensor)\..*_sheet_inventory$"],
+    }.get(appliance_type or "", [])
+    found: list[str] = []
+    for pattern in patterns:
+        match = _first(ids, pattern)
+        if match and match not in found:
+            found.append(match)
+    if appliance_type == "washer" and len(found) > 1:
+        # Loads left is the better signal when the washer has both
+        found = found[:1]
+    return found
 
 
 def entity_prefix(entity_ids: list[str]) -> str:
@@ -180,7 +260,7 @@ def leak_sensors_for_prefix(states: list[tuple[str, str | None]], prefix: str) -
     )
 
 
-def async_discover(hass: HomeAssistant, device_id: str) -> GEDiscovery:
+def async_discover(hass: HomeAssistant, device_id: str, cavity: str | None = None) -> GEDiscovery:
     """Discover entities for a ge_home device from the entity registry."""
     ent_reg = er.async_get(hass)
     entity_ids = [
@@ -188,7 +268,7 @@ def async_discover(hass: HomeAssistant, device_id: str) -> GEDiscovery:
         for entry in er.async_entries_for_device(ent_reg, device_id)
         if not entry.disabled_by
     ]
-    found = discover_from_entity_ids(entity_ids)
+    found = discover_from_entity_ids(entity_ids, cavity)
 
     # Leak sensors live on their own (non-GE) device, so match them by name
     moisture = [

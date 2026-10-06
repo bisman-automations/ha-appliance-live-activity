@@ -40,6 +40,7 @@ from .const import (
     ACTION_START_DRYER,
     CONF_ACTIVE_STATES,
     CONF_APPLIANCE_TYPE,
+    CONF_COMBINE_LAUNDRY,
     CONF_COMPLETE_STATES,
     CONF_COOKTOP_ALERT_MINUTES,
     CONF_COOKTOP_ENTITIES,
@@ -54,6 +55,7 @@ from .const import (
     CONF_DRYER_ENTITY,
     CONF_DRYER_START_ENTITY,
     CONF_ESCALATION_DEVICES,
+    CONF_FILTER_ENTITY,
     CONF_FINISHED_ALERT,
     CONF_ICON,
     CONF_ICON_COLOR,
@@ -68,13 +70,19 @@ from .const import (
     CONF_PAUSE_STATES,
     CONF_PHASE_ENTITY,
     CONF_PREHEAT_ALERT,
+    CONF_PROBE_ENTITY,
     CONF_REMAINING_ENTITY,
     CONF_SOURCE_DEVICE,
     CONF_SPEAKERS,
     CONF_STATE_ENTITY,
+    CONF_SUPPLY_ENTITIES,
+    CONF_SUPPLY_LOW,
     CONF_TARGET_TEMPERATURE_ENTITY,
     CONF_TEMPERATURE_ENTITY,
+    CONF_TIMER_ENTITY,
     CONF_TTS_ENTITY,
+    CONF_TUMBLE_ENTITY,
+    CONF_VENT_ENTITY,
     DEFAULT_COOKTOP_ALERT_MINUTES,
     DEFAULT_COOKTOP_REPEAT_MINUTES,
     DEFAULT_DISMISS_MINUTES,
@@ -82,6 +90,7 @@ from .const import (
     DEFAULT_MOVE_MAX_REMINDERS,
     DEFAULT_MOVE_REMINDER_MINUTES,
     DEFAULT_MOVE_REPEAT_MINUTES,
+    DEFAULT_SUPPLY_LOW,
     DOMAIN,
     DRIFT_MINUTES,
     EVENT_NOTIFICATION_ACTION,
@@ -202,6 +211,55 @@ class ApplianceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             )
             self.monitors.append(self.leak)
 
+        # Oven kitchen timer / meat probe Live Activities
+        self.timer = None
+        self.probe = None
+        if self.appliance_type == "oven":
+            from .oven_extras import KitchenTimerMonitor, ProbeMonitor  # noqa: PLC0415
+
+            if cfg.get(CONF_TIMER_ENTITY):
+                self.timer = KitchenTimerMonitor(hass, self, cfg[CONF_TIMER_ENTITY])
+                self.monitors.append(self.timer)
+            if cfg.get(CONF_PROBE_ENTITY):
+                self.probe = ProbeMonitor(hass, self, cfg[CONF_PROBE_ENTITY])
+                self.monitors.append(self.probe)
+
+        # Health: blocked dryer vent, refill reminders, water filter
+        from .maintenance import FilterMonitor, SupplyMonitor, VentMonitor  # noqa: PLC0415
+
+        self.vent = None
+        if self.appliance_type == "dryer" and cfg.get(CONF_VENT_ENTITY):
+            self.vent = VentMonitor(
+                hass,
+                self,
+                cfg[CONF_VENT_ENTITY],
+                cfg.get(CONF_TTS_ENTITY) or None,
+                list(cfg.get(CONF_SPEAKERS) or []),
+            )
+            self.monitors.append(self.vent)
+        self.supplies = None
+        supply_entities = list(cfg.get(CONF_SUPPLY_ENTITIES) or [])
+        if supply_entities:
+            self.supplies = SupplyMonitor(
+                hass, self, supply_entities, float(cfg.get(CONF_SUPPLY_LOW, DEFAULT_SUPPLY_LOW))
+            )
+            self.monitors.append(self.supplies)
+        self.filter = None
+        if cfg.get(CONF_FILTER_ENTITY):
+            self.filter = FilterMonitor(hass, self, cfg[CONF_FILTER_ENTITY])
+            self.monitors.append(self.filter)
+
+        # Dryer: extended (wrinkle-guard) tumble after the cycle
+        self.tumble_entity: str | None = (
+            cfg.get(CONF_TUMBLE_ENTITY) or None if self.appliance_type == "dryer" else None
+        )
+        # Washer + dryer share one Live Activity ("Laundry")
+        self.combine_laundry: bool = (
+            self.appliance_type == "washer"
+            and bool(self.dryer_entity)
+            and cfg.get(CONF_COMBINE_LAUNDRY, True) is not False
+        )
+
         self._store: Store[dict[str, Any]] = Store(
             hass, STORAGE_VERSION, f"{DOMAIN}_{entry.entry_id}"
         )
@@ -241,6 +299,52 @@ class ApplianceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             "remaining": 0,
             "progress": 0,
         }
+
+    # ------------------------------------------------------------------
+    # Shared washer + dryer Live Activity
+    # ------------------------------------------------------------------
+    def partner(self) -> ApplianceCoordinator | None:
+        """The washer <-> dryer this appliance shares its Live Activity with."""
+        coordinators = [
+            c
+            for c in self.hass.data.get(DOMAIN, {}).values()
+            if isinstance(c, ApplianceCoordinator) and c is not self
+        ]
+        if self.combine_laundry:
+            return next(
+                (c for c in coordinators if c.appliance_type == "dryer" and c.state_entity == self.dryer_entity),
+                None,
+            )
+        if self.appliance_type == "dryer" and self.state_entity:
+            return next(
+                (
+                    c
+                    for c in coordinators
+                    if c.combine_laundry and c.dryer_entity == self.state_entity
+                ),
+                None,
+            )
+        return None
+
+    @property
+    def activity_tag(self) -> str:
+        """Tag of the main Live Activity (the washer's when shared)."""
+        partner = self.partner()
+        if partner is not None and self.appliance_type == "dryer":
+            return partner.notification_tag
+        return self.notification_tag
+
+    @property
+    def activity_title(self) -> str:
+        return "Laundry" if self.partner() is not None else self.name
+
+    def owns_activity(self) -> bool:
+        """This appliance is currently showing something on the Live Activity."""
+        return self._in_cycle or self._delay_sent is not None
+
+    def _partner_busy(self) -> bool:
+        partner = self.partner()
+        return partner is not None and partner.owns_activity()
 
     def action_id(self, suffix: str) -> str:
         """Notification button id, unique to this appliance."""
@@ -296,6 +400,7 @@ class ApplianceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 self.target_entity,
                 self.dryer_entity,
                 self.delay_entity,
+                self.tumble_entity,
             )
             if e
         ]
@@ -344,8 +449,9 @@ class ApplianceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             and (self._dismiss_at is not None or self._move_since is not None)
         ):
             # Door opened after a finished cycle: dismiss "Done" and stop the
-            # "move the laundry" reminders
-            if self._dismiss_at is not None:
+            # "move the laundry" reminders. A shared laundry activity stays
+            # up until the dryer takes it over (or the dismiss delay).
+            if self._dismiss_at is not None and not self.combine_laundry:
                 self.hass.async_create_task(self._async_dismiss())
             if self._move_since is not None:
                 self.hass.async_create_task(self._async_cancel_move("door opened"))
@@ -447,6 +553,9 @@ class ApplianceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             unknown_is_running=self.definition.unknown_is_running,
             done_signal=bool(self.done_entity) and self._state(self.done_entity) == STATE_ON,
         )
+        if self._tumbling(status):
+            # Cycle is over; the drum just turns now and then to stop wrinkles
+            return STATUS_COMPLETE
         # An unrecognised state (e.g. GE's "Control Locked") keeps a running
         # cycle running, but must not *start* one -- otherwise a finished
         # appliance flips back to "running" and its Live Activity never clears.
@@ -460,6 +569,25 @@ class ApplianceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             _LOGGER.debug("%s: ignoring unrecognised state %r while idle", self.name, raw)
             return STATUS_IDLE
         return status
+
+    def _tumbling(self, status: str | None = None) -> bool:
+        """Dryer in extended (wrinkle-guard) tumble after the cycle."""
+        if self.appliance_type != "dryer":
+            return False
+        if self.door_entity and self._state(self.door_entity) == STATE_ON:
+            return False  # door opened: laundry is being taken out
+        phase = self._state(self.phase_entity).lower()
+        if "extended tumble" in phase or "wrinkle" in phase:
+            return True
+        if not self.tumble_entity or self._state(self.tumble_entity).lower() not in ("enable", "on", "enabled"):
+            return False
+        # The tumble setting can stay "Enable"; the dryer must also still be on
+        raw = self._state(self.state_entity).strip().lower()
+        if not raw or raw in {i.lower() for i in self.idle_states} or raw in ("off", "unavailable", "unknown"):
+            return False
+        if status is None:
+            status = STATUS_COMPLETE if self._dismiss_at is not None else STATUS_IDLE
+        return status == STATUS_COMPLETE and self._remaining_minutes() <= 0
 
     # ------------------------------------------------------------------
     # Core logic
@@ -573,7 +701,14 @@ class ApplianceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         """Delay cancelled (appliance turned off without starting)."""
         sent = self._delay_sent is not None
         self._delay_target = self._delay_value = self._delay_sent = None
-        if sent and send and self.devices and not self._in_cycle and self._dismiss_at is None:
+        if (
+            sent
+            and send
+            and self.devices
+            and not self._in_cycle
+            and self._dismiss_at is None
+            and not self._partner_busy()
+        ):
             await async_clear(self.hass, self)
 
     def _finishes_at(self, remaining: float) -> datetime | None:
@@ -699,7 +834,12 @@ class ApplianceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
         if send and self.devices:
             if finished and self.definition.supports_progress:
-                await async_send_done(self.hass, self, cycle)
+                note = ""
+                if self._tumbling(status):
+                    note = "tumbling to prevent wrinkles"
+                elif self.combine_laundry:
+                    note = "move to the dryer"
+                await async_send_done(self.hass, self, cycle, note)
                 if self.finished_alert:
                     await async_send_finished_alert(
                         self.hass,
@@ -708,7 +848,7 @@ class ApplianceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                     )
                 self._dismiss_at = dt_util.utcnow().timestamp() + self.dismiss_minutes * 60
                 self._schedule_dismiss(self.dismiss_minutes * 60)
-            else:
+            elif not self._partner_busy():
                 # Cancelled, or a door that closed: just end the activity
                 await async_clear(self.hass, self)
         if finished and self.move_minutes > 0:
@@ -716,6 +856,8 @@ class ApplianceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             self._move_since = dt_util.utcnow().timestamp()
             self._move_count = 0
         await self._async_save()
+        if finished and self.supplies is not None:
+            await self.supplies.async_after_cycle()
 
     # ------------------------------------------------------------------
     # Oven preheat
@@ -867,10 +1009,16 @@ class ApplianceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         if self._dismiss_at is None or self._in_cycle:
             _LOGGER.debug("%s: dismiss skipped (in cycle: %s)", self.name, self._in_cycle)
             return
+        if self._tumbling(STATUS_COMPLETE):
+            # Still tumbling: keep "Done" up until the door opens
+            self._dismiss_at = dt_util.utcnow().timestamp() + self.dismiss_minutes * 60
+            self._schedule_dismiss(self.dismiss_minutes * 60)
+            await self._async_save()
+            return
         _LOGGER.debug("%s: dismissing finished Live Activity", self.name)
         self._dismiss_at = None
         await self._async_save()
-        if self.devices:
+        if self.devices and not self._partner_busy():
             await async_clear(self.hass, self)
 
     @callback

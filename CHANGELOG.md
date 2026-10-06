@@ -1,5 +1,40 @@
 # Changelog
 
+## 1.6.0
+
+### Added
+- **Oven kitchen timer Live Activity**: a timer set on the oven gets its own
+  Live Activity counting down on the phone, then a time-sensitive "Timer
+  done" alert. Cancelling the timer just ends it.
+- **Meat probe Live Activity**: while the probe is plugged in, its
+  temperature climbs on a Live Activity. Set a target with the new
+  **Probe Target** number entity (GE ovens don't report the one set on the
+  oven) to get "128°F → 145°F" with a progress bar and an alert when it's
+  reached.
+- **Double ovens**: GE double ovens are set up one oven at a time (upper /
+  lower), each with its own Live Activity, timer and probe. The cooktop is
+  alerted once, by the upper oven.
+- **Dryer wrinkle tumble**: when a dryer finishes into extended tumble, the
+  Live Activity shows "Dry Complete · tumbling to prevent wrinkles" and
+  stays up until the door opens.
+- **One Live Activity per laundry load**: the washer and dryer share a
+  "Laundry" Live Activity — washing → "move to the dryer" → drying → done —
+  instead of two. Opening the washer door keeps it up so the dryer can take
+  it over. On by default for washers with a dryer; can be turned off in
+  Configure.
+- **Blocked dryer vent**: critical alert (a fire risk) while GE reports a
+  blocked vent, repeated every 30 minutes, removed when it clears.
+- **Refill reminders**: after a cycle, one notification listing what's
+  low — washer detergent tank, dishwasher pods / rinse aid, dryer sheets.
+  Each is mentioned once until it's refilled.
+- **Fridge water filter**: a reminder when the filter needs replacing or has
+  expired, and a critical alert if it reports a leak.
+- GE appliances set up with an earlier version pick up the new sensors
+  automatically.
+- Status sensor attributes: `kitchen_timer_minutes`, `probe_temperature`,
+  `probe_target`, `vent_blocked`.
+- README: **Add to HACS** and **Add integration** buttons.
+
 ## 1.5.0
 
 ### Added
