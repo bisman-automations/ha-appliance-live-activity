@@ -25,7 +25,7 @@ _LOGGER = logging.getLogger(__name__)
 NOTIFY = "notify"
 
 
-def notify_services_for_device(hass: HomeAssistant, device_id: str) -> list[str]:
+def notify_services_for_device(hass: HomeAssistant, device_id: str, warn: bool = True) -> list[str]:
     """Return notify service names (without the 'notify.' prefix) for a phone.
 
     The Companion app registers a legacy service ``notify.mobile_app_<device
@@ -49,7 +49,7 @@ def notify_services_for_device(hass: HomeAssistant, device_id: str) -> list[str]
             if hass.services.has_service(NOTIFY, candidate) and candidate not in services:
                 services.append(candidate)
 
-    if not services:
+    if not services and warn:
         _LOGGER.warning(
             "No notify.mobile_app_* service found for device %s (%s). If the phone "
             "was renamed after it registered, check Developer Tools > Actions",
@@ -76,12 +76,27 @@ async def _async_send(
     deferrable: bool | None = None,
 ) -> None:
     tag = (payload.get("data") or {}).get("tag")
+    # Regular alerts (not Live Activities, clears or critical alerts) to the
+    # appliance's own phones can be limited to whoever is home
+    home_filter = devices is None and _deferrable(payload)
     if payload.get("message") == "clear_notification":
         coordinator.drop_deferred(tag)
     elif (_deferrable(payload) if deferrable is None else deferrable) and coordinator.quiet_now():
-        coordinator.defer(tag, payload, devices)
+        coordinator.defer(tag, payload, devices, home_filter)
         return
-    await async_deliver(hass, coordinator, payload, devices)
+    await async_deliver(hass, coordinator, payload, devices, home_filter)
+
+
+def phone_is_home(hass: HomeAssistant, device_id: str) -> bool | None:
+    """Home / away from the Companion app's device tracker (None = unknown)."""
+    for entry in er.async_entries_for_device(er.async_get(hass), device_id):
+        if entry.domain != "device_tracker":
+            continue
+        state = hass.states.get(entry.entity_id)
+        if state is None or state.state in ("unknown", "unavailable"):
+            continue
+        return state.state == "home"
+    return None
 
 
 async def async_deliver(
@@ -89,9 +104,15 @@ async def async_deliver(
     coordinator: ApplianceCoordinator,
     payload: dict[str, Any],
     devices: list[str] | None = None,
+    home_filter: bool = False,
 ) -> None:
     """Send now (quiet hours already checked)."""
     targets = list(dict.fromkeys(coordinator.devices if devices is None else devices))
+    if home_filter and coordinator.home_only:
+        # Phones whose owner is home (unknown counts as home); nobody home -> everyone
+        home = [d for d in targets if phone_is_home(hass, d) is not False]
+        if home:
+            targets = home
     if payload.get("message") != "clear_notification":
         # Tapping the notification / Live Activity opens the appliance's device
         # page. iOS needs `url` on every update; Android uses `clickAction`.

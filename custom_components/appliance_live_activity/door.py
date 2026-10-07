@@ -52,6 +52,8 @@ from .const import (
     DEFAULT_ESCALATE_AFTER,
     DEFAULT_OPEN_DELAY_SECONDS,
     DEFAULT_SNOOZE_MINUTES,
+    EVENT_DOOR_CLOSED,
+    EVENT_DOOR_LEFT_OPEN,
     STATUS_IDLE,
     STATUS_RUNNING,
 )
@@ -198,6 +200,11 @@ class DoorCoordinator(ApplianceCoordinator):
                 ):
                     self._snooze_until = None
                     self._critical_count += 1
+                    if self._critical_count == 1:
+                        self.fire_event(
+                            EVENT_DOOR_LEFT_OPEN,
+                            {"doors": ", ".join(labels), "minutes_open": round(elapsed / 60)},
+                        )
                     escalated = self._critical_count > self.escalate_after
                     minutes_open = round(elapsed / 60)
                     devices = self.devices + (self.escalation_devices if escalated else [])
@@ -238,6 +245,8 @@ class DoorCoordinator(ApplianceCoordinator):
         # All doors closed
         if self._open_since is not None:
             minutes_open = round((now - self._open_since) / 60)
+            if self._activity_started or self._critical_count:
+                self.fire_event(EVENT_DOOR_CLOSED, {"minutes_open": minutes_open})
             if send and self.devices and self._activity_started:
                 if self._last_critical is not None:
                     await async_clear_tag(

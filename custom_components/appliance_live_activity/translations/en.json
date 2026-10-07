@@ -67,7 +67,8 @@
           "critical_after_minutes": "Send critical alerts after",
           "critical_repeat_minutes": "Repeat critical alerts every",
           "delay_start": "Live Activity while a delayed start is waiting",
-          "snooze_minutes": "Snooze button on critical alerts (0 = no button)"
+          "snooze_minutes": "Snooze button on critical alerts (0 = no button)",
+          "only_home": "Only alert people who are home"
         },
         "data_description": {
           "finished_alert": "Changing a Live Activity to Done doesn't always alert you; this does.",
@@ -75,7 +76,8 @@
           "open_delay_seconds": "Quick grabs don't start a Live Activity (iOS limits how many can be started).",
           "critical_after_minutes": "Critical alerts bypass Silent and Focus until the door is closed.",
           "delay_start": "Counts down to when the cycle starts (\"Scheduled · starts at 3:45 PM\"), then switches to the normal countdown.",
-          "snooze_minutes": "Pauses the critical alerts for this long while the door stays open. The Live Activity stays."
+          "snooze_minutes": "Pauses the critical alerts for this long while the door stays open. The Live Activity stays.",
+          "only_home": "Done alerts and reminders go only to phones whose owner is home (by the Companion app's location); if nobody is home, everyone gets them. Live Activities and critical alerts always go to everyone."
         },
         "sections": {
           "laundry": {
@@ -222,7 +224,8 @@
           "tumble_entity": "Extended tumble sensor",
           "fridge_temp_entity": "Fridge temperature sensor",
           "freezer_temp_entity": "Freezer temperature sensor",
-          "ice_entity": "Ice bucket sensor"
+          "ice_entity": "Ice bucket sensor",
+          "clean_entity": "Clean dishes sensor"
         },
         "data_description": {
           "rediscover": "Re-runs automatic discovery and replaces the sensors below with what's found.",
@@ -233,7 +236,8 @@
           "delay_entity": "While a delayed start is waiting, the Live Activity counts down to the start.",
           "timer_entity": "A timer set on the oven gets its own countdown Live Activity and a \"Timer done\" alert.",
           "probe_entity": "Live Activity with the probe temperature. Set the target with the appliance's Probe Target number.",
-          "tumble_entity": "Shows \"tumbling to prevent wrinkles\" after the cycle until the door opens."
+          "tumble_entity": "Shows \"tumbling to prevent wrinkles\" after the cycle until the door opens.",
+          "clean_entity": "While it's on, \"Done · ready to unload\" stays up until the dishwasher door opens."
         }
       }
     },
@@ -258,11 +262,13 @@
           "critical_after_minutes": "Send critical alerts after",
           "critical_repeat_minutes": "Repeat critical alerts every",
           "delay_start": "Live Activity while a delayed start is waiting",
-          "snooze_minutes": "Snooze button on critical alerts (0 = no button)"
+          "snooze_minutes": "Snooze button on critical alerts (0 = no button)",
+          "only_home": "Only alert people who are home"
         },
         "data_description": {
           "delay_start": "Counts down to when the cycle starts (\"Scheduled · starts at 3:45 PM\"), then switches to the normal countdown.",
-          "snooze_minutes": "Pauses the critical alerts for this long while the door stays open. The Live Activity stays."
+          "snooze_minutes": "Pauses the critical alerts for this long while the door stays open. The Live Activity stays.",
+          "only_home": "Done alerts and reminders go only to phones whose owner is home (by the Companion app's location); if nobody is home, everyone gets them. Live Activities and critical alerts always go to everyone."
         },
         "sections": {
           "laundry": {
@@ -390,6 +396,16 @@
           "description": "The configured appliance to refresh."
         }
       }
+    }
+  },
+  "issues": {
+    "phone_not_found": {
+      "title": "{appliance}: can't send to {phone}",
+      "description": "{phone} has no Home Assistant notification service, so {appliance}'s alerts aren't reaching it. This usually happens after renaming the phone in the Companion app. Open the Companion app on the phone so it re-registers, or choose the phone again under {appliance} → Configure."
+    },
+    "missing_entities": {
+      "title": "{appliance}: sensors are missing",
+      "description": "{appliance} uses sensors that no longer exist: {entities}. Pick the right ones with {appliance} → ⋮ → Reconfigure."
     }
   }
 }

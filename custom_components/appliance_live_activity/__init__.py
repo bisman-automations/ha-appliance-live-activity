@@ -34,7 +34,7 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
 
 
 # Bump when GE discovery learns new entities, so existing entries pick them up
-GE_DISCOVERY_VERSION = 4
+GE_DISCOVERY_VERSION = 5
 
 
 def _async_backfill_ge(hass: HomeAssistant, entry: ConfigEntry) -> None:
@@ -111,3 +111,10 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         if not hass.data[DOMAIN]:
             await async_unload_services(hass)
     return unloaded
+
+
+async def async_remove_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
+    """Appliance deleted: remove its Repairs issues."""
+    from .health import async_remove_issues  # noqa: PLC0415
+
+    async_remove_issues(hass, entry)

@@ -20,6 +20,7 @@ from .appliance import APPLIANCE_REGISTRY
 from .const import (
     CONF_ALERT_LIGHTS,
     CONF_APPLIANCE_TYPE,
+    CONF_CLEAN_ENTITY,
     CONF_COOKTOP_ALERT_MINUTES,
     CONF_COOKTOP_ENTITIES,
     CONF_COOKTOP_REPEAT_MINUTES,
@@ -56,6 +57,7 @@ from .const import (
     CONF_MOVE_REPEAT_MINUTES,
     CONF_NAME,
     CONF_NOTIFICATION_TAG,
+    CONF_ONLY_HOME,
     CONF_OPEN_DELAY_SECONDS,
     CONF_OVEN_CAVITY,
     CONF_PHASE_ENTITY,
@@ -107,7 +109,7 @@ from .const import (
 )
 from .ge import async_discover, async_has_ge_devices, device_name
 
-GE_DISCOVERY_VERSION = 4  # keep in sync with __init__.GE_DISCOVERY_VERSION
+GE_DISCOVERY_VERSION = 5  # keep in sync with __init__.GE_DISCOVERY_VERSION
 from .helpers import hex_to_rgb, slugify_tag
 
 AUTO = "auto"
@@ -328,6 +330,9 @@ def _behaviour_fields(
                     CONF_FINISHED_ALERT, default=current.get(CONF_FINISHED_ALERT, True)
                 ): selector.BooleanSelector(),
                 vol.Optional(
+                    CONF_ONLY_HOME, default=current.get(CONF_ONLY_HOME, False)
+                ): selector.BooleanSelector(),
+                vol.Optional(
                     CONF_DISMISS_MINUTES,
                     default=current.get(CONF_DISMISS_MINUTES, DEFAULT_DISMISS_MINUTES),
                 ): _dismiss_selector(),
@@ -499,6 +504,8 @@ def _entity_fields(appliance_type: str) -> dict:
         )
     if appliance_type == "dryer":
         fields[vol.Optional(CONF_TUMBLE_ENTITY)] = sensor
+    if appliance_type == "dishwasher":
+        fields[vol.Optional(CONF_CLEAN_ENTITY)] = binary
     return fields
 
 

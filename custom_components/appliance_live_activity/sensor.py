@@ -24,6 +24,8 @@ async def async_setup_entry(
         entities += [
             ApplianceTimeRemainingSensor(coordinator, entry),
             ApplianceFinishesAtSensor(coordinator, entry),
+            ApplianceCyclesWeekSensor(coordinator, entry),
+            ApplianceAverageCycleSensor(coordinator, entry),
         ]
     async_add_entities(entities)
 
@@ -174,3 +176,51 @@ class ApplianceFinishesAtSensor(_ApplianceBaseSensor):
     @property
     def native_value(self):
         return self.coordinator.data.get("finishes_at")
+
+
+class ApplianceCyclesWeekSensor(_ApplianceBaseSensor):
+    """Finished cycles in the last 7 days."""
+
+    _attr_native_unit_of_measurement = "cycles"
+    _attr_state_class = "measurement"
+
+    def __init__(self, coordinator, entry: ConfigEntry) -> None:
+        super().__init__(coordinator, entry)
+        self._attr_unique_id = f"{entry.entry_id}_cycles_week"
+        self._attr_icon = "mdi:counter"
+
+    @property
+    def name(self) -> str:
+        return f"{self.coordinator.name} Cycles This Week"
+
+    @property
+    def native_value(self):
+        return self.coordinator.cycles_since(7)
+
+    @property
+    def extra_state_attributes(self) -> dict:
+        return {
+            "today": self.coordinator.cycles_since(1),
+            "last_30_days": self.coordinator.cycles_since(30),
+        }
+
+
+class ApplianceAverageCycleSensor(_ApplianceBaseSensor):
+    """Average length of the last 10 finished cycles."""
+
+    _attr_device_class = SensorDeviceClass.DURATION
+    _attr_native_unit_of_measurement = UnitOfTime.MINUTES
+    _attr_suggested_display_precision = 0
+
+    def __init__(self, coordinator, entry: ConfigEntry) -> None:
+        super().__init__(coordinator, entry)
+        self._attr_unique_id = f"{entry.entry_id}_average_cycle"
+        self._attr_icon = "mdi:timer-outline"
+
+    @property
+    def name(self) -> str:
+        return f"{self.coordinator.name} Average Cycle"
+
+    @property
+    def native_value(self):
+        return self.coordinator.average_minutes()

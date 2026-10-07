@@ -6,7 +6,7 @@ from homeassistant.const import Platform
 DOMAIN = "appliance_live_activity"
 STORAGE_VERSION = 1
 
-PLATFORMS: list[Platform] = [Platform.SENSOR, Platform.NUMBER]
+PLATFORMS: list[Platform] = [Platform.SENSOR, Platform.NUMBER, Platform.EVENT]
 
 # Config keys
 CONF_SOURCE = "source"
@@ -87,6 +87,28 @@ CONF_ICE_FULL_ALERT = "ice_full_alert"
 # Quiet hours (non-critical alerts wait until they end)
 CONF_QUIET_START = "quiet_start"
 CONF_QUIET_END = "quiet_end"
+# Only send regular alerts to phones of people who are home
+CONF_ONLY_HOME = "only_home"
+# Dishwasher "clean" sensor: keep "ready to unload" up until the door opens
+CONF_CLEAN_ENTITY = "clean_entity"
+
+# Cycle events (event entity)
+EVENT_STARTED = "started"
+EVENT_FINISHED = "finished"
+EVENT_CANCELLED = "cancelled"
+EVENT_SCHEDULED = "scheduled"
+EVENT_DOOR_LEFT_OPEN = "door_left_open"
+EVENT_DOOR_CLOSED = "door_closed"
+CYCLE_EVENTS = [EVENT_STARTED, EVENT_FINISHED, EVENT_CANCELLED, EVENT_SCHEDULED]
+DOOR_EVENTS = [EVENT_DOOR_LEFT_OPEN, EVENT_DOOR_CLOSED]
+
+# Cycle history kept per appliance
+HISTORY_MAX = 100
+HISTORY_AVERAGE_OF = 10
+# Problems are reported in Settings -> Repairs after this long (lets other
+# integrations finish starting first), then rechecked this often
+HEALTH_FIRST_CHECK_SECONDS = 300
+HEALTH_CHECK_MINUTES = 30
 
 # Appliance types handled by the door monitor
 DOOR_TYPES = ("refrigerator", "door")

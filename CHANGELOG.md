@@ -1,5 +1,25 @@
 # Changelog
 
+## 1.8.0
+
+### Added
+- **Only alert people who are home** (Configure, off by default): Done
+  alerts and reminders go only to phones whose owner is home, by the
+  Companion app's location; if nobody is home, everyone gets them. Live
+  Activities and critical alerts always go to everyone.
+- **Dishwasher "ready to unload"**: when the dishwasher reports clean dishes,
+  the Live Activity shows "Dishes Clean · ready to unload" and stays up until
+  the door opens. GE's clean sensor is found automatically.
+- **Cycle events** for automations: an event entity per appliance —
+  `started`, `scheduled`, `finished` (with how long it ran) and `cancelled`
+  for appliances, `door_left_open` and `door_closed` for fridges and doors.
+- **Cycle history**: *Cycles This Week* (with today and last 30 days) and
+  *Average Cycle* (last 10 cycles) sensors.
+- **Repairs**: Settings → Repairs shows when a phone can no longer receive
+  alerts (e.g. renamed in the Companion app) or a sensor an appliance uses
+  no longer exists. Issues clear themselves once fixed.
+- **Download diagnostics** on each appliance for bug reports.
+
 ## 1.7.0
 
 ### Added

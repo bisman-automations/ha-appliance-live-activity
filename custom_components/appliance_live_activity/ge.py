@@ -18,6 +18,7 @@ from homeassistant.helpers import device_registry as dr, entity_registry as er
 from .const import (
     CONF_COOKTOP_ENTITIES,
     CONF_CYCLE_ENTITY,
+    CONF_CLEAN_ENTITY,
     CONF_DELAY_ENTITY,
     CONF_DONE_ENTITY,
     CONF_DOOR_ENTITIES,
@@ -72,6 +73,7 @@ class GEDiscovery:
     fridge_temp_entity: str | None = None
     freezer_temp_entity: str | None = None
     ice_entity: str | None = None
+    clean_entity: str | None = None
     supply_entities: list[str] = field(default_factory=list)
     # Double ovens: ["upper", "lower"] (set up one entry per oven)
     cavities: list[str] = field(default_factory=list)
@@ -101,6 +103,7 @@ class GEDiscovery:
             CONF_FRIDGE_TEMP_ENTITY: self.fridge_temp_entity,
             CONF_FREEZER_TEMP_ENTITY: self.freezer_temp_entity,
             CONF_ICE_ENTITY: self.ice_entity,
+            CONF_CLEAN_ENTITY: self.clean_entity,
         }
         result = {k: v for k, v in mapping.items() if v}
         if self.door_entities:
@@ -220,6 +223,7 @@ def discover_from_entity_ids(entity_ids: list[str], cavity: str | None = None) -
         tumble_entity=_first(ids, r"^sensor\..*_tumble_status$"),
         vent_entity=_first(ids, r"^binary_sensor\..*_blocked_vent(_fault)?$"),
         supply_entities=_supplies(ids, appliance_type),
+        clean_entity=_first(ids, r"^binary_sensor\..*_is_clean$") if appliance_type == "dishwasher" else None,
         # GE dishwashers: "Reminders Clean Filter"
         filter_entity=_first(ids, r"^sensor\..*_clean_filter$") if appliance_type == "dishwasher" else None,
         cavities=cavities,

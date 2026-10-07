@@ -120,7 +120,7 @@ async def test_form_sections(hass: HomeAssistant, phone):
     result, form = await _setup(hass, washer.id, {"devices": [me.id], "quiet_start": "22:00:00"})
     schema = form["data_schema"].schema
     keys = [str(k) for k in schema]
-    assert keys[:4] == ["devices", "finished_alert", "dismiss_minutes", "delay_start"]
+    assert keys[:5] == ["devices", "finished_alert", "only_home", "dismiss_minutes", "delay_start"]
     assert "laundry" in keys and "quiet_hours" in keys and "appearance" in keys
     assert "fridge" not in keys and "cooking" not in keys
     assert schema[next(k for k in schema if str(k) == "laundry")].options["collapsed"] is False

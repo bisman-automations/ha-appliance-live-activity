@@ -193,6 +193,18 @@ until the dryer door opens or you tap **Unloaded**.
 iOS doesn't allow buttons on Live Activities, so buttons are on the regular
 alerts (long-press or swipe down on the notification to see them).
 
+### Only alert people who are home
+
+Turn on *Only alert people who are home* in Configure and Done alerts and
+reminders go only to phones whose owner is home (from the Companion app's
+location). If nobody is home, everyone gets them. Live Activities and
+critical alerts always go to everyone.
+
+### Dishwasher: ready to unload
+
+When the dishwasher reports clean dishes, its Live Activity shows
+*Dishes Clean · ready to unload* and stays up until the door opens.
+
 ### Tapping a notification
 
 Tapping a Live Activity or alert opens the appliance's device page in the
@@ -203,8 +215,22 @@ Home Assistant app (the GE appliance's own page for GE setups).
 - **Status** and **Progress** sensors per appliance, plus **Time Left** and
   **Finishes At** for washers, dryers, dishwashers and ovens (status attributes include
   phase, cycle, remaining minutes, door open minutes and cooktop on-time).
+- **Cycles This Week** and **Average Cycle** sensors for washers, dryers,
+  dishwashers and ovens.
+- An **event entity** per appliance for automations: `started`,
+  `scheduled`, `finished`, `cancelled` (fridges and doors: `door_left_open`,
+  `door_closed`). Use it as a trigger: *Entity → Event*.
 - **Probe Target** number for ovens with a meat probe.
 - `appliance_live_activity.update` re-sends an appliance's Live Activity.
+
+## Troubleshooting
+
+- **Settings → Repairs** tells you when a phone can't receive alerts (e.g.
+  after renaming it in the Companion app) or a sensor an appliance uses is
+  gone.
+- **Download diagnostics** (⋮ on the appliance) gives the settings, what the
+  appliance reports and what the integration is doing — attach it to bug
+  reports.
 
 ## Adding an appliance type
 
