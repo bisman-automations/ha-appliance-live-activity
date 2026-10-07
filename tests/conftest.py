@@ -40,6 +40,15 @@ def _sectioned_forms(monkeypatch):
     original = data_entry_flow.FlowManager.async_configure
 
     async def async_configure(self, flow_id, user_input=None):
-        return await original(self, flow_id, sectioned(user_input))
+        user_input = sectioned(user_input)
+        # Like the frontend: every section of the form is submitted
+        flow = self._progress.get(flow_id)
+        step = getattr(flow, "cur_step", None) or {}
+        schema = step.get("data_schema")
+        if isinstance(user_input, dict) and schema is not None:
+            for key, value in schema.schema.items():
+                if isinstance(value, data_entry_flow.section):
+                    user_input.setdefault(str(key), {})
+        return await original(self, flow_id, user_input)
 
     monkeypatch.setattr(data_entry_flow.FlowManager, "async_configure", async_configure)

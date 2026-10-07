@@ -250,7 +250,9 @@ def _sectioned(fields: dict) -> vol.Schema:
         (grouped[name] if name else top)[key] = value
     for name, collapsed in SECTIONS.items():
         if grouped[name]:
-            top[vol.Optional(name, default={})] = section(
+            # Must be Required: the frontend neither shows nor submits the
+            # values of a section whose key is Optional
+            top[vol.Required(name)] = section(
                 vol.Schema(grouped[name]), {"collapsed": collapsed}
             )
     return vol.Schema(top)

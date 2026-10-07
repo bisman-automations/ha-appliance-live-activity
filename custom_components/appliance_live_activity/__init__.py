@@ -76,10 +76,36 @@ def _async_move_filter_out_of_supplies(hass: HomeAssistant, entry: ConfigEntry) 
         hass.config_entries.async_update_entry(entry, **{update: new})
 
 
+# Pickers that 1.7.0 / 1.8.0 could wipe when saving Configure (the grouped
+# sections weren't submitted by the frontend). Where setup had found a value,
+# drop the wiped None so it applies again.
+_WIPEABLE = (
+    "leak_entities",
+    "dryer_entity",
+    "dryer_start_entity",
+    "supply_entities",
+    "filter_entity",
+    "vent_entity",
+)
+
+
+def _async_restore_wiped(hass: HomeAssistant, entry: ConfigEntry) -> None:
+    if entry.data.get("options_restored"):
+        return
+    options = dict(entry.options)
+    for key in _WIPEABLE:
+        if key in options and options[key] is None and entry.data.get(key):
+            options.pop(key)
+    hass.config_entries.async_update_entry(
+        entry, data={**entry.data, "options_restored": 1}, options=options
+    )
+
+
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     hass.data.setdefault(DOMAIN, {})
     _async_backfill_ge(hass, entry)
     _async_move_filter_out_of_supplies(hass, entry)
+    _async_restore_wiped(hass, entry)
     cfg = {**entry.data, **entry.options}
     coordinator_cls = (
         DoorCoordinator

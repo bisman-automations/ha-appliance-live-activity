@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.8.1
+
+### Fixed
+- **Configure didn't save** (1.7.0, 1.8.0): settings inside the grouped
+  sections (Laundry, Cooking, Leak sensors, Quiet hours…) weren't shown or
+  saved by the Home Assistant frontend, and saving could wipe pickers in
+  those sections. Sections now show your saved values and save normally.
+- Sensors that setup had found and that were wiped this way (leak sensors,
+  dryer, dryer start button, supplies, filter, blocked vent) are restored
+  automatically. Settings you picked yourself (speakers, text-to-speech,
+  quiet hours, escalation phones and lights) can't be recovered — please
+  set them again in Configure.
+
 ## 1.8.0
 
 ### Added
