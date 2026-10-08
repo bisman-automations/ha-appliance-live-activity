@@ -89,6 +89,14 @@ washer door to move the load keeps it up; the dryer takes it over when it
 starts. It ends when the dryer door opens (or after the dismiss delay).
 Turn it off in the washer's **Configure** to get two separate activities.
 
+### One notification per load
+
+Each load gets its own notification, named after the wash cycle, that stays
+in Notification Center after the Live Activity is gone: *✅ Towels: washed —
+load it into the dryer*, which becomes *✅ Towels: load complete — washed and
+dried, please take care of it* when that load finishes drying. Two loads at
+once each keep their own.
+
 ### Dryer wrinkle tumble
 
 If the dryer finishes into extended tumble, the Live Activity shows

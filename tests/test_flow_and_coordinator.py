@@ -145,7 +145,7 @@ async def test_ge_flow_and_lifecycle(hass: HomeAssistant, setup_devices):
     await hass.async_block_till_done()
     new = calls[sent:]
     assert [c.data["data"].get("critical_text") for c in new if c.data["data"].get("live_update")] == ["Done"]
-    assert any("finished" in c.data.get("title", "") for c in new)
+    assert any(c.data.get("title", "").startswith("✅") for c in new)
     sent = len(calls)
 
     assert hass.states.get("sensor.laundry_room_washer_time_left").state == "0"

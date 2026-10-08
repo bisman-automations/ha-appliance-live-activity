@@ -230,7 +230,9 @@ async def test_finished_alert_buttons_and_start_dryer(hass: HomeAssistant, phone
     presses = async_mock_service(hass, "button", "press")
     await _run_and_finish(hass)
 
-    alert = _titled(calls, "✅ Laundry Room Washer finished")[0]
+    alert = _titled(calls, "✅ Normal: washed")[0]
+    assert alert.data["message"] == "Laundry Room Washer finished the Normal cycle. Load it into the dryer."
+    assert alert.data["data"]["tag"] == "laundry_room_washer_load_1"
     actions = alert.data["data"]["actions"]
     assert [a["title"] for a in actions] == ["Start dryer", "Laundry moved"]
     assert actions[0]["action"] == "LAUNDRY_ROOM_WASHER_START_DRYER"
@@ -243,8 +245,9 @@ async def test_finished_alert_buttons_and_start_dryer(hass: HomeAssistant, phone
     assert len(presses) == 1
     assert presses[0].data["entity_id"] in ("button.laundry_room_dryer_start_cycle",
                                             ["button.laundry_room_dryer_start_cycle"])
-    # Done alert and finished Live Activity removed; no reminders afterwards
-    assert "laundry_room_washer_done" in _cleared(calls)
+    # Finished Live Activity removed; the load's notification stays for the
+    # dryer to complete; no reminders afterwards
+    assert "laundry_room_washer_load_1" not in _cleared(calls)
     assert "laundry_room_washer" in _cleared(calls)
     await _tick(hass, freezer, timedelta(minutes=60))
     assert _titled(calls, "🧺") == []

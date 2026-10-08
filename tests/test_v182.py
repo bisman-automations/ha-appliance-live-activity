@@ -189,3 +189,55 @@ async def test_new_wash_while_last_load_dries(hass: HomeAssistant, enable_custom
     async_fire_time_changed(hass)
     await hass.async_block_till_done()
     assert cleared() == []
+
+
+async def _finish_cycle(hass, name, cycle):
+    hass.states.async_set(f"sensor.{name}_cycle", cycle)
+    await _run(hass, name)
+    await _finish(hass, name)
+
+
+def _alerts(calls):
+    return [
+        (c.data["data"]["tag"], c.data["title"], c.data["message"])
+        for c in calls
+        if str(c.data.get("title", "")).startswith("✅")
+    ]
+
+
+async def test_one_notification_per_load(hass: HomeAssistant, enable_custom_integrations):
+    calls, washer, dryer = await _washer_dryer(hass)
+    for entry in (washer, dryer):
+        hass.config_entries.async_update_entry(
+            entry, data={**entry.data, "cycle_entity": f"sensor.{entry.data['appliance_type']}_cycle"}
+        )
+    hass.states.async_set("sensor.washer_cycle", "---")
+    hass.states.async_set("sensor.dryer_cycle", "---")
+    for entry in (washer, dryer):
+        await hass.config_entries.async_reload(entry.entry_id)
+    await hass.async_block_till_done()
+
+    # Towels: washed, then a second load (Darks) washed while towels wait
+    await _finish_cycle(hass, "washer", "Towels")
+    await _finish_cycle(hass, "washer", "Darks")
+    # Towels go into the dryer first, then Darks
+    await _finish_cycle(hass, "dryer", "Mixed Load")
+    await _finish_cycle(hass, "dryer", "Mixed Load")
+
+    assert _alerts(calls) == [
+        ("laundry_room_washer_load_1", "✅ Towels: washed",
+         "Laundry Room Washer finished the Towels cycle. Load it into the dryer."),
+        ("laundry_room_washer_load_2", "✅ Darks: washed",
+         "Laundry Room Washer finished the Darks cycle. Load it into the dryer."),
+        ("laundry_room_washer_load_1", "✅ Towels: load complete",
+         "Your Towels load has been washed and dried. Please take care of it."),
+        ("laundry_room_washer_load_2", "✅ Darks: load complete",
+         "Your Darks load has been washed and dried. Please take care of it."),
+    ]
+
+    # Something dried on its own (nothing washed waiting)
+    await _finish_cycle(hass, "dryer", "Delicates")
+    assert _alerts(calls)[-1] == (
+        "laundry_room_dryer_load_1", "✅ Delicates: dry",
+        "Laundry Room Dryer finished the Delicates cycle. Please take care of it.",
+    )

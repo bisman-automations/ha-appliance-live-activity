@@ -114,7 +114,7 @@ async def test_only_people_who_are_home(hass: HomeAssistant, env, freezer):
     await _setup(hass, washer.id, {"devices": [mine.id, theirs.id], "only_home": True})
 
     await _cycle(hass)
-    assert len(_titled(mine_calls, "✅ Laundry Room Washer finished")) == 1
+    assert len(_titled(mine_calls, "✅ Normal: washed")) == 1
     assert _titled(their_calls, "✅") == []
     # Live Activities still go to everyone
     assert [c for c in their_calls if c.data["data"].get("live_update")]

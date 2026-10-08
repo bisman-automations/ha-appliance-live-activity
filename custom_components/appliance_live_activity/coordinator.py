@@ -208,6 +208,12 @@ class ApplianceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._cycle_started: float | None = None
         # Tag of the Live Activity this appliance is showing (see activity_tag)
         self._active_tag: str | None = None
+        # Laundry loads: each load gets its own finished notification, which
+        # follows it from the washer to the dryer
+        self._load: dict[str, Any] | None = None
+        self._washed_loads: list[dict[str, Any]] = []
+        self._load_counter = 0
+        self._last_load_tag: str | None = None
 
         # Quiet hours: regular alerts wait until they end
         self.quiet_start: str | None = cfg.get(CONF_QUIET_START) or None
@@ -488,6 +494,93 @@ class ApplianceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         """This appliance is currently showing something on the Live Activity."""
         return self._in_cycle or self._delay_sent is not None
 
+    # ------------------------------------------------------------------
+    # Laundry loads
+    # ------------------------------------------------------------------
+    def _washer_for_dryer(self) -> ApplianceCoordinator | None:
+        """The washer that feeds this dryer (its dryer sensor is this dryer)."""
+        if self.appliance_type != "dryer" or not self.state_entity:
+            return None
+        return next(
+            (
+                c
+                for c in self.hass.data.get(DOMAIN, {}).values()
+                if isinstance(c, ApplianceCoordinator)
+                and c.appliance_type == "washer"
+                and c.dryer_entity == self.state_entity
+            ),
+            None,
+        )
+
+    def _start_load(self, cycle: str) -> None:
+        if self.appliance_type not in ("washer", "dryer"):
+            return
+        now = dt_util.utcnow().timestamp()
+        if self.appliance_type == "dryer":
+            washer = self._washer_for_dryer()
+            if washer is not None:
+                # Loads washed in the last day, oldest first
+                washer._washed_loads = [
+                    load for load in washer._washed_loads if now - load.get("at", now) < 86400
+                ]
+                if washer._washed_loads:
+                    self._load = washer._washed_loads.pop(0)
+                    washer._store.async_delay_save(washer._data_to_save, 1)
+                    return
+        self._load_counter += 1
+        self._load = {
+            "tag": f"{self.notification_tag}_load_{self._load_counter}",
+            "name": cycle or None,
+            "washed": False,
+            "at": now,
+        }
+
+    def _load_alert(self) -> tuple[str | None, str | None, str | None]:
+        """(title, message, tag) of the finished alert for the current load."""
+        load = self._load
+        if load is None or self.appliance_type not in ("washer", "dryer"):
+            return None, None, None
+        name = load.get("name")
+        who = self.display_title
+        if self.appliance_type == "washer":
+            next_step = "Load it into the dryer." if self.dryer_entity else "Time to take it out."
+            if name:
+                return (
+                    f"✅ {name}: washed",
+                    f"{who} finished the {name} cycle. {next_step}",
+                    load["tag"],
+                )
+            return f"✅ {who} finished", f"The wash is done. {next_step}", load["tag"]
+        if load.get("washed"):
+            if name:
+                return (
+                    f"✅ {name}: load complete",
+                    f"Your {name} load has been washed and dried. Please take care of it.",
+                    load["tag"],
+                )
+            return (
+                "✅ Laundry load complete",
+                "Your load has been washed and dried. Please take care of it.",
+                load["tag"],
+            )
+        if name:
+            return (
+                f"✅ {name}: dry",
+                f"{who} finished the {name} cycle. Please take care of it.",
+                load["tag"],
+            )
+        return f"✅ {who} finished", "The laundry is dry. Please take care of it.", load["tag"]
+
+    def _finish_load(self, finished: bool) -> None:
+        load, self._load = self._load, None
+        if load is None or not finished:
+            return  # a cancelled cycle isn't a load
+        self._last_load_tag = load["tag"]
+        if self.appliance_type == "washer":
+            load["washed"] = True
+            load["at"] = dt_util.utcnow().timestamp()
+            self._washed_loads = (self._washed_loads + [load])[-3:]
+
     def configured_entities(self) -> list[str]:
         """Every entity this appliance was set up to use (for Repairs / diagnostics)."""
         cfg = {**self.entry.data, **self.entry.options}
@@ -598,6 +691,10 @@ class ApplianceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._history = [list(h) for h in stored.get("history", []) if len(h) == 2][-HISTORY_MAX:]
         self._cycle_started = stored.get("cycle_started")
         self._active_tag = stored.get("active_tag")
+        self._load = stored.get("load")
+        self._washed_loads = list(stored.get("washed_loads") or [])
+        self._load_counter = int(stored.get("load_counter", 0) or 0)
+        self._last_load_tag = stored.get("last_load_tag")
 
         tracked = [
             e
@@ -703,10 +800,14 @@ class ApplianceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         }
 
     async def _async_laundry_moved(self) -> None:
-        """'Laundry moved': stop reminders and remove the finished alert / activity."""
+        """'Laundry moved' / 'Unloaded': stop reminders and remove the finished
+        alert / activity. A washed load headed for the dryer keeps its
+        notification -- the dryer finishes it."""
         await self._async_cancel_move("laundry moved")
-        if self.devices:
-            await async_clear_tag(self.hass, self, f"{self.notification_tag}_done")
+        if self.devices and not (self.appliance_type == "washer" and self.dryer_entity):
+            await async_clear_tag(
+                self.hass, self, self._last_load_tag or f"{self.notification_tag}_done"
+            )
         if self._dismiss_at is not None:
             await self._async_dismiss()
 
@@ -1000,8 +1101,13 @@ class ApplianceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             self._sent_signature = None
             self._cycle_started = dt_util.utcnow().timestamp()
             await self._async_claim_activity()
+            self._start_load(cycle)
             changed = True
             self.fire_event(EVENT_STARTED, {"cycle": cycle, "minutes_left": round(remaining)})
+        elif self._load is not None and not self._load.get("name") and cycle and not self._load.get("washed"):
+            # The cycle name often arrives a moment after the machine starts
+            self._load["name"] = cycle
+            changed = True
         elif self._total_minutes <= 0 and remaining > 0:
             self._total_minutes = remaining
             changed = True
@@ -1108,18 +1214,23 @@ class ApplianceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                     note = "move to the dryer"
                 await async_send_done(self.hass, self, cycle, note)
                 if self.finished_alert:
+                    title, message, tag = self._load_alert()
                     await async_send_finished_alert(
                         self.hass,
                         self,
                         actions=self.washer_actions()
                         if self.appliance_type in ("washer", "dryer")
                         else None,
+                        title=title,
+                        message=message,
+                        tag=tag,
                     )
                 self._dismiss_at = dt_util.utcnow().timestamp() + self.dismiss_minutes * 60
                 self._schedule_dismiss(self.dismiss_minutes * 60)
             else:
                 # Cancelled, or a door that closed: just end the activity
                 await self._async_end_activity()
+        self._finish_load(finished)
         if finished and self.move_minutes > 0:
             # Washer done: remind to move the laundry unless the door opens
             self._move_since = dt_util.utcnow().timestamp()
@@ -1300,6 +1411,10 @@ class ApplianceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             "history": self._history,
             "cycle_started": self._cycle_started,
             "active_tag": self._active_tag,
+            "load": self._load,
+            "washed_loads": self._washed_loads,
+            "load_counter": self._load_counter,
+            "last_load_tag": self._last_load_tag,
         }
 
     async def _async_save(self) -> None:

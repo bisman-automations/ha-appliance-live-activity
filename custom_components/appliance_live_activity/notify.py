@@ -212,17 +212,22 @@ async def async_send_finished_alert(
     hass: HomeAssistant,
     coordinator: ApplianceCoordinator,
     actions: list[dict[str, str]] | None = None,
+    *,
+    title: str | None = None,
+    message: str | None = None,
+    tag: str | None = None,
 ) -> None:
-    """A regular, time-sensitive alert -- a Live Activity update doesn't always alert."""
+    """A regular, time-sensitive alert -- a Live Activity update doesn't always
+    alert, and this one stays in Notification Center after it ends."""
     await _async_send(
         hass,
         coordinator,
         {
-            "title": f"✅ {coordinator.name} finished",
-            "message": coordinator.definition.finished_alert_message,
+            "title": title or f"✅ {coordinator.name} finished",
+            "message": message or coordinator.definition.finished_alert_message,
             "data": _with_actions(
                 {
-                    "tag": f"{coordinator.notification_tag}_done",
+                    "tag": tag or f"{coordinator.notification_tag}_done",
                     "push": {"interruption-level": "time-sensitive"},
                     "ttl": 0,
                     "priority": "high",

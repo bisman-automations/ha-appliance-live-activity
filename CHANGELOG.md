@@ -1,5 +1,21 @@
 # Changelog
 
+## 1.9.0
+
+### Added
+- **One notification per laundry load**, named after the wash cycle, that
+  stays in Notification Center after the Live Activity is gone:
+  - Washer done: "✅ Towels: washed — Laundry Room Washer finished the
+    Towels cycle. Load it into the dryer."
+  - When that load finishes drying, the same notification becomes
+    "✅ Towels: load complete — Your Towels load has been washed and dried.
+    Please take care of it."
+  - Each load has its own notification, so two loads (towels drying while
+    darks wash) never replace each other. Loads go into the dryer in the
+    order they were washed.
+  - Something dried on its own: "✅ Delicates: dry".
+  - *Unloaded* on the dryer's notification removes it.
+
 ## 1.8.2
 
 ### Changed
