@@ -278,12 +278,14 @@ async def async_send_dryer_remote_off(hass: HomeAssistant, coordinator: Applianc
     )
 
 
-async def async_clear(hass: HomeAssistant, coordinator: ApplianceCoordinator) -> None:
+async def async_clear(
+    hass: HomeAssistant, coordinator: ApplianceCoordinator, tag: str | None = None
+) -> None:
     """End the Live Activity."""
     await _async_send(
         hass,
         coordinator,
-        {"message": "clear_notification", "data": {"tag": coordinator.activity_tag}},
+        {"message": "clear_notification", "data": {"tag": tag or coordinator.activity_tag}},
     )
 
 

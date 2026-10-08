@@ -39,6 +39,7 @@ from .const import (
     ACTION_LAUNDRY_MOVED,
     ACTION_START_DRYER,
     CONF_ACTIVE_STATES,
+    CONF_ACTIVITY_TITLE,
     CONF_APPLIANCE_TYPE,
     CONF_CLEAN_ENTITY,
     CONF_COMBINE_LAUNDRY,
@@ -68,6 +69,7 @@ from .const import (
     CONF_ICON,
     CONF_ICON_COLOR,
     CONF_IDLE_STATES,
+    CONF_LAUNDRY_TITLE,
     CONF_LEAK_ENTITIES,
     CONF_LEAK_REPEAT_MINUTES,
     CONF_MOVE_MAX_REMINDERS,
@@ -204,6 +206,8 @@ class ApplianceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._event_listeners: list[Any] = []
         self._history: list[list[float]] = []  # [finished_at, minutes]
         self._cycle_started: float | None = None
+        # Tag of the Live Activity this appliance is showing (see activity_tag)
+        self._active_tag: str | None = None
 
         # Quiet hours: regular alerts wait until they end
         self.quiet_start: str | None = cfg.get(CONF_QUIET_START) or None
@@ -326,7 +330,9 @@ class ApplianceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.tumble_entity: str | None = (
             cfg.get(CONF_TUMBLE_ENTITY) or None if self.appliance_type == "dryer" else None
         )
-        # Washer + dryer share one Live Activity ("Laundry")
+        self.custom_title: str = (cfg.get(CONF_ACTIVITY_TITLE) or "").strip()
+        self.laundry_title: str = (cfg.get(CONF_LAUNDRY_TITLE) or "").strip()
+        # Washer + dryer share one Live Activity
         self.combine_laundry: bool = (
             self.appliance_type == "washer"
             and bool(self.dryer_entity)
@@ -401,23 +407,86 @@ class ApplianceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
     @property
     def activity_tag(self) -> str:
-        """Tag of the main Live Activity (the washer's when shared)."""
+        """Tag of this appliance's Live Activity. Fixed for as long as the
+        activity is up (see _async_claim_activity)."""
+        if self._active_tag:
+            return self._active_tag
+        return self._preferred_tag()[0]
+
+    def _preferred_tag(self) -> tuple[str, ApplianceCoordinator | None]:
+        """(tag, appliance whose finished activity is taken over).
+
+        A washer + dryer share one Live Activity per load: the dryer takes
+        over the washer's finished "move to the dryer" activity. If both run
+        at the same time (a new wash while the last load dries), the one
+        that starts second gets a Live Activity of its own, so the two never
+        overwrite each other.
+        """
         partner = self.partner()
-        if partner is not None and self.appliance_type == "dryer":
-            return partner.notification_tag
-        return self.notification_tag
+        if partner is None:
+            return self.notification_tag, None
+        if self.appliance_type == "dryer":
+            if partner._active_tag and not partner.owns_activity():
+                return partner._active_tag, partner  # the washed load moves on
+            if partner.owns_activity():
+                return self.notification_tag, None  # washer busy: own activity
+            return partner.notification_tag, None
+        shared = self.notification_tag
+        if partner._active_tag == shared:
+            return f"{shared}_2", None  # the dryer is showing the last load
+        return shared, None
+
+    async def _async_claim_activity(self) -> None:
+        """Fix the Live Activity this cycle uses."""
+        if self._active_tag is not None:
+            return
+        tag, previous = self._preferred_tag()
+        if previous is not None:
+            await previous._async_hand_over()
+        self._active_tag = tag
+
+    async def _async_hand_over(self) -> None:
+        """The partner took over this appliance's finished Live Activity."""
+        self._cancel_dismiss()
+        self._dismiss_at = None
+        self._active_tag = None
+        await self._async_save()
+
+    async def _async_end_activity(self) -> None:
+        """End this appliance's Live Activity (unless the partner took it)."""
+        tag = self.activity_tag
+        self._active_tag = None
+        await self._async_save()
+        partner = self.partner()
+        if partner is not None and partner._active_tag == tag:
+            return
+        if self.devices:
+            await async_clear(self.hass, self, tag)
 
     @property
     def activity_title(self) -> str:
-        return "Laundry" if self.partner() is not None else self.name
+        """Live Activity title: the custom title, else the appliance's name
+        (as renamed in Home Assistant). A shared washer + dryer activity
+        follows whichever is running, unless the washer sets one title."""
+        partner = self.partner()
+        if partner is not None:
+            washer = self if self.combine_laundry else partner
+            if washer.laundry_title:
+                return washer.laundry_title
+        return self.display_title
+
+    @property
+    def display_title(self) -> str:
+        if self.custom_title:
+            return self.custom_title
+        device = dr.async_get(self.hass).async_get_device(identifiers={(DOMAIN, self.entry.entry_id)})
+        if device is not None and device.name_by_user:
+            return device.name_by_user
+        return self.name
 
     def owns_activity(self) -> bool:
         """This appliance is currently showing something on the Live Activity."""
         return self._in_cycle or self._delay_sent is not None
-
-    def _partner_busy(self) -> bool:
-        partner = self.partner()
-        return partner is not None and partner.owns_activity()
 
     def configured_entities(self) -> list[str]:
         """Every entity this appliance was set up to use (for Repairs / diagnostics)."""
@@ -528,6 +597,7 @@ class ApplianceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._move_count = int(stored.get("move_count", 0) or 0)
         self._history = [list(h) for h in stored.get("history", []) if len(h) == 2][-HISTORY_MAX:]
         self._cycle_started = stored.get("cycle_started")
+        self._active_tag = stored.get("active_tag")
 
         tracked = [
             e
@@ -846,6 +916,7 @@ class ApplianceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             self._dismiss_at = None
             await self._async_save()
         await self._async_cancel_move("new cycle scheduled")
+        await self._async_claim_activity()
 
         now = dt_util.utcnow().timestamp()
         value, minutes = self._delay_minutes()
@@ -887,15 +958,8 @@ class ApplianceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         """Delay cancelled (appliance turned off without starting)."""
         sent = self._delay_sent is not None
         self._delay_target = self._delay_value = self._delay_sent = None
-        if (
-            sent
-            and send
-            and self.devices
-            and not self._in_cycle
-            and self._dismiss_at is None
-            and not self._partner_busy()
-        ):
-            await async_clear(self.hass, self)
+        if sent and send and not self._in_cycle and self._dismiss_at is None:
+            await self._async_end_activity()
 
     def _finishes_at(self, remaining: float) -> datetime | None:
         """Estimated end time, kept steady unless it moves by a minute or more."""
@@ -935,6 +999,7 @@ class ApplianceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             self._total_minutes = remaining
             self._sent_signature = None
             self._cycle_started = dt_util.utcnow().timestamp()
+            await self._async_claim_activity()
             changed = True
             self.fire_event(EVENT_STARTED, {"cycle": cycle, "minutes_left": round(remaining)})
         elif self._total_minutes <= 0 and remaining > 0:
@@ -1052,9 +1117,9 @@ class ApplianceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                     )
                 self._dismiss_at = dt_util.utcnow().timestamp() + self.dismiss_minutes * 60
                 self._schedule_dismiss(self.dismiss_minutes * 60)
-            elif not self._partner_busy():
+            else:
                 # Cancelled, or a door that closed: just end the activity
-                await async_clear(self.hass, self)
+                await self._async_end_activity()
         if finished and self.move_minutes > 0:
             # Washer done: remind to move the laundry unless the door opens
             self._move_since = dt_util.utcnow().timestamp()
@@ -1221,9 +1286,7 @@ class ApplianceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             return
         _LOGGER.debug("%s: dismissing finished Live Activity", self.name)
         self._dismiss_at = None
-        await self._async_save()
-        if self.devices and not self._partner_busy():
-            await async_clear(self.hass, self)
+        await self._async_end_activity()
 
     @callback
     def _data_to_save(self) -> dict[str, Any]:
@@ -1236,6 +1299,7 @@ class ApplianceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             "move_count": self._move_count,
             "history": self._history,
             "cycle_started": self._cycle_started,
+            "active_tag": self._active_tag,
         }
 
     async def _async_save(self) -> None:

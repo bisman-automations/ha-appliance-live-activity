@@ -18,6 +18,7 @@ from homeassistant.helpers import selector
 
 from .appliance import APPLIANCE_REGISTRY
 from .const import (
+    CONF_ACTIVITY_TITLE,
     CONF_ALERT_LIGHTS,
     CONF_APPLIANCE_TYPE,
     CONF_CLEAN_ENTITY,
@@ -50,6 +51,7 @@ from .const import (
     CONF_GE_DISCOVERY,
     CONF_ICON,
     CONF_ICON_COLOR,
+    CONF_LAUNDRY_TITLE,
     CONF_LEAK_ENTITIES,
     CONF_LEAK_REPEAT_MINUTES,
     CONF_MOVE_MAX_REMINDERS,
@@ -190,6 +192,8 @@ CLEARABLE = (
     CONF_VENT_ENTITY,
     CONF_QUIET_START,
     CONF_QUIET_END,
+    CONF_ACTIVITY_TITLE,
+    CONF_LAUNDRY_TITLE,
 )
 
 # Which collapsible section of the form each setting lives in (anything not
@@ -212,6 +216,7 @@ SECTION_OF: dict[str, str] = {
     CONF_DRYER_ENTITY: "laundry",
     CONF_DRYER_START_ENTITY: "laundry",
     CONF_COMBINE_LAUNDRY: "laundry",
+    CONF_LAUNDRY_TITLE: "laundry",
     CONF_PREHEAT_ALERT: "cooking",
     CONF_COOKTOP_ALERT_MINUTES: "cooking",
     CONF_COOKTOP_REPEAT_MINUTES: "cooking",
@@ -232,6 +237,7 @@ SECTION_OF: dict[str, str] = {
     CONF_SPEAKERS: "announcements",
     CONF_QUIET_START: "quiet_hours",
     CONF_QUIET_END: "quiet_hours",
+    CONF_ACTIVITY_TITLE: "appearance",
     CONF_ICON: "appearance",
     CONF_ICON_COLOR: "appearance",
 }
@@ -285,6 +291,10 @@ def _temperature_defaults(hass) -> tuple[float, float]:
     if hass.config.units.temperature_unit == "°F":
         return DEFAULT_FRIDGE_MAX_F, DEFAULT_FREEZER_MAX_F
     return DEFAULT_FRIDGE_MAX_C, DEFAULT_FREEZER_MAX_C
+
+
+# Appliances with a water supply, where leak sensors make sense
+LEAK_TYPES = ("washer", "dishwasher", "refrigerator")
 
 
 def _behaviour_fields(
@@ -419,6 +429,7 @@ def _behaviour_fields(
                 vol.Optional(
                     CONF_COMBINE_LAUNDRY, default=current.get(CONF_COMBINE_LAUNDRY, True)
                 ): selector.BooleanSelector(),
+                vol.Optional(CONF_LAUNDRY_TITLE): selector.TextSelector(),
             }
         )
     if has_cooktop:
@@ -434,27 +445,46 @@ def _behaviour_fields(
                 ): _number(1, 120, 1, "min"),
             }
         )
-    # Every appliance: leak sensors + speaker announcements
-    fields.update(
-        {
-            vol.Optional(CONF_LEAK_ENTITIES): selector.EntitySelector(
-                selector.EntitySelectorConfig(
-                    domain="binary_sensor", device_class="moisture", multiple=True
-                )
-            ),
-            vol.Optional(
-                CONF_LEAK_REPEAT_MINUTES,
-                default=current.get(CONF_LEAK_REPEAT_MINUTES, DEFAULT_LEAK_REPEAT_MINUTES),
-            ): _number(1, 60, 1, "min"),
-            **_announce_fields(),
-            vol.Optional(CONF_QUIET_START): selector.TimeSelector(),
-            vol.Optional(CONF_QUIET_END): selector.TimeSelector(),
-        }
-    )
+    # Leak sensors: appliances with a water supply (or already set up)
+    has_leaks = appliance_type in LEAK_TYPES or bool(current.get(CONF_LEAK_ENTITIES))
+    if has_leaks:
+        fields.update(
+            {
+                vol.Optional(CONF_LEAK_ENTITIES): selector.EntitySelector(
+                    selector.EntitySelectorConfig(
+                        domain="binary_sensor", device_class="moisture", multiple=True
+                    )
+                ),
+                vol.Optional(
+                    CONF_LEAK_REPEAT_MINUTES,
+                    default=current.get(CONF_LEAK_REPEAT_MINUTES, DEFAULT_LEAK_REPEAT_MINUTES),
+                ): _number(1, 60, 1, "min"),
+            }
+        )
+    # Speakers: only when something can be announced (leaks, cooktop, dryer
+    # vent, a door left open)
+    if (
+        has_leaks
+        or has_cooktop
+        or appliance_type in ("dryer",) + tuple(DOOR_TYPES)
+        or current.get(CONF_TTS_ENTITY)
+        or current.get(CONF_SPEAKERS)
+    ):
+        fields.update(_announce_fields())
+    # Quiet hours: only when the appliance sends alerts that can wait (a plain
+    # door's alerts are all critical or Live Activities)
+    if appliance_type != "door" or current.get(CONF_QUIET_START) or current.get(CONF_QUIET_END):
+        fields.update(
+            {
+                vol.Optional(CONF_QUIET_START): selector.TimeSelector(),
+                vol.Optional(CONF_QUIET_END): selector.TimeSelector(),
+            }
+        )
     return fields
 
 
 REDISCOVER = "rediscover"
+
 
 
 def _entity_fields(appliance_type: str) -> dict:
@@ -674,17 +704,8 @@ class ApplianceLiveActivityConfigFlow(ConfigFlow, domain=DOMAIN):
         if self._data[CONF_APPLIANCE_TYPE] == "dryer":
             schema = schema.extend({vol.Optional(CONF_TUMBLE_ENTITY): sensor})
         if self._data[CONF_APPLIANCE_TYPE] in DOOR_TYPES:
-            # Doors only: the state entity is the first door, add more here
-            schema = vol.Schema(
-                {
-                    vol.Required(CONF_STATE_ENTITY): selector.EntitySelector(
-                        selector.EntitySelectorConfig(domain=["binary_sensor", "sensor"])
-                    ),
-                    vol.Optional(CONF_DOOR_ENTITIES): selector.EntitySelector(
-                        selector.EntitySelectorConfig(domain="binary_sensor", multiple=True)
-                    ),
-                }
-            )
+            # Doors / fridges: same sensors as Reconfigure
+            schema = vol.Schema(_entity_fields(self._data[CONF_APPLIANCE_TYPE]))
         return self.async_show_form(step_id="entities", data_schema=schema)
 
     # ------------------------------------------------------------------
@@ -713,6 +734,7 @@ class ApplianceLiveActivityConfigFlow(ConfigFlow, domain=DOMAIN):
                     bool(self._data.get(CONF_COOKTOP_ENTITIES)),
                     _temperature_defaults(self.hass),
                 ),
+                vol.Optional(CONF_ACTIVITY_TITLE): selector.TextSelector(),
                 vol.Optional(CONF_ICON, default=definition.icon): selector.IconSelector(),
                 vol.Optional(CONF_ICON_COLOR, default=hex_to_rgb(definition.color)): selector.ColorRGBSelector(),
             }
@@ -787,6 +809,7 @@ class ApplianceLiveActivityOptionsFlow(OptionsFlow):
                     bool(current.get(CONF_COOKTOP_ENTITIES)),
                     _temperature_defaults(self.hass),
                 ),
+                vol.Optional(CONF_ACTIVITY_TITLE): selector.TextSelector(),
                 vol.Optional(
                     CONF_ICON, default=current.get(CONF_ICON) or definition.icon
                 ): selector.IconSelector(),

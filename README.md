@@ -80,8 +80,11 @@ an appliance uses — or have the GE sensors found again — use
 
 ### Laundry: one Live Activity per load
 
-The washer and dryer share a single **Laundry** Live Activity: washing →
-*Wash Complete · move to the dryer* → drying → *Dry Complete*. Opening the
+The washer and dryer share a single Live Activity: washing →
+*Wash Complete · move to the dryer* → drying → *Dry Complete*. Its title is
+the name of whichever is running, or one title of your choice (washer's
+Configure → Laundry). Washing a new load while the last one dries? Each
+load keeps its own Live Activity. Opening the
 washer door to move the load keeps it up; the dryer takes it over when it
 starts. It ends when the dryer door opens (or after the dismiss delay).
 Turn it off in the washer's **Configure** to get two separate activities.
@@ -204,6 +207,12 @@ critical alerts always go to everyone.
 
 When the dishwasher reports clean dishes, its Live Activity shows
 *Dishes Clean · ready to unload* and stays up until the door opens.
+
+### Live Activity titles
+
+A Live Activity is titled with the appliance's name — rename the device in
+Home Assistant and it follows — or a title of your own (Configure → Live
+Activity title & icon).
 
 ### Tapping a notification
 

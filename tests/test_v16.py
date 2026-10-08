@@ -413,7 +413,7 @@ async def test_shared_laundry_activity(hass: HomeAssistant, phone, freezer):
     await _run(hass, "laundry_room_washer")
     await _finish(hass, "laundry_room_washer")
     done = _live(calls)[-1]
-    assert done.data["title"] == "Laundry"
+    assert done.data["title"] == "Laundry Room Washer"
     assert done.data["data"]["tag"] == "laundry_room_washer"
     assert "move to the dryer" in done.data["message"]
 
@@ -426,7 +426,7 @@ async def test_shared_laundry_activity(hass: HomeAssistant, phone, freezer):
     await _run(hass, "laundry_room_dryer", 60)
     drying = _live(calls)[-1]
     assert drying.data["data"]["tag"] == "laundry_room_washer"
-    assert drying.data["title"] == "Laundry"
+    assert drying.data["title"] == "Laundry Room Dryer"  # follows the appliance
     assert drying.data["data"]["when"] == 3600
 
     # The washer's dismiss timer must not end the dryer's activity

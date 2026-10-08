@@ -1,5 +1,32 @@
 # Changelog
 
+## 1.8.2
+
+### Changed
+- Settings only show for the appliances they apply to:
+  - **Leak sensors** for washers, dishwashers and fridges (not ovens, dryers
+    or doors).
+  - **Speaker announcements** only when there's something to announce —
+    leaks, a cooktop, the dryer vent or a door left open.
+  - **Quiet hours** not for plain doors (their alerts are all critical or
+    Live Activities, which never wait).
+  - A setting you already use stays visible.
+- **Live Activity titles**: the shared washer + dryer Live Activity now shows
+  the name of whichever is running ("Laundry Room Washer", then "Laundry Room
+  Dryer") instead of "Laundry". Set one title for it under the washer's
+  Configure → Laundry, or a title for any appliance under Configure → Live
+  Activity title & icon. Titles also follow the appliance if you rename its
+  device in Home Assistant.
+
+### Fixed
+- **Two loads at once**: a new wash while the last load is drying no longer
+  fights the dryer over one Live Activity. Each load keeps its own: the
+  second appliance to start gets a Live Activity of its own, and the dryer
+  takes over the right load's activity when it's moved in.
+- Fridges and doors no longer get a Progress sensor (it was disabled anyway).
+- Setting up a fridge by hand now also asks for the fridge / freezer
+  temperature and ice bucket sensors.
+
 ## 1.8.1
 
 ### Fixed

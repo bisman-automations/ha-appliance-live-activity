@@ -89,6 +89,11 @@ CONF_QUIET_START = "quiet_start"
 CONF_QUIET_END = "quiet_end"
 # Only send regular alerts to phones of people who are home
 CONF_ONLY_HOME = "only_home"
+# Live Activity title (blank = the appliance's name) and, for a washer
+# sharing its Live Activity with the dryer, one title for both (blank =
+# whichever is running)
+CONF_ACTIVITY_TITLE = "activity_title"
+CONF_LAUNDRY_TITLE = "laundry_title"
 # Dishwasher "clean" sensor: keep "ready to unload" up until the door opens
 CONF_CLEAN_ENTITY = "clean_entity"
 

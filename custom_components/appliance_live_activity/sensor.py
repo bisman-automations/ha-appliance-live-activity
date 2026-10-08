@@ -16,12 +16,11 @@ async def async_setup_entry(
     hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
 ) -> None:
     coordinator = hass.data[DOMAIN][entry.entry_id]
-    entities: list[SensorEntity] = [
-        ApplianceStatusSensor(coordinator, entry),
-        ApplianceProgressSensor(coordinator, entry),
-    ]
+    entities: list[SensorEntity] = [ApplianceStatusSensor(coordinator, entry)]
     if coordinator.appliance_type not in DOOR_TYPES:
+        # Doors and fridges have no cycle: no progress, time left or history
         entities += [
+            ApplianceProgressSensor(coordinator, entry),
             ApplianceTimeRemainingSensor(coordinator, entry),
             ApplianceFinishesAtSensor(coordinator, entry),
             ApplianceCyclesWeekSensor(coordinator, entry),
