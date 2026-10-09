@@ -323,7 +323,8 @@ async def test_snooze_door_alert(hass: HomeAssistant, phone, freezer):
     assert action == {"action": "KITCHEN_REFRIGERATOR_SNOOZE_DOOR", "title": "Snooze 10 min"}
 
     await _action(hass, action["action"])
-    assert "kitchen_refrigerator_critical" in _cleared(calls)
+    snoozed = [c for c in calls if c.data["data"].get("tag") == "kitchen_refrigerator_critical"][-1]
+    assert snoozed.data["title"] == "🔕 Kitchen Refrigerator: alert snoozed"
     assert _status(hass, "kitchen_refrigerator").attributes["snoozed_until"] is not None
     for _ in range(9):
         await _tick(hass, freezer, timedelta(minutes=1))

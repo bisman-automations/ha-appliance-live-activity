@@ -101,6 +101,12 @@ async def test_cooktop_alerts_repeat_and_clear(hass: HomeAssistant, oven, freeze
 
     hass.states.async_set("binary_sensor.kitchen_oven_cooktop_status", "off")
     await hass.async_block_till_done()
+    # Replaced with a quiet "off" notification (reliable on iOS)...
+    assert calls[-1].data["title"] == "✅ Cooktop off"
+    assert calls[-1].data["data"]["tag"].endswith("_cooktop")
+    assert calls[-1].data["data"]["push"]["interruption-level"] == "passive"
+    # ...which is removed two minutes later
+    await _advance(hass, freezer, timedelta(minutes=2, seconds=5))
     assert calls[-1].data["message"] == "clear_notification"
     assert calls[-1].data["data"]["tag"].endswith("_cooktop")
 

@@ -23,7 +23,7 @@ from homeassistant.helpers.event import async_track_state_change_event, async_tr
 from homeassistant.util import dt as dt_util
 
 from .const import EVENT_NOTIFICATION_ACTION
-from .notify import async_clear_tag, async_send_cooktop_critical, async_speak
+from .notify import async_clear_tag, async_resolve, async_send_cooktop_critical, async_speak
 
 if TYPE_CHECKING:
     from .coordinator import ApplianceCoordinator
@@ -104,7 +104,14 @@ class CooktopMonitor:
         now = dt_util.utcnow().timestamp()
         if not self.is_on:
             if self._last_alert is not None and self.coordinator.devices:
-                await async_clear_tag(self.hass, self.coordinator, self.tag)
+                await async_resolve(
+                    self.hass,
+                    self.coordinator,
+                    tag=self.tag,
+                    title="✅ Cooktop off",
+                    message=f"{self.coordinator.name}: the cooktop is off now.",
+                    still_resolved=lambda: not self.is_on,
+                )
             self._on_since = None
             self._last_alert = None
             self._acknowledged = False

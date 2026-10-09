@@ -26,7 +26,7 @@ from homeassistant.helpers.event import async_track_state_change_event, async_tr
 from homeassistant.util import dt as dt_util
 
 from .const import SUPPLY_LOW_PERCENT, UNAVAILABLE_STATES, VENT_REPEAT_MINUTES, WARM_REPEAT_MINUTES
-from .notify import async_clear_tag, async_send_alert, async_speak
+from .notify import async_clear_tag, async_resolve, async_send_alert, async_speak
 
 if TYPE_CHECKING:
     from .coordinator import ApplianceCoordinator
@@ -113,7 +113,14 @@ class VentMonitor(_Base):
             if self._last_alert is not None:
                 self._last_alert = None
                 if self.coordinator.devices:
-                    await async_clear_tag(self.hass, self.coordinator, self.tag)
+                    await async_resolve(
+                        self.hass,
+                        self.coordinator,
+                        tag=self.tag,
+                        title=f"✅ {self.coordinator.name}: vent clear",
+                        message="The dryer no longer reports a blocked vent.",
+                        still_resolved=lambda: not self.blocked,
+                    )
                 self.coordinator.async_update_listeners()
             return
         if self._last_alert is not None and now - self._last_alert < VENT_REPEAT_MINUTES * 60 - 1:

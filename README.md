@@ -222,6 +222,12 @@ A Live Activity is titled with the appliance's name — rename the device in
 Home Assistant and it follows — or a title of your own (Configure → Live
 Activity title & icon).
 
+### Linked to the appliance
+
+This integration's device shows as *Connected via* the appliance — the GE
+appliance, or for other brands the device the state sensor belongs to — and
+starts in its area, so each device page links to the other.
+
 ### Tapping a notification
 
 Tapping a Live Activity or alert opens the appliance's device page in the

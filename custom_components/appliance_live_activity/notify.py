@@ -13,7 +13,8 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING, Any
 
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
+from homeassistant.helpers.event import async_call_later
 from homeassistant.helpers import device_registry as dr, entity_registry as er
 from homeassistant.util import slugify
 
@@ -664,3 +665,45 @@ async def async_send_alert(
         devices,
         deferrable,
     )
+
+
+# Seconds a "resolved" notification stays before it is removed
+RESOLVED_CLEAR_SECONDS = 120
+
+
+async def async_resolve(
+    hass: HomeAssistant,
+    coordinator: ApplianceCoordinator,
+    *,
+    tag: str,
+    title: str,
+    message: str,
+    devices: list[str] | None = None,
+    still_resolved=None,
+) -> None:
+    """Take down an alert reliably.
+
+    A bare ``clear_notification`` is a silent push: iOS may handle it late
+    or not at all, and it can arrive before an alert sent seconds earlier
+    -- leaving that alert on screen. Replacing the alert with a quiet
+    "resolved" notification on the same tag always works; that one is then
+    removed a couple of minutes later (unless the problem came back).
+    """
+    await _async_send(
+        hass,
+        coordinator,
+        {
+            "title": title,
+            "message": message,
+            "data": {"tag": tag, "push": {"interruption-level": "passive"}},
+        },
+        devices,
+        deferrable=False,
+    )
+
+    @callback
+    def _later(_now) -> None:
+        if still_resolved is None or still_resolved():
+            hass.async_create_task(async_clear_tag(hass, coordinator, tag, devices))
+
+    async_call_later(hass, RESOLVED_CLEAR_SECONDS, _later)

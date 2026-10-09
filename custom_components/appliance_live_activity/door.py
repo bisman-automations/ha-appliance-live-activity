@@ -60,6 +60,8 @@ from .const import (
 from .coordinator import ApplianceCoordinator
 from .notify import (
     async_clear_tag,
+    async_resolve,
+    async_send_alert,
     async_send_door_closed,
     async_send_door_critical,
     async_send_door_open,
@@ -148,8 +150,16 @@ class DoorCoordinator(ApplianceCoordinator):
         self._snooze_until = dt_util.utcnow().timestamp() + self.snooze_minutes * 60
         _LOGGER.debug("%s: door alerts snoozed for %s min", self.name, self.snooze_minutes)
         if self._last_critical is not None:
-            await async_clear_tag(
-                self.hass, self, self.critical_tag, self.devices + self.escalation_devices
+            # Replace the critical alert (a silent clear isn't reliable on iOS)
+            await async_send_alert(
+                self.hass,
+                self,
+                tag=self.critical_tag,
+                title=f"🔕 {self.name}: alert snoozed",
+                message=f"Snoozed for {round(self.snooze_minutes)} min — it's still open.",
+                level="passive",
+                devices=self.devices + self.escalation_devices,
+                deferrable=False,
             )
         await self.async_evaluate(send=True)
 
@@ -175,7 +185,13 @@ class DoorCoordinator(ApplianceCoordinator):
         open_doors = [d for d in self.doors if self._is_open(d)]
 
         if open_doors:
-            self._cancel_closed_clear()
+            if self._closed_clear_unsub is not None:
+                # Reopened while the Live Activity still shows "Closed": carry
+                # on with that activity (update it now) instead of waiting for
+                # the open delay as if it were a new opening
+                self._cancel_closed_clear()
+                self._activity_started = True
+                self._sent_signature = None
             if self._open_since is None:
                 changed = [
                     self.hass.states.get(d).last_changed.timestamp() for d in open_doors
@@ -183,6 +199,9 @@ class DoorCoordinator(ApplianceCoordinator):
                 self._open_since = min(changed) if changed else now
             elapsed = now - self._open_since
             labels = [self._label(d) for d in open_doors]
+            if len(labels) > 1:
+                # GE also has an overall "Door" sensor: name the specific doors
+                labels = [label for label in labels if label.lower() != "door"] or labels
 
             if send and self.devices and (self._activity_started or elapsed >= self.open_delay):
                 critical = elapsed >= self.critical_after
@@ -249,8 +268,14 @@ class DoorCoordinator(ApplianceCoordinator):
                 self.fire_event(EVENT_DOOR_CLOSED, {"minutes_open": minutes_open})
             if send and self.devices and self._activity_started:
                 if self._last_critical is not None:
-                    await async_clear_tag(
-                        self.hass, self, self.critical_tag, self.devices + self.escalation_devices
+                    await async_resolve(
+                        self.hass,
+                        self,
+                        tag=self.critical_tag,
+                        title=f"✅ {self.name}: closed",
+                        message=f"Closed after {minutes_open} min.",
+                        devices=self.devices + self.escalation_devices,
+                        still_resolved=lambda: self._open_since is None,
                     )
                 await async_send_door_closed(self.hass, self, minutes_open=minutes_open)
                 self._schedule_closed_clear()

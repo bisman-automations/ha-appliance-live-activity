@@ -391,6 +391,8 @@ async def test_blocked_vent(hass: HomeAssistant, phone, freezer):
     assert len(_titled(calls, "🔥")) == 2
     _set(hass, "binary_sensor.laundry_room_dryer_blocked_vent_fault", "off")
     await hass.async_block_till_done()
+    assert calls[-1].data["title"] == "✅ Laundry Room Dryer: vent clear"
+    await _tick(hass, freezer, timedelta(minutes=2, seconds=5))
     assert "laundry_room_dryer_vent" in _cleared(calls)
     assert hass.states.get("sensor.laundry_room_dryer_status").attributes["vent_blocked"] is False
 

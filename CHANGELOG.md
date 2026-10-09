@@ -1,5 +1,32 @@
 # Changelog
 
+## 1.9.1
+
+### Added
+- **Linked to the appliance**: this integration's device now shows as
+  *Connected via* the appliance, so the two device pages link to each other —
+  the GE appliance for GE setups, or for any other brand the device the
+  state sensor belongs to (e.g. an LG or Samsung washer, or a door's contact
+  sensor). It also starts out in the appliance's area (an area you've already
+  chosen is kept), and tapping a notification opens the appliance's page.
+  Existing appliances are linked on the next start.
+
+### Fixed
+- **Critical alerts could stay on screen after the problem was fixed**
+  (cooktop turned off, door closed, dryer vent cleared). They were removed
+  with a silent "clear" push, which iOS may handle late, not at all, or before
+  an alert sent seconds earlier. They're now replaced with a quiet "✅ Cooktop
+  off" / "✅ closed" / "✅ vent clear" notification, which is removed two
+  minutes later.
+- **Fridge / door Live Activity stuck**: closing and reopening the door
+  within the minute "Closed" shows left the Live Activity up for good. A
+  reopen now updates the same Live Activity right away, and the next close
+  ends it as usual.
+- GE fridges: alerts name the door that's open ("Fridge Right Door") instead
+  of also listing the overall "Door" sensor.
+- Snoozing a door alert replaces it with "🔕 alert snoozed" instead of a
+  silent clear.
+
 ## 1.9.0
 
 ### Added

@@ -664,13 +664,17 @@ class ApplianceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     def tap_path(self) -> str:
         """Where tapping a notification / Live Activity goes in the app.
 
-        The appliance's own device page (e.g. the GE washer, with its controls)
-        when there is one, else this integration's device for the appliance,
-        else the integration page.
+        The appliance's own device page (e.g. the GE washer, with its controls,
+        or another brand's device the state sensor belongs to) when there is
+        one, else this integration's device for the appliance, else the
+        integration page.
         """
+        from .device import appliance_device_id  # noqa: PLC0415
+
         dev_reg = dr.async_get(self.hass)
-        if self.source_device and dev_reg.async_get(self.source_device):
-            return f"/config/devices/device/{self.source_device}"
+        appliance = appliance_device_id(self.hass, self)
+        if appliance is not None:
+            return f"/config/devices/device/{appliance}"
         own = dev_reg.async_get_device(identifiers={(DOMAIN, self.entry.entry_id)})
         if own is not None:
             return f"/config/devices/device/{own.id}"

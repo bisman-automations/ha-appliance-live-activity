@@ -5,11 +5,11 @@ from homeassistant.components.sensor import SensorDeviceClass, SensorEntity
 from homeassistant.const import UnitOfTime
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN, DOOR_TYPES
+from .device import appliance_device_info
 
 
 async def async_setup_entry(
@@ -33,12 +33,7 @@ class _ApplianceBaseSensor(CoordinatorEntity, SensorEntity):
     def __init__(self, coordinator, entry: ConfigEntry) -> None:
         super().__init__(coordinator)
         self._entry = entry
-        self._attr_device_info = DeviceInfo(
-            identifiers={(DOMAIN, entry.entry_id)},
-            name=coordinator.name,
-            manufacturer="Appliance Live Activity",
-            model=coordinator.definition.display_name,
-        )
+        self._attr_device_info = appliance_device_info(coordinator, entry)
 
 
 class ApplianceStatusSensor(_ApplianceBaseSensor):

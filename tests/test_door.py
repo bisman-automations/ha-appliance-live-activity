@@ -130,16 +130,22 @@ async def test_door_flow(hass: HomeAssistant, fridge, freezer):
     # Closed -> critical cleared, activity shows Closed
     _door(hass, "freezer_door", "off")
     await hass.async_block_till_done()
-    tags_cleared = [c.data["data"]["tag"] for c in calls if c.data.get("message") == "clear_notification"]
-    assert any(t.endswith("_critical") for t in tags_cleared)
+    resolved = [c for c in calls if c.data["data"].get("tag", "").endswith("_critical")][-1]
+    assert resolved.data["title"] == "✅ Kitchen Refrigerator: closed"
+    assert resolved.data["data"]["push"]["interruption-level"] == "passive"
     assert _live(calls)[-1].data["data"]["critical_text"] == "Closed"
 
-    # ...and is ended a minute later
+    # ...the Live Activity is ended a minute later, the "closed" note after two
     freezer.tick(timedelta(seconds=61))
     async_fire_time_changed(hass)
     await hass.async_block_till_done()
     assert calls[-1].data["message"] == "clear_notification"
     assert not calls[-1].data["data"]["tag"].endswith("_critical")
+    freezer.tick(timedelta(seconds=61))
+    async_fire_time_changed(hass)
+    await hass.async_block_till_done()
+    assert calls[-1].data["message"] == "clear_notification"
+    assert calls[-1].data["data"]["tag"].endswith("_critical")
 
 
 async def test_generic_door_escalation(hass: HomeAssistant, enable_custom_integrations, freezer):
@@ -196,4 +202,42 @@ async def test_generic_door_escalation(hass: HomeAssistant, enable_custom_integr
     hass.states.async_set("binary_sensor.garage_door", "off", {"friendly_name": "Garage Door"})
     await hass.async_block_till_done()
     assert len(scene_on) == 1  # lights restored
-    assert any(c.data.get("message") == "clear_notification" for c in theirs)
+    assert theirs[-1].data["title"] == "✅ Garage: closed"  # escalated phones too
+
+
+async def test_reopened_while_closed_is_showing(hass: HomeAssistant, fridge, freezer):
+    """Closed, then reopened within the minute "Closed" shows: the same Live
+    Activity updates right away, and the next close ends it (real-world bug:
+    it stayed up forever)."""
+    calls = fridge
+    _door(hass, "fridge_right_door", "on")
+    _door(hass, "door", "on")
+    await hass.async_block_till_done()
+    freezer.tick(timedelta(seconds=31))
+    async_fire_time_changed(hass)
+    await hass.async_block_till_done()
+    assert _live(calls)[-1].data["message"] == "Fridge Right Door is open"  # not "Door & …"
+
+    _door(hass, "fridge_right_door", "off")
+    _door(hass, "door", "off")
+    await hass.async_block_till_done()
+    assert _live(calls)[-1].data["data"]["critical_text"] == "Closed"
+
+    freezer.tick(timedelta(seconds=7))
+    async_fire_time_changed(hass)
+    _door(hass, "fridge_right_door", "on")
+    _door(hass, "door", "on")
+    await hass.async_block_till_done()
+    assert _live(calls)[-1].data["data"]["critical_text"] == "Open"  # updated at once
+
+    freezer.tick(timedelta(seconds=20))
+    async_fire_time_changed(hass)
+    _door(hass, "fridge_right_door", "off")
+    _door(hass, "door", "off")
+    await hass.async_block_till_done()
+    assert _live(calls)[-1].data["data"]["critical_text"] == "Closed"
+    freezer.tick(timedelta(seconds=61))
+    async_fire_time_changed(hass)
+    await hass.async_block_till_done()
+    assert calls[-1].data["message"] == "clear_notification"
+    assert calls[-1].data["data"]["tag"] == "kitchen_refrigerator"
