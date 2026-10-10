@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.9.4
+
+### Fixed
+- **Still two devices per appliance on Home Assistant 2026.9+**: since
+  2026.9 a device belongs to a single integration, and the way 1.9.3 joined
+  the appliance's device is deprecated there (it silently kept the separate
+  device). The integration's entities are now *linked* to the appliance's
+  device the way Home Assistant now asks for, which works on older versions
+  too. On the next start the separate "Kitchen Oven" / "Kitchen Dishwasher"
+  devices are removed and their entities moved over; entity IDs don't change.
+
 ## 1.9.3
 
 ### Changed

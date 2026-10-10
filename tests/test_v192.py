@@ -44,7 +44,8 @@ async def test_entities_on_the_ge_appliance(hass: HomeAssistant, enable_custom_i
     ours = er.async_entries_for_config_entry(ent_reg, entry.entry_id)
     assert ours and {e.device_id for e in ours} == {dishwasher.id}
     assert ent_reg.async_get("sensor.kitchen_dishwasher_status").device_id == dishwasher.id
-    assert entry.entry_id in dev_reg.async_get(dishwasher.id).config_entries
+    # Linked, not co-owned (Home Assistant 2026.9+: a device has one owner)
+    assert dev_reg.async_get(dishwasher.id).config_entries == {ge.entry_id}
     assert dev_reg.async_get(dishwasher.id).name == "Kitchen Dishwasher"  # GE's name kept
 
 

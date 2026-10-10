@@ -9,7 +9,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN, DOOR_TYPES
-from .device import appliance_device_info
+from .device import attach_to_appliance
 
 
 async def async_setup_entry(
@@ -33,7 +33,7 @@ class _ApplianceBaseSensor(CoordinatorEntity, SensorEntity):
     def __init__(self, coordinator, entry: ConfigEntry) -> None:
         super().__init__(coordinator)
         self._entry = entry
-        self._attr_device_info = appliance_device_info(coordinator, entry)
+        attach_to_appliance(self, coordinator, entry)
 
 
 class ApplianceStatusSensor(_ApplianceBaseSensor):

@@ -14,7 +14,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .device import appliance_device_info
+from .device import attach_to_appliance
 from .const import CYCLE_EVENTS, DOMAIN, DOOR_EVENTS, DOOR_TYPES
 
 
@@ -36,7 +36,7 @@ class ApplianceEvent(EventEntity):
         self._attr_name = f"{coordinator.name} {'Door' if door else 'Cycle'}"
         self._attr_event_types = list(DOOR_EVENTS if door else CYCLE_EVENTS)
         self._attr_icon = "mdi:door" if door else "mdi:bell-ring-outline"
-        self._attr_device_info = appliance_device_info(coordinator, entry)
+        attach_to_appliance(self, coordinator, entry)
 
     async def async_added_to_hass(self) -> None:
         self.async_on_remove(self.coordinator.add_event_listener(self._handle))
