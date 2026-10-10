@@ -9,12 +9,13 @@ from homeassistant.helpers import device_registry as dr
 from custom_components.appliance_live_activity.const import DOMAIN
 
 
-async def test_entities_on_the_ge_appliance(hass: HomeAssistant, enable_custom_integrations):
+async def test_own_device_linked_to_ge_appliance(hass: HomeAssistant, enable_custom_integrations, monkeypatch):
     ge = MockConfigEntry(domain="ge_home")
     ge.add_to_hass(hass)
     dev_reg = dr.async_get(hass)
     dishwasher = dev_reg.async_get_or_create(
-        config_entry_id=ge.entry_id, identifiers={("ge_home", "DW123")}, name="Kitchen Dishwasher"
+        config_entry_id=ge.entry_id, identifiers={("ge_home", "DW123")},
+        connections={("mac", "aa:bb:cc:dd:ee:ff")}, name="Kitchen Dishwasher",
     )
     hass.states.async_set("sensor.kitchen_dishwasher_operating_mode", "Off")
     entry = MockConfigEntry(domain=DOMAIN, data={
@@ -24,29 +25,53 @@ async def test_entities_on_the_ge_appliance(hass: HomeAssistant, enable_custom_i
     })
     entry.add_to_hass(hass)
 
-    # A separate device made by an older version, with an entity on it
+    # 1.9.4 put our entities on the GE device
     from homeassistant.helpers import entity_registry as er  # noqa: PLC0415
 
-    old = dev_reg.async_get_or_create(
-        config_entry_id=entry.entry_id, identifiers={(DOMAIN, entry.entry_id)}, name="Kitchen Dishwasher"
-    )
     ent_reg = er.async_get(hass)
     ent_reg.async_get_or_create(
         "sensor", DOMAIN, f"{entry.entry_id}_status", suggested_object_id="kitchen_dishwasher_status",
-        device_id=old.id, config_entry=entry,
+        device_id=dishwasher.id, config_entry=entry,
     )
 
     assert await hass.config_entries.async_setup(entry.entry_id)
     await hass.async_block_till_done()
 
-    # One device: our entities are on the GE dishwasher, the old device is gone
-    assert dev_reg.async_get_device(identifiers={(DOMAIN, entry.entry_id)}) is None
+    # Our own device again, holding all our entities; GE's device untouched
+    own = dev_reg.async_get_device(identifiers={(DOMAIN, entry.entry_id)})
+    assert own is not None and own.id != dishwasher.id
+    assert own.name == "Kitchen Dishwasher Live Activity"
     ours = er.async_entries_for_config_entry(ent_reg, entry.entry_id)
-    assert ours and {e.device_id for e in ours} == {dishwasher.id}
-    assert ent_reg.async_get("sensor.kitchen_dishwasher_status").device_id == dishwasher.id
-    # Linked, not co-owned (Home Assistant 2026.9+: a device has one owner)
+    assert ours and {e.device_id for e in ours} == {own.id}
+    assert ent_reg.async_get("sensor.kitchen_dishwasher_status").device_id == own.id
     assert dev_reg.async_get(dishwasher.id).config_entries == {ge.entry_id}
-    assert dev_reg.async_get(dishwasher.id).name == "Kitchen Dishwasher"  # GE's name kept
+    assert dev_reg.async_get(dishwasher.id).name == "Kitchen Dishwasher"
+    coordinator = hass.data[DOMAIN][entry.entry_id]
+    assert coordinator.tap_path() == f"/config/devices/device/{dishwasher.id}"
+
+    # Home Assistant 2026.8+: our device shares the GE device's identifiers and
+    # connections, which lists each under the other's "Linked devices"
+    from custom_components.appliance_live_activity import device as device_mod  # noqa: PLC0415
+
+    monkeypatch.setattr(device_mod, "LINKED_DEVICES_SUPPORTED", True)
+    info = device_mod.own_device_info(coordinator, entry)
+    assert info["identifiers"] == {(DOMAIN, entry.entry_id), ("ge_home", "DW123")}
+    assert info["connections"] == {("mac", "aa:bb:cc:dd:ee:ff")}
+
+
+async def test_renamed_device_titles_activity(hass: HomeAssistant, enable_custom_integrations):
+    hass.states.async_set("binary_sensor.garage_door", "off")
+    entry = MockConfigEntry(domain=DOMAIN, data={
+        "source": "manual", "appliance_type": "door", "name": "Garage Door",
+        "state_entity": "binary_sensor.garage_door", "notification_tag": "garage_door", "devices": [],
+    })
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+    dev_reg = dr.async_get(hass)
+    own = dev_reg.async_get_device(identifiers={(DOMAIN, entry.entry_id)})
+    dev_reg.async_update_device(own.id, name_by_user="Big Door")
+    assert hass.data[DOMAIN][entry.entry_id].display_title == "Big Door"
 
 
 async def test_manual_appliance_not_linked(hass: HomeAssistant, enable_custom_integrations):
@@ -58,12 +83,13 @@ async def test_manual_appliance_not_linked(hass: HomeAssistant, enable_custom_in
     entry.add_to_hass(hass)
     assert await hass.config_entries.async_setup(entry.entry_id)
     await hass.async_block_till_done()
-    # No device behind the sensor: the integration keeps a device of its own
+    # No device behind the sensor: just our device, named after the appliance
     own = dr.async_get(hass).async_get_device(identifiers={(DOMAIN, entry.entry_id)})
     assert own is not None and own.name == "Garage Door"
+    assert own.identifiers == {(DOMAIN, entry.entry_id)}
 
 
-async def test_other_brand_on_its_device(hass: HomeAssistant, enable_custom_integrations):
+async def test_other_brand_linked(hass: HomeAssistant, enable_custom_integrations):
     lg = MockConfigEntry(domain="lg_thinq")
     lg.add_to_hass(hass)
     dev_reg = dr.async_get(hass)
@@ -84,9 +110,11 @@ async def test_other_brand_on_its_device(hass: HomeAssistant, enable_custom_inte
     entry.add_to_hass(hass)
     assert await hass.config_entries.async_setup(entry.entry_id)
     await hass.async_block_till_done()
-    assert dev_reg.async_get_device(identifiers={(DOMAIN, entry.entry_id)}) is None
+    own = dev_reg.async_get_device(identifiers={(DOMAIN, entry.entry_id)})
+    assert own is not None and own.name == "LG Washer Live Activity"
     status = er.async_get(hass).async_get("sensor.lg_washer_status")
-    assert status is not None and status.device_id == washer.id
+    assert status is not None and status.device_id == own.id
+    assert dev_reg.async_get(washer.id).config_entries == {lg.entry_id}
     coordinator = hass.data[DOMAIN][entry.entry_id]
     assert coordinator.tap_path() == f"/config/devices/device/{washer.id}"
 

@@ -492,14 +492,15 @@ class ApplianceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         from .device import appliance_device_id  # noqa: PLC0415
 
         dev_reg = dr.async_get(self.hass)
+        # A name given to the appliance's device, else to ours (whose own
+        # name ends in "Live Activity" when it is linked)
         linked = appliance_device_id(self.hass, self)
-        device = (
-            dev_reg.async_get(linked)
-            if linked
-            else dev_reg.async_get_device(identifiers={(DOMAIN, self.entry.entry_id)})
-        )
-        if device is not None and device.name_by_user:
-            return device.name_by_user
+        for device in (
+            dev_reg.async_get(linked) if linked else None,
+            dev_reg.async_get_device(identifiers={(DOMAIN, self.entry.entry_id)}),
+        ):
+            if device is not None and device.name_by_user:
+                return device.name_by_user
         return self.name
 
     def owns_activity(self) -> bool:

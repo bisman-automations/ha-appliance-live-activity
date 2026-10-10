@@ -222,11 +222,15 @@ A Live Activity is titled with the appliance's name — rename the device in
 Home Assistant and it follows — or a title of your own (Configure → Live
 Activity title & icon).
 
-### One device per appliance
+### Linked devices
 
-This integration's sensors, event and Probe Target are added to the
-appliance's own device — the GE appliance, or for other brands the device the
-state sensor belongs to — so each appliance is one device in Home Assistant.
+Each appliance gets a device of this integration (e.g. "Kitchen Oven Live
+Activity") holding its sensors, event and Probe Target. When the appliance has
+a device of its own — the GE appliance, or for other brands the device the
+state sensor belongs to — the two pages list each other under **Linked
+devices** (Home Assistant 2026.8+), the same way UniFi Network links its
+client devices. Appliances without a device of their own (e.g. a template
+sensor) just get this integration's device, named after the appliance.
 
 ### Tapping a notification
 

@@ -1,5 +1,20 @@
 # Changelog
 
+## 1.9.5
+
+### Changed
+- **Linked devices instead of merged entities**: 1.9.4 put this
+  integration's sensors on the GE (or other brand's) device, where they
+  looked like helpers and nothing showed the device was tied to this
+  integration. Each appliance now has its own device again — named
+  "<Appliance> Live Activity" — that shares the appliance device's
+  identifiers and connections, so on Home Assistant 2026.8+ each device page
+  lists the other under **Linked devices** ("These devices share hardware
+  with this device and are managed by other integrations"), like UniFi
+  Network's client devices. Entities are moved onto it on the next start;
+  entity IDs don't change. Renaming either device still renames the Live
+  Activity, and tapping it still opens the appliance's page.
+
 ## 1.9.4
 
 ### Fixed
