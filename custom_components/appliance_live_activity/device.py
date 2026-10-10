@@ -1,18 +1,25 @@
-"""The integration's device for an appliance, linked to the appliance itself.
+"""Which device the appliance's entities live on.
 
-Our device is shown as "Connected via" the appliance, so each device page
-links to the other, and it starts out in the appliance's area. The appliance
-is the GE device picked at setup, or -- for any other brand -- the device
-the appliance's state sensor belongs to (e.g. an LG or Samsung washer).
+When the appliance has its own device in Home Assistant -- the GE device
+picked at setup, or for other brands the device the state sensor belongs
+to (an LG washer, a door's contact sensor) -- this integration's sensors,
+event and Probe Target are added to *that* device, the same way Home
+Assistant's own helpers (Utility Meter, Derivative…) attach to their source.
+One "Kitchen Oven" instead of two. Otherwise the integration has a device of
+its own.
 """
 from __future__ import annotations
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import device_registry as dr, entity_registry as er
+from homeassistant.helpers.device import (
+    async_device_info_to_link_from_device_id,
+    async_remove_stale_devices_links_keep_current_device,
+)
 from homeassistant.helpers.device_registry import DeviceInfo
 
-from .const import DOMAIN, GE_HOME_DOMAIN
+from .const import DOMAIN
 
 
 def appliance_device_id(hass: HomeAssistant, coordinator) -> str | None:
@@ -32,46 +39,25 @@ def appliance_device_id(hass: HomeAssistant, coordinator) -> str | None:
     return device.id
 
 
-def _source_identifier(hass: HomeAssistant, device_id: str | None) -> tuple[str, str] | None:
-    if not device_id:
-        return None
-    device = dr.async_get(hass).async_get(device_id)
-    if device is None or not device.identifiers:
-        return None
-    # Prefer the GE Home identifier when the device has several
-    return next(
-        (i for i in device.identifiers if i[0] == GE_HOME_DOMAIN),
-        next(iter(sorted(device.identifiers))),
-    )
-
-
 def appliance_device_info(coordinator, entry: ConfigEntry) -> DeviceInfo:
-    info = DeviceInfo(
+    link = async_device_info_to_link_from_device_id(
+        coordinator.hass, appliance_device_id(coordinator.hass, coordinator)
+    )
+    if link is not None:
+        return link
+    return DeviceInfo(
         identifiers={(DOMAIN, entry.entry_id)},
         name=coordinator.name,
         manufacturer="Appliance Live Activity",
         model=coordinator.definition.display_name,
     )
-    via = _source_identifier(coordinator.hass, appliance_device_id(coordinator.hass, coordinator))
-    if via is not None:
-        info["via_device"] = via
-    return info
 
 
 @callback
 def async_link_device(hass: HomeAssistant, coordinator, entry: ConfigEntry) -> None:
-    """Make sure our device is connected via the appliance (also for devices
-    created by older versions) and, if it has no area yet, use the appliance's."""
-    dev_reg = dr.async_get(hass)
-    own = dev_reg.async_get_device(identifiers={(DOMAIN, entry.entry_id)})
-    source_id = appliance_device_id(hass, coordinator)
-    source = dev_reg.async_get(source_id) if source_id else None
-    if own is None or source is None:
-        return
-    changes = {}
-    if own.via_device_id != source.id:
-        changes["via_device_id"] = source.id
-    if own.area_id is None and source.area_id is not None:
-        changes["area_id"] = source.area_id
-    if changes:
-        dev_reg.async_update_device(own.id, **changes)
+    """Before the entities are added: move entities made by older versions
+    (which had a separate device) onto the appliance's device and drop the
+    separate device."""
+    target = appliance_device_id(hass, coordinator)
+    if target is not None:
+        async_remove_stale_devices_links_keep_current_device(hass, entry.entry_id, target)

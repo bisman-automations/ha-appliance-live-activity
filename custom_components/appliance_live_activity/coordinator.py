@@ -489,7 +489,15 @@ class ApplianceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     def display_title(self) -> str:
         if self.custom_title:
             return self.custom_title
-        device = dr.async_get(self.hass).async_get_device(identifiers={(DOMAIN, self.entry.entry_id)})
+        from .device import appliance_device_id  # noqa: PLC0415
+
+        dev_reg = dr.async_get(self.hass)
+        linked = appliance_device_id(self.hass, self)
+        device = (
+            dev_reg.async_get(linked)
+            if linked
+            else dev_reg.async_get_device(identifiers={(DOMAIN, self.entry.entry_id)})
+        )
         if device is not None and device.name_by_user:
             return device.name_by_user
         return self.name

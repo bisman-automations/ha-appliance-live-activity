@@ -4,44 +4,48 @@ from __future__ import annotations
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers import area_registry as ar, device_registry as dr
+from homeassistant.helpers import device_registry as dr
 
 from custom_components.appliance_live_activity.const import DOMAIN
 
 
-async def test_connected_via_ge_appliance(hass: HomeAssistant, enable_custom_integrations):
+async def test_entities_on_the_ge_appliance(hass: HomeAssistant, enable_custom_integrations):
     ge = MockConfigEntry(domain="ge_home")
     ge.add_to_hass(hass)
     dev_reg = dr.async_get(hass)
-    kitchen = ar.async_get(hass).async_create("Kitchen")
     dishwasher = dev_reg.async_get_or_create(
         config_entry_id=ge.entry_id, identifiers={("ge_home", "DW123")}, name="Kitchen Dishwasher"
     )
-    dev_reg.async_update_device(dishwasher.id, area_id=kitchen.id)
     hass.states.async_set("sensor.kitchen_dishwasher_operating_mode", "Off")
-
     entry = MockConfigEntry(domain=DOMAIN, data={
         "source": "ge_home", "source_device": dishwasher.id, "appliance_type": "dishwasher",
         "name": "Kitchen Dishwasher", "state_entity": "sensor.kitchen_dishwasher_operating_mode",
         "notification_tag": "kitchen_dishwasher", "devices": [], "ge_discovery": 99,
     })
     entry.add_to_hass(hass)
+
+    # A separate device made by an older version, with an entity on it
+    from homeassistant.helpers import entity_registry as er  # noqa: PLC0415
+
+    old = dev_reg.async_get_or_create(
+        config_entry_id=entry.entry_id, identifiers={(DOMAIN, entry.entry_id)}, name="Kitchen Dishwasher"
+    )
+    ent_reg = er.async_get(hass)
+    ent_reg.async_get_or_create(
+        "sensor", DOMAIN, f"{entry.entry_id}_status", suggested_object_id="kitchen_dishwasher_status",
+        device_id=old.id, config_entry=entry,
+    )
+
     assert await hass.config_entries.async_setup(entry.entry_id)
     await hass.async_block_till_done()
 
-    own = dev_reg.async_get_device(identifiers={(DOMAIN, entry.entry_id)})
-    assert own.via_device_id == dishwasher.id
-    assert own.area_id == kitchen.id
-
-    # A device created by an older version (not linked) is linked on start-up,
-    # and an area the user picked is kept
-    living = ar.async_get(hass).async_create("Utility")
-    dev_reg.async_update_device(own.id, via_device_id=None, area_id=living.id)
-    await hass.config_entries.async_reload(entry.entry_id)
-    await hass.async_block_till_done()
-    own = dev_reg.async_get(own.id)
-    assert own.via_device_id == dishwasher.id
-    assert own.area_id == living.id
+    # One device: our entities are on the GE dishwasher, the old device is gone
+    assert dev_reg.async_get_device(identifiers={(DOMAIN, entry.entry_id)}) is None
+    ours = er.async_entries_for_config_entry(ent_reg, entry.entry_id)
+    assert ours and {e.device_id for e in ours} == {dishwasher.id}
+    assert ent_reg.async_get("sensor.kitchen_dishwasher_status").device_id == dishwasher.id
+    assert entry.entry_id in dev_reg.async_get(dishwasher.id).config_entries
+    assert dev_reg.async_get(dishwasher.id).name == "Kitchen Dishwasher"  # GE's name kept
 
 
 async def test_manual_appliance_not_linked(hass: HomeAssistant, enable_custom_integrations):
@@ -53,11 +57,12 @@ async def test_manual_appliance_not_linked(hass: HomeAssistant, enable_custom_in
     entry.add_to_hass(hass)
     assert await hass.config_entries.async_setup(entry.entry_id)
     await hass.async_block_till_done()
+    # No device behind the sensor: the integration keeps a device of its own
     own = dr.async_get(hass).async_get_device(identifiers={(DOMAIN, entry.entry_id)})
-    assert own is not None and own.via_device_id is None
+    assert own is not None and own.name == "Garage Door"
 
 
-async def test_other_brand_linked_via_state_sensor(hass: HomeAssistant, enable_custom_integrations):
+async def test_other_brand_on_its_device(hass: HomeAssistant, enable_custom_integrations):
     lg = MockConfigEntry(domain="lg_thinq")
     lg.add_to_hass(hass)
     dev_reg = dr.async_get(hass)
@@ -78,8 +83,9 @@ async def test_other_brand_linked_via_state_sensor(hass: HomeAssistant, enable_c
     entry.add_to_hass(hass)
     assert await hass.config_entries.async_setup(entry.entry_id)
     await hass.async_block_till_done()
-    own = dev_reg.async_get_device(identifiers={(DOMAIN, entry.entry_id)})
-    assert own.via_device_id == washer.id
+    assert dev_reg.async_get_device(identifiers={(DOMAIN, entry.entry_id)}) is None
+    status = er.async_get(hass).async_get("sensor.lg_washer_status")
+    assert status is not None and status.device_id == washer.id
     coordinator = hass.data[DOMAIN][entry.entry_id]
     assert coordinator.tap_path() == f"/config/devices/device/{washer.id}"
 

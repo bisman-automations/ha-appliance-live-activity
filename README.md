@@ -222,11 +222,11 @@ A Live Activity is titled with the appliance's name — rename the device in
 Home Assistant and it follows — or a title of your own (Configure → Live
 Activity title & icon).
 
-### Linked to the appliance
+### One device per appliance
 
-This integration's device shows as *Connected via* the appliance — the GE
-appliance, or for other brands the device the state sensor belongs to — and
-starts in its area, so each device page links to the other.
+This integration's sensors, event and Probe Target are added to the
+appliance's own device — the GE appliance, or for other brands the device the
+state sensor belongs to — so each appliance is one device in Home Assistant.
 
 ### Tapping a notification
 

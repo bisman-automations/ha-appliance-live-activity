@@ -1,5 +1,19 @@
 # Changelog
 
+## 1.9.3
+
+### Changed
+- **One device per appliance**: instead of a second "Kitchen Oven" device
+  *connected via* the GE one, this integration's sensors (Status, Progress,
+  Time Left, Finishes At, cycle history, the Cycle event, Probe Target) are
+  now added to the appliance's own device — the GE appliance, or for other
+  brands the device the state sensor belongs to — the same way Home
+  Assistant's own helpers attach to their source. Existing setups are moved
+  over on the next start and the separate device is removed; entity IDs
+  don't change, so dashboards and automations keep working. Appliances whose
+  sensor isn't part of a device (e.g. a template sensor) keep a device of
+  their own.
+
 ## 1.9.2
 
 ### Fixed
