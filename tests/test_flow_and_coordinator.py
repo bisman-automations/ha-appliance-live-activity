@@ -162,7 +162,7 @@ async def test_ge_flow_and_lifecycle(hass: HomeAssistant, setup_devices):
     assert calls[-1].data["message"] == "clear_notification"
 
 
-async def test_cancelled_cycle_clears(hass: HomeAssistant, setup_devices):
+async def test_cancelled_cycle_clears(hass: HomeAssistant, setup_devices, freezer):
     washer, phone, calls = setup_devices
     await _create_entry(hass, washer, phone)
     _set(hass, "time_remaining", "50")
@@ -170,8 +170,15 @@ async def test_cancelled_cycle_clears(hass: HomeAssistant, setup_devices):
     await hass.async_block_till_done()
     _set(hass, "state", "Off")
     await hass.async_block_till_done()
-    assert calls[-1].data["message"] == "clear_notification"
+    # The Live Activity shows "Stopped" (an update always arrives)...
+    assert calls[-1].data["data"]["critical_text"] == "Stopped"
+    assert calls[-1].data["data"]["live_update"] is True
     assert not any("finished" in c.data.get("title", "") for c in calls)
+    # ...and is ended a minute later
+    freezer.tick(timedelta(seconds=61))
+    async_fire_time_changed(hass)
+    await hass.async_block_till_done()
+    assert calls[-1].data["message"] == "clear_notification"
 
 
 async def test_options_flow(hass: HomeAssistant, setup_devices):

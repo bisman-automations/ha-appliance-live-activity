@@ -209,6 +209,35 @@ def _with_actions(data: dict[str, Any], actions: list[dict[str, str]] | None) ->
     return data
 
 
+async def async_send_stopped(
+    hass: HomeAssistant, coordinator: ApplianceCoordinator, *, minutes: float | None
+) -> None:
+    """Show that the appliance turned off before finishing (e.g. an oven used
+    without a cook timer). A Live Activity *update* always shows; the
+    activity is ended a minute later."""
+    ran = f"{'cooked' if coordinator.appliance_type == 'oven' else 'ran'} {round(minutes)} min" if minutes and minutes >= 1 else ""
+    if coordinator.appliance_type == "oven":
+        headline, message = "Off", _join("Oven off", ran)
+    else:
+        headline, message = "Stopped", _join(f"{coordinator.definition.display_name} stopped", ran)
+    await _async_send(
+        hass,
+        coordinator,
+        {
+            "title": coordinator.activity_title,
+            "message": message,
+            "data": {
+                "tag": coordinator.activity_tag,
+                "live_update": True,
+                "critical_text": headline,
+                "notification_icon": "mdi:power",
+                "notification_icon_color": "#9E9E9E",
+                "color": "#9E9E9E",
+            },
+        },
+    )
+
+
 async def async_send_finished_alert(
     hass: HomeAssistant,
     coordinator: ApplianceCoordinator,

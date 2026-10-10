@@ -82,3 +82,77 @@ async def test_other_brand_linked_via_state_sensor(hass: HomeAssistant, enable_c
     assert own.via_device_id == washer.id
     coordinator = hass.data[DOMAIN][entry.entry_id]
     assert coordinator.tap_path() == f"/config/devices/device/{washer.id}"
+
+
+# ---------------------------------------------------------------- oven off
+from datetime import timedelta  # noqa: E402
+
+from pytest_homeassistant_custom_component.common import (  # noqa: E402
+    async_fire_time_changed,
+    async_mock_service,
+)
+
+
+async def test_oven_off_shows_off_then_ends(hass: HomeAssistant, enable_custom_integrations, freezer):
+    """Oven used without a cook timer: turning it off updates the Live Activity
+    to "Off" (real-world bug: it stayed on the last cooking state)."""
+    phone_entry = MockConfigEntry(domain="mobile_app")
+    phone_entry.add_to_hass(hass)
+    me = dr.async_get(hass).async_get_or_create(
+        config_entry_id=phone_entry.entry_id, identifiers={("mobile_app", "p")}, name="My Phone"
+    )
+    calls = async_mock_service(hass, "notify", "mobile_app_my_phone")
+    for entity, state in (
+        ("sensor.oven_current_state", "Off"),
+        ("sensor.oven_cook_mode", "Off"),
+        ("sensor.oven_cook_time_remaining", "0.0"),
+    ):
+        hass.states.async_set(entity, state, {"unit_of_measurement": "h"} if "remaining" in entity else {})
+    entry = MockConfigEntry(domain=DOMAIN, data={
+        "source": "manual", "appliance_type": "oven", "name": "Kitchen Oven",
+        "state_entity": "sensor.oven_current_state", "phase_entity": "sensor.oven_cook_mode",
+        "remaining_entity": "sensor.oven_cook_time_remaining",
+        "notification_tag": "kitchen_oven", "devices": [me.id],
+    })
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    hass.states.async_set("sensor.oven_cook_mode", "Bake")
+    hass.states.async_set("sensor.oven_current_state", "Bake")
+    await hass.async_block_till_done()
+    live = lambda: [c for c in calls if c.data.get("data", {}).get("live_update")]  # noqa: E731
+    assert live()[-1].data["data"]["critical_text"] == "Bake"
+
+    freezer.tick(timedelta(minutes=45))
+    async_fire_time_changed(hass)
+    hass.states.async_set("sensor.oven_cook_mode", "Off")
+    hass.states.async_set("sensor.oven_current_state", "Off")
+    await hass.async_block_till_done()
+    off = live()[-1]
+    assert off.data["data"]["critical_text"] == "Off"
+    assert off.data["message"] == "Oven off · cooked 45 min"
+    assert off.data["data"]["tag"] == "kitchen_oven"
+    assert not [c for c in calls if c.data.get("message") == "clear_notification"]
+
+    # Back on within the minute: the same activity carries on (not ended)
+    freezer.tick(timedelta(seconds=30))
+    async_fire_time_changed(hass)
+    hass.states.async_set("sensor.oven_cook_mode", "Bake")
+    hass.states.async_set("sensor.oven_current_state", "Bake")
+    await hass.async_block_till_done()
+    freezer.tick(timedelta(seconds=45))
+    async_fire_time_changed(hass)
+    await hass.async_block_till_done()
+    assert not [c for c in calls if c.data.get("message") == "clear_notification"]
+    assert live()[-1].data["data"]["critical_text"] == "Bake"
+
+    # Off again -> "Off", ended a minute later
+    hass.states.async_set("sensor.oven_cook_mode", "Off")
+    hass.states.async_set("sensor.oven_current_state", "Off")
+    await hass.async_block_till_done()
+    freezer.tick(timedelta(seconds=61))
+    async_fire_time_changed(hass)
+    await hass.async_block_till_done()
+    assert calls[-1].data["message"] == "clear_notification"
+    assert calls[-1].data["data"]["tag"] == "kitchen_oven"

@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.9.2
+
+### Fixed
+- **Oven Live Activity stayed on after the oven was turned off** (used
+  without a cook timer). Ending a Live Activity is a silent push iOS doesn't
+  always act on, so it stayed on the last cooking state. Now the Live
+  Activity first updates to **Off** ("Oven off · cooked 45 min") and is ended
+  a minute later; turning the oven back on within that minute carries on with
+  the same activity. Washers, dryers and dishwashers stopped before finishing
+  show **Stopped** the same way.
+
 ## 1.9.1
 
 ### Added

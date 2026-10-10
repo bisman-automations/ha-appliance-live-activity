@@ -142,11 +142,14 @@ from .notify import (
     async_send_preheated,
     async_deliver,
     async_send_progress,
+    async_send_stopped,
 )
 
 _LOGGER = logging.getLogger(__name__)
 
 ACTIVE = (STATUS_RUNNING, STATUS_PAUSED)
+# Seconds "Off" / "Stopped" shows before the Live Activity is ended
+STOPPED_DISPLAY_SECONDS = 60
 
 
 class ApplianceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
@@ -376,6 +379,7 @@ class ApplianceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._unsubs: list[CALLBACK_TYPE] = []
         self._finish_time: datetime | None = None
         self._dismiss_unsub: CALLBACK_TYPE | None = None
+        self._stop_unsub: CALLBACK_TYPE | None = None
 
         self.data = {
             "status": STATUS_IDLE,
@@ -1231,8 +1235,12 @@ class ApplianceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                     )
                 self._dismiss_at = dt_util.utcnow().timestamp() + self.dismiss_minutes * 60
                 self._schedule_dismiss(self.dismiss_minutes * 60)
+            elif self._active_tag is not None:
+                # Turned off before finishing (e.g. an oven used without a cook
+                # timer): show it, then end the activity a minute later
+                await async_send_stopped(self.hass, self, minutes=duration)
+                self._schedule_stop_end()
             else:
-                # Cancelled, or a door that closed: just end the activity
                 await self._async_end_activity()
         self._finish_load(finished)
         if finished and self.move_minutes > 0:
@@ -1387,6 +1395,21 @@ class ApplianceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         if self._dismiss_unsub is not None:
             self._dismiss_unsub()
             self._dismiss_unsub = None
+        if self._stop_unsub is not None:
+            self._stop_unsub()
+            self._stop_unsub = None
+
+    def _schedule_stop_end(self) -> None:
+        if self._stop_unsub is not None:
+            self._stop_unsub()
+
+        @callback
+        def _fire(_now) -> None:
+            self._stop_unsub = None
+            if not self._in_cycle and self._delay_sent is None and self._dismiss_at is None:
+                self.hass.async_create_task(self._async_end_activity())
+
+        self._stop_unsub = async_call_later(self.hass, STOPPED_DISPLAY_SECONDS, _fire)
 
     async def _async_dismiss(self) -> None:
         self._cancel_dismiss()
