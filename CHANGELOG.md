@@ -12,8 +12,10 @@
   lists the other under **Linked devices** ("These devices share hardware
   with this device and are managed by other integrations"), like UniFi
   Network's client devices. Entities are moved onto it on the next start;
-  entity IDs don't change. Renaming either device still renames the Live
-  Activity, and tapping it still opens the appliance's page.
+  entity IDs don't change. The Live Activity entry is marked as a service,
+  while remaining in the linked devices relationship. Renaming either entry
+  still renames the Live Activity, and tapping it still opens the appliance's
+  page.
 
 ## 1.9.4
 

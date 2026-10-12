@@ -225,12 +225,13 @@ Activity title & icon).
 ### Linked devices
 
 Each appliance gets a device of this integration (e.g. "Kitchen Oven Live
-Activity") holding its sensors, event and Probe Target. When the appliance has
-a device of its own — the GE appliance, or for other brands the device the
-state sensor belongs to — the two pages list each other under **Linked
-devices** (Home Assistant 2026.8+), the same way UniFi Network links its
-client devices. Appliances without a device of their own (e.g. a template
-sensor) just get this integration's device, named after the appliance.
+Activity") marked as a service, holding its sensors, event and Probe Target.
+When the appliance has a device of its own — the GE appliance, or for other
+brands the device the state sensor belongs to — the two pages list each other
+under **Linked devices** (Home Assistant 2026.8+), the same way UniFi Network
+links its client devices. Appliances without a device of their own (e.g. a
+template sensor) just get this integration's service entry, named after the
+appliance.
 
 ### Tapping a notification
 
