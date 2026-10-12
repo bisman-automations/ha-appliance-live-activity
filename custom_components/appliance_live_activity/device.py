@@ -19,7 +19,7 @@ from __future__ import annotations
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import device_registry as dr, entity_registry as er
-from homeassistant.helpers.device_registry import DeviceInfo
+from homeassistant.helpers.device_registry import DeviceEntryType, DeviceInfo
 from homeassistant.helpers.entity import Entity
 
 from .const import DOMAIN
@@ -59,6 +59,7 @@ def own_device_info(coordinator, entry: ConfigEntry) -> DeviceInfo:
         name=coordinator.name,
         manufacturer="Appliance Live Activity",
         model=coordinator.definition.display_name,
+        entry_type=DeviceEntryType.SERVICE,
     )
     target = appliance_device_id(coordinator.hass, coordinator)
     if target is None:
