@@ -41,6 +41,7 @@ async def test_own_device_linked_to_ge_appliance(hass: HomeAssistant, enable_cus
     own = dev_reg.async_get_device(identifiers={(DOMAIN, entry.entry_id)})
     assert own is not None and own.id != dishwasher.id
     assert own.name == "Kitchen Dishwasher Live Activity"
+    assert own.entry_type == dr.DeviceEntryType.SERVICE
     ours = er.async_entries_for_config_entry(ent_reg, entry.entry_id)
     assert ours and {e.device_id for e in ours} == {own.id}
     assert ent_reg.async_get("sensor.kitchen_dishwasher_status").device_id == own.id
@@ -57,6 +58,7 @@ async def test_own_device_linked_to_ge_appliance(hass: HomeAssistant, enable_cus
     info = device_mod.own_device_info(coordinator, entry)
     assert info["identifiers"] == {(DOMAIN, entry.entry_id), ("ge_home", "DW123")}
     assert info["connections"] == {("mac", "aa:bb:cc:dd:ee:ff")}
+    assert info["entry_type"] == dr.DeviceEntryType.SERVICE
 
 
 async def test_renamed_device_titles_activity(hass: HomeAssistant, enable_custom_integrations):
