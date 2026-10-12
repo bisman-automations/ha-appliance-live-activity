@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.10.0
+
+### Changed
+- **Linked service entry**: the Live Activity device entry is marked as a
+  service while retaining the shared identifiers and connections that keep it
+  linked to the appliance under **Linked devices**.
+- **Manual Live Activity refresh**: each appliance now has an **Update Live
+  Activity** button to re-send the current activity after it has been
+  dismissed from the notification center.
+
 ## 1.9.5
 
 ### Changed

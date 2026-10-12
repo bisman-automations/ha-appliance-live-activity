@@ -6,7 +6,12 @@ from homeassistant.const import Platform
 DOMAIN = "appliance_live_activity"
 STORAGE_VERSION = 1
 
-PLATFORMS: list[Platform] = [Platform.SENSOR, Platform.NUMBER, Platform.EVENT]
+PLATFORMS: list[Platform] = [
+    Platform.SENSOR,
+    Platform.NUMBER,
+    Platform.EVENT,
+    Platform.BUTTON,
+]
 
 # Config keys
 CONF_SOURCE = "source"
