@@ -249,6 +249,8 @@ Home Assistant app (the GE appliance's own page for GE setups).
   `scheduled`, `finished`, `cancelled` (fridges and doors: `door_left_open`,
   `door_closed`). Use it as a trigger: *Entity → Event*.
 - **Probe Target** number for ovens with a meat probe.
+- **Update Live Activity** button on each appliance to re-send its current
+  activity if it was dismissed from the notification center.
 - `appliance_live_activity.update` re-sends an appliance's Live Activity.
 
 ## Troubleshooting

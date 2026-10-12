@@ -87,7 +87,7 @@ def _set(hass, suffix, state, domain="sensor"):
 
 async def test_ge_flow_and_lifecycle(hass: HomeAssistant, setup_devices):
     washer, phone, calls = setup_devices
-    await _create_entry(hass, washer, phone)
+    entry = await _create_entry(hass, washer, phone)
     assert calls == []  # idle: nothing sent
 
     # Cycle starts
@@ -106,6 +106,16 @@ async def test_ge_flow_and_lifecycle(hass: HomeAssistant, setup_devices):
     assert data["clickAction"] == data["url"]
     assert data["chronometer"] is True and data["when_relative"] is True
     assert calls[-1].data["title"] == "Laundry Room Washer"
+    button_entity = er.async_get(hass).async_get_entity_id(
+        "button", DOMAIN, f"{entry.entry_id}_update_live_activity"
+    )
+    assert button_entity == "button.laundry_room_washer_update_live_activity"
+    sent = len(calls)
+    await hass.services.async_call(
+        "button", "press", {"entity_id": button_entity}, blocking=True
+    )
+    assert len(calls) == sent + 1
+    assert calls[-1].data["data"]["live_update"] is True
     sent = len(calls)
 
     # Countdown ticks along as expected -> no new push

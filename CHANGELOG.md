@@ -16,6 +16,9 @@
   while remaining in the linked devices relationship. Renaming either entry
   still renames the Live Activity, and tapping it still opens the appliance's
   page.
+- **Manual Live Activity refresh**: each appliance now has an **Update Live
+  Activity** button to re-send the current activity after it has been
+  dismissed from the notification center.
 
 ## 1.9.4
 
