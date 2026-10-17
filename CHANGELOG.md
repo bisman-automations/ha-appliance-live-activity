@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.10.1
+
+### Changed
+- **Ready for Home Assistant 2026.12**: saving Configure now reloads the
+  appliance through Home Assistant's built-in options reload instead of a
+  config entry update listener. Home Assistant warns about an update listener
+  combined with Reconfigure's save-and-reload and changes that behaviour in
+  2026.12. The coordinator also passes its config entry explicitly.
+
 ## 1.10.0
 
 ### Changed
@@ -9,11 +18,6 @@
 - **Manual Live Activity refresh**: each appliance now has an **Update Live
   Activity** button to re-send the current activity after it has been
   dismissed from the notification center.
-- **Ready for Home Assistant 2026.12**: saving Configure now reloads the
-  appliance through Home Assistant's built-in options reload instead of a
-  config entry update listener. Home Assistant warns about an update listener
-  combined with Reconfigure's save-and-reload and changes that behaviour in
-  2026.12. The coordinator also passes its config entry explicitly.
 
 ## 1.9.5
 
