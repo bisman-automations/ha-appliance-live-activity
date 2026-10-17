@@ -11,7 +11,13 @@ from typing import Any
 
 import voluptuous as vol
 
-from homeassistant.config_entries import ConfigEntry, ConfigFlow, ConfigFlowResult, OptionsFlow
+from homeassistant.config_entries import (
+    ConfigEntry,
+    ConfigFlow,
+    ConfigFlowResult,
+    OptionsFlow,
+    OptionsFlowWithReload,
+)
 from homeassistant.core import callback
 from homeassistant.data_entry_flow import section
 from homeassistant.helpers import selector
@@ -786,8 +792,8 @@ class ApplianceLiveActivityConfigFlow(ConfigFlow, domain=DOMAIN):
         return ApplianceLiveActivityOptionsFlow()
 
 
-class ApplianceLiveActivityOptionsFlow(OptionsFlow):
-    """Change phones, alerts and appearance after setup."""
+class ApplianceLiveActivityOptionsFlow(OptionsFlowWithReload):
+    """Change phones, alerts and appearance after setup (reloads on save)."""
 
     async def async_step_init(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         if user_input is not None:

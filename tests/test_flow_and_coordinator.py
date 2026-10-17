@@ -199,11 +199,16 @@ async def test_options_flow(hass: HomeAssistant, setup_devices):
     # Color picker is pre-filled with RGB (not a hex string -> black picker)
     suggested = suggested_values(result)
     assert suggested["icon_color"] == [0, 188, 212]
+    before = hass.data[DOMAIN][entry.entry_id]
     result = await hass.config_entries.options.async_configure(
         result["flow_id"], {"devices": [phone.id], "finished_alert": False, "dismiss_minutes": 10}
     )
     assert result["type"] is FlowResultType.CREATE_ENTRY
     assert entry.options["finished_alert"] is False
+    # Saved options reload the entry (OptionsFlowWithReload, no update listener)
+    await hass.async_block_till_done()
+    assert hass.data[DOMAIN][entry.entry_id] is not before
+    assert not entry.update_listeners
 
 
 async def test_manual_flow(hass: HomeAssistant, enable_custom_integrations):

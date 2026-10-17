@@ -156,7 +156,13 @@ class ApplianceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     """Tracks one appliance's state and drives its Live Activity."""
 
     def __init__(self, hass: HomeAssistant, entry: ConfigEntry) -> None:
-        super().__init__(hass, _LOGGER, name=f"{DOMAIN}_{entry.entry_id}", update_interval=None)
+        super().__init__(
+            hass,
+            _LOGGER,
+            config_entry=entry,
+            name=f"{DOMAIN}_{entry.entry_id}",
+            update_interval=None,
+        )
         self.entry = entry
 
         cfg = {**entry.data, **entry.options}
