@@ -125,12 +125,13 @@ when the oven turns off.
 
 ### Oven light
 
-Turn on **Configure → Cooking → Turn the oven light on while the oven is on**
-and the oven light comes on when the oven starts and goes off when it turns
-off. GE ovens' **Oven Light** setting is found automatically (each oven of a
-double oven gets its own). For other ovens, pick any light or switch. A light
-that was already on when the oven started, or that you turned off while
-cooking, is left alone. Off by default.
+Pick the oven's light in **Configure → Cooking → Oven light** and it comes on
+when the oven starts and goes off when the oven turns off. An on/off light or
+switch simply follows the oven. A setting with levels, like GE's **Oven
+Light** (Off / High / Dim), is set to **High**, and any level other than Off
+counts as on. A light that was already on when the oven started, or that you
+turned off while cooking, is left alone. Leave it empty to not control the
+light.
 
 ### Water leaks (any appliance)
 

@@ -80,7 +80,6 @@ from .const import (
     CONF_PAUSE_STATES,
     CONF_PHASE_ENTITY,
     CONF_PREHEAT_ALERT,
-    CONF_OVEN_LIGHT,
     CONF_OVEN_LIGHT_ENTITY,
     CONF_PROBE_ENTITY,
     CONF_QUIET_END,
@@ -182,13 +181,10 @@ class ApplianceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.temperature_entity: str | None = cfg.get(CONF_TEMPERATURE_ENTITY) or None
         self.target_entity: str | None = cfg.get(CONF_TARGET_TEMPERATURE_ENTITY) or None
         self.preheat_alert: bool = cfg.get(CONF_PREHEAT_ALERT, True) is not False
-        # Oven light on while the oven is on (Configure -> Cooking)
+        # Oven light on while the oven is on: picking a light in
+        # Configure -> Cooking turns it on
         self.oven_light = None
-        if (
-            self.appliance_type == "oven"
-            and cfg.get(CONF_OVEN_LIGHT)
-            and cfg.get(CONF_OVEN_LIGHT_ENTITY)
-        ):
+        if self.appliance_type == "oven" and cfg.get(CONF_OVEN_LIGHT_ENTITY):
             from .oven_light import OvenLight  # noqa: PLC0415
 
             self.oven_light = OvenLight(self, cfg[CONF_OVEN_LIGHT_ENTITY])

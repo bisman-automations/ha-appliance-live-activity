@@ -1,10 +1,12 @@
 """Oven light on while the oven is on.
 
-When enabled in Configure → Cooking, the oven light (a GE "Oven Light"
-select, or any light / switch) turns on when the oven starts heating and
-off again when the oven turns off. A light that was already on when the
-oven started is left alone, and so is one the user turned off while
-cooking. A blip where the oven reports "unavailable" changes nothing.
+The light picked in Configure → Cooking turns on when the oven starts
+heating and off again when the oven turns off. An on/off light or switch is
+turned on and off; a select such as GE's "Oven Light" (Off / High / Dim) is
+set to High, and any level other than Off counts as on. A light that was
+already on when the oven started is left alone, and so is one the user
+turned off while cooking. A blip where the oven reports "unavailable"
+changes nothing.
 """
 from __future__ import annotations
 

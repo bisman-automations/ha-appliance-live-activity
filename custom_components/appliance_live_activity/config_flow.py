@@ -69,7 +69,6 @@ from .const import (
     CONF_OPEN_DELAY_SECONDS,
     CONF_OVEN_CAVITY,
     CONF_PHASE_ENTITY,
-    CONF_OVEN_LIGHT,
     CONF_OVEN_LIGHT_ENTITY,
     CONF_PREHEAT_ALERT,
     CONF_PROBE_ENTITY,
@@ -119,7 +118,7 @@ from .const import (
 )
 from .ge import async_discover, async_has_ge_devices, device_name
 
-GE_DISCOVERY_VERSION = 6  # keep in sync with __init__.GE_DISCOVERY_VERSION
+GE_DISCOVERY_VERSION = 5  # keep in sync with __init__.GE_DISCOVERY_VERSION
 from .helpers import hex_to_rgb, slugify_tag
 
 AUTO = "auto"
@@ -227,7 +226,6 @@ SECTION_OF: dict[str, str] = {
     CONF_COMBINE_LAUNDRY: "laundry",
     CONF_LAUNDRY_TITLE: "laundry",
     CONF_PREHEAT_ALERT: "cooking",
-    CONF_OVEN_LIGHT: "cooking",
     CONF_OVEN_LIGHT_ENTITY: "cooking",
     CONF_COOKTOP_ALERT_MINUTES: "cooking",
     CONF_COOKTOP_REPEAT_MINUTES: "cooking",
@@ -388,9 +386,6 @@ def _behaviour_fields(
     if appliance_type == "oven":
         fields[
             vol.Optional(CONF_PREHEAT_ALERT, default=current.get(CONF_PREHEAT_ALERT, True))
-        ] = selector.BooleanSelector()
-        fields[
-            vol.Optional(CONF_OVEN_LIGHT, default=current.get(CONF_OVEN_LIGHT, False))
         ] = selector.BooleanSelector()
         fields[vol.Optional(CONF_OVEN_LIGHT_ENTITY)] = selector.EntitySelector(
             selector.EntitySelectorConfig(domain=["select", "light", "switch"])

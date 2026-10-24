@@ -109,14 +109,12 @@
               "cooktop_alert_minutes": "Cooktop alert after on for",
               "cooktop_repeat_minutes": "Repeat cooktop alert every",
               "preheat_alert": "Alert when the oven is preheated",
-              "oven_light": "Turn the oven light on while the oven is on",
-              "oven_light_entity": "Oven light"
+              "oven_light_entity": "Oven light (on while the oven is on)"
             },
             "data_description": {
               "cooktop_alert_minutes": "Critical alert with an Acknowledge button; repeats until the cooktop is off or acknowledged. The cooktop is never turned off.",
               "preheat_alert": "A time-sensitive alert when the oven reaches its set temperature. The Live Activity shows the temperature climbing while it preheats.",
-              "oven_light": "The light turns on when the oven starts and off when the oven turns off. A light that was already on, or that you turn off while cooking, is left alone.",
-              "oven_light_entity": "Found automatically for GE ovens (the Oven Light setting). Any light or switch works too."
+              "oven_light_entity": "Pick the oven's light to turn it on when the oven starts and off when the oven turns off. An on/off light or switch follows the oven; a GE Oven Light (Off / High / Dim) is set to High, and any level other than Off counts as on. A light that was already on, or that you turn off while cooking, is left alone. Leave empty to not control the light."
             }
           },
           "fridge": {
@@ -309,13 +307,11 @@
               "cooktop_alert_minutes": "Cooktop alert after on for",
               "cooktop_repeat_minutes": "Repeat cooktop alert every",
               "preheat_alert": "Alert when the oven is preheated",
-              "oven_light": "Turn the oven light on while the oven is on",
-              "oven_light_entity": "Oven light"
+              "oven_light_entity": "Oven light (on while the oven is on)"
             },
             "data_description": {
               "preheat_alert": "A time-sensitive alert when the oven reaches its set temperature. The Live Activity shows the temperature climbing while it preheats.",
-              "oven_light": "The light turns on when the oven starts and off when the oven turns off. A light that was already on, or that you turn off while cooking, is left alone.",
-              "oven_light_entity": "Found automatically for GE ovens (the Oven Light setting). Any light or switch works too."
+              "oven_light_entity": "Pick the oven's light to turn it on when the oven starts and off when the oven turns off. An on/off light or switch follows the oven; a GE Oven Light (Off / High / Dim) is set to High, and any level other than Off counts as on. A light that was already on, or that you turn off while cooking, is left alone. Leave empty to not control the light."
             }
           },
           "fridge": {

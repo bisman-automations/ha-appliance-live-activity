@@ -73,7 +73,6 @@ CONF_OVEN_CAVITY = "oven_cavity"
 CONF_TIMER_ENTITY = "timer_entity"
 CONF_PROBE_ENTITY = "probe_entity"
 # Oven light on while the oven is on
-CONF_OVEN_LIGHT = "oven_light"
 CONF_OVEN_LIGHT_ENTITY = "oven_light_entity"
 # Dryer extras
 CONF_TUMBLE_ENTITY = "tumble_entity"

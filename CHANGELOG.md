@@ -3,13 +3,14 @@
 ## 1.11.0
 
 ### Added
-- **Oven light follows the oven**: a new **Configure → Cooking** option
-  turns the oven light on when the oven starts and off when it turns off.
-  GE ovens' Oven Light setting is found automatically, including each oven
-  of a double oven; existing GE ovens pick it up on the next start. Any
-  light or switch works for other ovens. A light that was already on, or
-  that you turned off while cooking, is left alone, and a brief
-  "unavailable" from the oven doesn't touch the light. Off by default.
+- **Oven light follows the oven**: pick a light in **Configure → Cooking →
+  Oven light** and it turns on when the oven starts and off when the oven
+  turns off. An on/off light or switch follows the oven; a setting with
+  levels such as GE's Oven Light (Off / High / Dim) is set to High, and any
+  level other than Off counts as on. A light that was already on, or that
+  you turned off while cooking, is left alone, and a brief "unavailable"
+  from the oven doesn't touch the light. Nothing happens until a light is
+  picked.
 
 ## 1.10.1
 
