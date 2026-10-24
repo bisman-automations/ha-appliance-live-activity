@@ -30,6 +30,7 @@ from .const import (
     CONF_FRIDGE_TEMP_ENTITY,
     CONF_ICE_ENTITY,
     CONF_OVEN_CAVITY,
+    CONF_OVEN_LIGHT_ENTITY,
     CONF_PROBE_ENTITY,
     CONF_SUPPLY_ENTITIES,
     CONF_TIMER_ENTITY,
@@ -67,6 +68,7 @@ class GEDiscovery:
     start_button: str | None = None
     timer_entity: str | None = None
     probe_entity: str | None = None
+    oven_light_entity: str | None = None
     tumble_entity: str | None = None
     vent_entity: str | None = None
     filter_entity: str | None = None
@@ -96,6 +98,7 @@ class GEDiscovery:
             CONF_DELAY_ENTITY: self.delay_entity,
             CONF_TIMER_ENTITY: self.timer_entity,
             CONF_PROBE_ENTITY: self.probe_entity,
+            CONF_OVEN_LIGHT_ENTITY: self.oven_light_entity,
             CONF_TUMBLE_ENTITY: self.tumble_entity,
             CONF_VENT_ENTITY: self.vent_entity,
             CONF_FILTER_ENTITY: self.filter_entity,
@@ -220,6 +223,10 @@ def discover_from_entity_ids(entity_ids: list[str], cavity: str | None = None) -
         start_button=_first(ids, r"^button\..*_start_cycle$"),
         timer_entity=_first(ids, r"^sensor\..*_kitchen_timer$"),
         probe_entity=_first(ids, r"^sensor\..*_probe_display_temp$"),
+        # GE: a select (Off / High / Dim) per oven cavity
+        oven_light_entity=_first(ids, r"^(select|light|switch)\..*_oven_light$")
+        if appliance_type == "oven"
+        else None,
         tumble_entity=_first(ids, r"^sensor\..*_tumble_status$"),
         vent_entity=_first(ids, r"^binary_sensor\..*_blocked_vent(_fault)?$"),
         supply_entities=_supplies(ids, appliance_type),

@@ -69,6 +69,8 @@ from .const import (
     CONF_OPEN_DELAY_SECONDS,
     CONF_OVEN_CAVITY,
     CONF_PHASE_ENTITY,
+    CONF_OVEN_LIGHT,
+    CONF_OVEN_LIGHT_ENTITY,
     CONF_PREHEAT_ALERT,
     CONF_PROBE_ENTITY,
     CONF_QUIET_END,
@@ -117,7 +119,7 @@ from .const import (
 )
 from .ge import async_discover, async_has_ge_devices, device_name
 
-GE_DISCOVERY_VERSION = 5  # keep in sync with __init__.GE_DISCOVERY_VERSION
+GE_DISCOVERY_VERSION = 6  # keep in sync with __init__.GE_DISCOVERY_VERSION
 from .helpers import hex_to_rgb, slugify_tag
 
 AUTO = "auto"
@@ -200,6 +202,7 @@ CLEARABLE = (
     CONF_QUIET_END,
     CONF_ACTIVITY_TITLE,
     CONF_LAUNDRY_TITLE,
+    CONF_OVEN_LIGHT_ENTITY,
 )
 
 # Which collapsible section of the form each setting lives in (anything not
@@ -224,6 +227,8 @@ SECTION_OF: dict[str, str] = {
     CONF_COMBINE_LAUNDRY: "laundry",
     CONF_LAUNDRY_TITLE: "laundry",
     CONF_PREHEAT_ALERT: "cooking",
+    CONF_OVEN_LIGHT: "cooking",
+    CONF_OVEN_LIGHT_ENTITY: "cooking",
     CONF_COOKTOP_ALERT_MINUTES: "cooking",
     CONF_COOKTOP_REPEAT_MINUTES: "cooking",
     CONF_FRIDGE_MAX_TEMP: "fridge",
@@ -384,6 +389,12 @@ def _behaviour_fields(
         fields[
             vol.Optional(CONF_PREHEAT_ALERT, default=current.get(CONF_PREHEAT_ALERT, True))
         ] = selector.BooleanSelector()
+        fields[
+            vol.Optional(CONF_OVEN_LIGHT, default=current.get(CONF_OVEN_LIGHT, False))
+        ] = selector.BooleanSelector()
+        fields[vol.Optional(CONF_OVEN_LIGHT_ENTITY)] = selector.EntitySelector(
+            selector.EntitySelectorConfig(domain=["select", "light", "switch"])
+        )
     if appliance_type in ("washer", "dryer"):
         if appliance_type == "dryer":
             defaults = (DEFAULT_DRYER_REMINDER_MINUTES, DEFAULT_DRYER_REPEAT_MINUTES, DEFAULT_DRYER_MAX_REMINDERS)

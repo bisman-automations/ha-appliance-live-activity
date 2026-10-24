@@ -56,7 +56,7 @@ first, plus any other brand or a plain door/contact sensor set up manually.
 | `device.py` | Our device per appliance and its link to the appliance's device |
 | `ge.py` | GE Home entity discovery by entity-ID suffix |
 | `appliances/` | Per-type definitions (washer, dryer, dishwasher, oven, refrigerator, door) |
-| `door.py`, `cooktop.py`, `leak.py`, `maintenance.py`, `oven_extras.py` | Feature monitors |
+| `door.py`, `cooktop.py`, `leak.py`, `maintenance.py`, `oven_extras.py`, `oven_light.py` | Feature monitors |
 | `sensor.py`, `number.py`, `event.py`, `button.py` | Entities |
 | `health.py` | Repairs issues; `diagnostics.py` (redact personal data) |
 | `strings.json` + `translations/en.json` | Must stay **identical**; edit both |

@@ -123,6 +123,15 @@ toward the set temperature (with a progress bar). When it gets there you get a
 time-sensitive **"Oven preheated — it's at 350°F"** alert, which is removed
 when the oven turns off.
 
+### Oven light
+
+Turn on **Configure → Cooking → Turn the oven light on while the oven is on**
+and the oven light comes on when the oven starts and goes off when it turns
+off. GE ovens' **Oven Light** setting is found automatically (each oven of a
+double oven gets its own). For other ovens, pick any light or switch. A light
+that was already on when the oven started, or that you turned off while
+cooking, is left alone. Off by default.
+
 ### Water leaks (any appliance)
 
 Add leak sensors to any appliance. The moment one detects water you get a

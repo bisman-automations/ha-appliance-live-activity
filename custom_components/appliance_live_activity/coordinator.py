@@ -80,6 +80,8 @@ from .const import (
     CONF_PAUSE_STATES,
     CONF_PHASE_ENTITY,
     CONF_PREHEAT_ALERT,
+    CONF_OVEN_LIGHT,
+    CONF_OVEN_LIGHT_ENTITY,
     CONF_PROBE_ENTITY,
     CONF_QUIET_END,
     CONF_QUIET_START,
@@ -180,6 +182,16 @@ class ApplianceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.temperature_entity: str | None = cfg.get(CONF_TEMPERATURE_ENTITY) or None
         self.target_entity: str | None = cfg.get(CONF_TARGET_TEMPERATURE_ENTITY) or None
         self.preheat_alert: bool = cfg.get(CONF_PREHEAT_ALERT, True) is not False
+        # Oven light on while the oven is on (Configure -> Cooking)
+        self.oven_light = None
+        if (
+            self.appliance_type == "oven"
+            and cfg.get(CONF_OVEN_LIGHT)
+            and cfg.get(CONF_OVEN_LIGHT_ENTITY)
+        ):
+            from .oven_light import OvenLight  # noqa: PLC0415
+
+            self.oven_light = OvenLight(self, cfg[CONF_OVEN_LIGHT_ENTITY])
 
         self.active_states: list[str] = cfg.get(CONF_ACTIVE_STATES) or self.definition.active_states
         self.pause_states: list[str] = cfg.get(CONF_PAUSE_STATES) or self.definition.pause_states
@@ -718,6 +730,8 @@ class ApplianceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._washed_loads = list(stored.get("washed_loads") or [])
         self._load_counter = int(stored.get("load_counter", 0) or 0)
         self._last_load_tag = stored.get("last_load_tag")
+        if self.oven_light is not None:
+            self.oven_light.turned_on = bool(stored.get("oven_light_on", False))
 
         tracked = [
             e
@@ -990,6 +1004,11 @@ class ApplianceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             else:
                 await self._async_end_delay(send)
         await self._async_check_move(send)
+        if self.oven_light is not None:
+            turned_on = self.oven_light.turned_on
+            await self.oven_light.async_update(status in ACTIVE, raw_state)
+            if self.oven_light.turned_on != turned_on:
+                await self._async_save()
         if delayed:
             status = STATUS_DELAYED
 
@@ -1457,6 +1476,7 @@ class ApplianceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             "washed_loads": self._washed_loads,
             "load_counter": self._load_counter,
             "last_load_tag": self._last_load_tag,
+            "oven_light_on": self.oven_light.turned_on if self.oven_light else False,
         }
 
     async def _async_save(self) -> None:
