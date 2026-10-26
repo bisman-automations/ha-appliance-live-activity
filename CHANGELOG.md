@@ -5,12 +5,11 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
-
 ## [1.11.1] - 2026-10-26
 
 ### Changed
 
+- The changelog no longer keeps an Unreleased section, and the agent notes follow the updated shared release rules.
 - The README follows the same layout as the other bisman-automations integrations: a button that opens it in HACS, a button that starts setup, and troubleshooting steps for debug logs and diagnostics.
 - Each release now includes `appliance_live_activity.zip` for installing without HACS.
 
@@ -469,7 +468,6 @@ Initial release.
 - Status and Progress sensors per appliance for dashboards.
 - `appliance_live_activity.update` service for forcing a manual refresh.
 
-[Unreleased]: https://github.com/bisman-automations/ha-appliance-live-activity/compare/v1.11.1...HEAD
 [1.11.1]: https://github.com/bisman-automations/ha-appliance-live-activity/compare/v1.11.0...v1.11.1
 [1.11.0]: https://github.com/bisman-automations/ha-appliance-live-activity/compare/v1.10.1...v1.11.0
 [1.10.1]: https://github.com/bisman-automations/ha-appliance-live-activity/compare/v1.10.0...v1.10.1
