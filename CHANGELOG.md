@@ -1,8 +1,16 @@
 # Changelog
 
-## 1.11.0
+All notable changes to this project are documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [Unreleased]
+
+## [1.11.0] - 2026-10-24
 
 ### Added
+
 - **Oven light follows the oven**: pick a light in **Configure → Cooking →
   Oven light** and it turns on when the oven starts and off when the oven
   turns off. An on/off light or switch follows the oven; a setting with
@@ -12,18 +20,20 @@
   from the oven doesn't touch the light. Nothing happens until a light is
   picked.
 
-## 1.10.1
+## [1.10.1] - 2026-10-17
 
 ### Changed
+
 - **Ready for Home Assistant 2026.12**: saving Configure now reloads the
   appliance through Home Assistant's built-in options reload instead of a
   config entry update listener. Home Assistant warns about an update listener
   combined with Reconfigure's save-and-reload and changes that behaviour in
   2026.12. The coordinator also passes its config entry explicitly.
 
-## 1.10.0
+## [1.10.0] - 2026-10-12
 
 ### Changed
+
 - **Linked service entry**: the Live Activity device entry is marked as a
   service while retaining the shared identifiers and connections that keep it
   linked to the appliance under **Linked devices**.
@@ -31,9 +41,10 @@
   Activity** button to re-send the current activity after it has been
   dismissed from the notification center.
 
-## 1.9.5
+## [1.9.5] - 2026-10-10
 
 ### Changed
+
 - **Linked devices instead of merged entities**: 1.9.4 put this
   integration's sensors on the GE (or other brand's) device, where they
   looked like helpers and nothing showed the device was tied to this
@@ -46,9 +57,10 @@
   entity IDs don't change. Renaming either device still renames the Live
   Activity, and tapping it still opens the appliance's page.
 
-## 1.9.4
+## [1.9.4] - 2026-10-09
 
 ### Fixed
+
 - **Still two devices per appliance on Home Assistant 2026.9+**: since
   2026.9 a device belongs to a single integration, and the way 1.9.3 joined
   the appliance's device is deprecated there (it silently kept the separate
@@ -57,9 +69,10 @@
   too. On the next start the separate "Kitchen Oven" / "Kitchen Dishwasher"
   devices are removed and their entities moved over; entity IDs don't change.
 
-## 1.9.3
+## [1.9.3] - 2026-10-09
 
 ### Changed
+
 - **One device per appliance**: instead of a second "Kitchen Oven" device
   *connected via* the GE one, this integration's sensors (Status, Progress,
   Time Left, Finishes At, cycle history, the Cycle event, Probe Target) are
@@ -71,9 +84,10 @@
   sensor isn't part of a device (e.g. a template sensor) keep a device of
   their own.
 
-## 1.9.2
+## [1.9.2] - 2026-10-09
 
 ### Fixed
+
 - **Oven Live Activity stayed on after the oven was turned off** (used
   without a cook timer). Ending a Live Activity is a silent push iOS doesn't
   always act on, so it stayed on the last cooking state. Now the Live
@@ -82,9 +96,10 @@
   the same activity. Washers, dryers and dishwashers stopped before finishing
   show **Stopped** the same way.
 
-## 1.9.1
+## [1.9.1] - 2026-10-09
 
 ### Added
+
 - **Linked to the appliance**: this integration's device now shows as
   *Connected via* the appliance, so the two device pages link to each other —
   the GE appliance for GE setups, or for any other brand the device the
@@ -94,6 +109,7 @@
   Existing appliances are linked on the next start.
 
 ### Fixed
+
 - **Critical alerts could stay on screen after the problem was fixed**
   (cooktop turned off, door closed, dryer vent cleared). They were removed
   with a silent "clear" push, which iOS may handle late, not at all, or before
@@ -109,9 +125,10 @@
 - Snoozing a door alert replaces it with "🔕 alert snoozed" instead of a
   silent clear.
 
-## 1.9.0
+## [1.9.0] - 2026-10-08
 
 ### Added
+
 - **One notification per laundry load**, named after the wash cycle, that
   stays in Notification Center after the Live Activity is gone:
   - Washer done: "✅ Towels: washed — Laundry Room Washer finished the
@@ -125,9 +142,10 @@
   - Something dried on its own: "✅ Delicates: dry".
   - *Unloaded* on the dryer's notification removes it.
 
-## 1.8.2
+## [1.8.2] - 2026-10-07
 
 ### Changed
+
 - Settings only show for the appliances they apply to:
   - **Leak sensors** for washers, dishwashers and fridges (not ovens, dryers
     or doors).
@@ -144,6 +162,7 @@
   device in Home Assistant.
 
 ### Fixed
+
 - **Two loads at once**: a new wash while the last load is drying no longer
   fights the dryer over one Live Activity. Each load keeps its own: the
   second appliance to start gets a Live Activity of its own, and the dryer
@@ -152,9 +171,10 @@
 - Setting up a fridge by hand now also asks for the fridge / freezer
   temperature and ice bucket sensors.
 
-## 1.8.1
+## [1.8.1] - 2026-10-07
 
 ### Fixed
+
 - **Configure didn't save** (1.7.0, 1.8.0): settings inside the grouped
   sections (Laundry, Cooking, Leak sensors, Quiet hours…) weren't shown or
   saved by the Home Assistant frontend, and saving could wipe pickers in
@@ -165,9 +185,10 @@
   quiet hours, escalation phones and lights) can't be recovered — please
   set them again in Configure.
 
-## 1.8.0
+## [1.8.0] - 2026-10-07
 
 ### Added
+
 - **Only alert people who are home** (Configure, off by default): Done
   alerts and reminders go only to phones whose owner is home, by the
   Companion app's location; if nobody is home, everyone gets them. Live
@@ -185,9 +206,10 @@
   no longer exists. Issues clear themselves once fixed.
 - **Download diagnostics** on each appliance for bug reports.
 
-## 1.7.0
+## [1.7.0] - 2026-10-06
 
 ### Added
+
 - **Grouped settings**: setup and Configure are split into sections —
   Laundry, Cooking, Fridge & freezer, Escalation, Appliance health, Leak
   sensors, Speaker announcements, Quiet hours and Icon — with the less-used
@@ -211,9 +233,10 @@
 - **Ice bucket full** notification (off by default — a full bucket is the
   ice maker's normal resting state).
 
-## 1.6.1
+## [1.6.1] - 2026-10-06
 
 ### Changed
+
 - **Dishwasher filter** has its own **Filter sensor** field instead of being
   picked with the refill supplies. GE dishwashers' "Reminders Clean Filter"
   is found automatically, and you get a "clean the filter" reminder when it
@@ -221,9 +244,10 @@
   the Filter field for you.
 - Clearer labels for the refill reminder fields.
 
-## 1.6.0
+## [1.6.0] - 2026-10-06
 
 ### Added
+
 - **Oven kitchen timer Live Activity**: a timer set on the oven gets its own
   Live Activity counting down on the phone, then a time-sensitive "Timer
   done" alert. Cancelling the timer just ends it.
@@ -256,9 +280,10 @@
   `probe_target`, `vent_blocked`.
 - README: **Add to HACS** and **Add integration** buttons.
 
-## 1.5.0
+## [1.5.0] - 2026-10-06
 
 ### Added
+
 - **Delayed start Live Activity**: when a washer, dryer, dishwasher or oven
   is waiting on a delayed start, a Live Activity shows "Scheduled · Delayed
   start · starts at 3:45 PM" with a countdown to the start, then turns into
@@ -281,9 +306,10 @@
 - Status sensor: `delayed` state with a `starts_at` attribute, and a
   `snoozed_until` attribute for doors.
 
-## 1.4.0
+## [1.4.0] - 2026-10-06
 
 ### Added
+
 - **Oven preheated alert**: a time-sensitive "Kitchen Oven preheated — it's
   at 350°F, ready to cook" when the oven reaches its set temperature. While
   preheating, the Live Activity shows "Preheating · 275°F → 350°F" with the
@@ -304,13 +330,15 @@
 - Status sensor attribute `leak_detected`.
 
 ### Fixed
+
 - Oven "Delayed Start" is treated as idle.
 - Clearing an optional picker (leak sensors, speakers, dryer…) in Configure
   now actually removes it instead of falling back to the value found at setup.
 
-## 1.3.1
+## [1.3.1] - 2026-10-06
 
 ### Fixed
+
 - **Finished Live Activity didn't clear** after the dismiss delay. After a
   cycle ended, an unrecognised appliance state (e.g. a GE dishwasher showing
   "Control Locked") was treated as a new cycle, which switched the activity
@@ -320,9 +348,10 @@
 - **Icon color picker showed black** under Configure for appliances set up
   before 1.2.1 (stored as hex). It now shows the saved color.
 
-## 1.3.0
+## [1.3.0] - 2026-10-06
 
 ### Added
+
 - **Tap to open**: tapping a Live Activity or any alert opens the appliance's
   device page in the Home Assistant app — the GE appliance itself (with its
   controls) for GE setups, otherwise the appliance's device in this
@@ -332,16 +361,18 @@
   automations. Time Left is 0 and Finishes At is unknown when nothing is
   running; Finishes At is unknown while paused.
 
-## 1.2.2
+## [1.2.2] - 2026-10-06
 
 ### Added
+
 - Integration icon (light and dark) in `custom_components/appliance_live_activity/brand/`,
   shown by Home Assistant 2026.3+ in Settings → Devices & services and on the
   integration's devices.
 
-## 1.2.1
+## [1.2.1] - 2026-10-05
 
 ### Changed
+
 - **Icon color** is now a color picker in setup and **Configure** instead of
   a hex text field. Existing hex values keep working and show up in the
   picker.
@@ -349,9 +380,10 @@
   automatically and no longer repeats the appliance type
   (`kitchen_refrigerator` instead of `refrigerator_kitchen_refrigerator`).
 
-## 1.2.0
+## [1.2.0] - 2026-10-05
 
 ### Added
+
 - **Door monitoring** for refrigerators / freezers: after a door has been
   open 30 s, a Live Activity counts up how long it's been open. After 5
   minutes it turns red and **critical alerts** repeat every minute until the
@@ -369,12 +401,14 @@
 - Options for all door and cooktop timings, escalation and announcements.
 
 ### Changed
+
 - Everything lives in the integration: the repo no longer ships blueprints,
   and the blueprint installer was removed.
 
-## 1.1.0
+## [1.1.0] - 2026-10-05
 
 ### Added
+
 - **GE Home Appliances (SmartHQ) automatic setup**: pick the GE device and
   its state, sub-cycle, cycle, time-remaining, end-of-cycle, door and oven
   temperature entities are discovered automatically.
@@ -385,7 +419,12 @@
 - Options: finished alert and dismiss delay.
 - Tests and a CI workflow (hassfest, HACS validation, pytest).
 
+### Changed
+
+- Requires Home Assistant 2026.7+ (Live Activities support).
+
 ### Fixed
+
 - **Notifications were never sent**: phones were looked up by notify
   *entities*, but the Companion app registers `notify.mobile_app_<name>`
   services. Phones are now resolved by device name.
@@ -402,10 +441,7 @@
 - Options flow compatibility with current Home Assistant (no longer sets
   `config_entry` itself).
 
-### Changed
-- Requires Home Assistant 2026.7+ (Live Activities support).
-
-## 1.0.0
+## [1.0.0] - 2026-07-30
 
 Initial release.
 
@@ -418,3 +454,29 @@ Initial release.
   needed).
 - Status and Progress sensors per appliance for dashboards.
 - `appliance_live_activity.update` service for forcing a manual refresh.
+
+[Unreleased]: https://github.com/bisman-automations/ha-appliance-live-activity/compare/v1.11.0...HEAD
+[1.11.0]: https://github.com/bisman-automations/ha-appliance-live-activity/compare/v1.10.1...v1.11.0
+[1.10.1]: https://github.com/bisman-automations/ha-appliance-live-activity/compare/v1.10.0...v1.10.1
+[1.10.0]: https://github.com/bisman-automations/ha-appliance-live-activity/compare/v1.9.5...v1.10.0
+[1.9.5]: https://github.com/bisman-automations/ha-appliance-live-activity/compare/v1.9.4...v1.9.5
+[1.9.4]: https://github.com/bisman-automations/ha-appliance-live-activity/compare/v1.9.3...v1.9.4
+[1.9.3]: https://github.com/bisman-automations/ha-appliance-live-activity/compare/v1.9.2...v1.9.3
+[1.9.2]: https://github.com/bisman-automations/ha-appliance-live-activity/compare/v1.9.1...v1.9.2
+[1.9.1]: https://github.com/bisman-automations/ha-appliance-live-activity/compare/v1.9.0...v1.9.1
+[1.9.0]: https://github.com/bisman-automations/ha-appliance-live-activity/compare/v1.8.2...v1.9.0
+[1.8.2]: https://github.com/bisman-automations/ha-appliance-live-activity/compare/v1.8.1...v1.8.2
+[1.8.1]: https://github.com/bisman-automations/ha-appliance-live-activity/compare/v1.8.0...v1.8.1
+[1.8.0]: https://github.com/bisman-automations/ha-appliance-live-activity/compare/v1.7.0...v1.8.0
+[1.7.0]: https://github.com/bisman-automations/ha-appliance-live-activity/compare/v1.6.1...v1.7.0
+[1.6.1]: https://github.com/bisman-automations/ha-appliance-live-activity/compare/v1.6.0...v1.6.1
+[1.6.0]: https://github.com/bisman-automations/ha-appliance-live-activity/compare/v1.5.0...v1.6.0
+[1.5.0]: https://github.com/bisman-automations/ha-appliance-live-activity/compare/v1.4.0...v1.5.0
+[1.4.0]: https://github.com/bisman-automations/ha-appliance-live-activity/compare/v1.3.1...v1.4.0
+[1.3.1]: https://github.com/bisman-automations/ha-appliance-live-activity/compare/v1.3.0...v1.3.1
+[1.3.0]: https://github.com/bisman-automations/ha-appliance-live-activity/compare/v1.2.2...v1.3.0
+[1.2.2]: https://github.com/bisman-automations/ha-appliance-live-activity/compare/v1.2.1...v1.2.2
+[1.2.1]: https://github.com/bisman-automations/ha-appliance-live-activity/compare/v1.2.0...v1.2.1
+[1.2.0]: https://github.com/bisman-automations/ha-appliance-live-activity/compare/v1.1.0...v1.2.0
+[1.1.0]: https://github.com/bisman-automations/ha-appliance-live-activity/compare/v1.0.0...v1.1.0
+[1.0.0]: https://github.com/bisman-automations/ha-appliance-live-activity/releases/tag/v1.0.0

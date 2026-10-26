@@ -1,6 +1,15 @@
-<img src="custom_components/appliance_live_activity/brand/icon.png" alt="Appliance Live Activity" width="96" align="right">
+<p align="center">
+  <img src="https://raw.githubusercontent.com/bisman-automations/ha-appliance-live-activity/main/custom_components/appliance_live_activity/brand/icon.png" alt="Appliance Live Activity icon" width="128">
+</p>
 
 # Appliance Live Activity
+
+[![HACS Custom](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://hacs.xyz/)
+[![Home Assistant](https://img.shields.io/badge/Home%20Assistant-2026.7%2B-blue.svg)](https://www.home-assistant.io/)
+[![GitHub Release](https://img.shields.io/github/v/release/bisman-automations/ha-appliance-live-activity)](https://github.com/bisman-automations/ha-appliance-live-activity/releases)
+[![Test](https://github.com/bisman-automations/ha-appliance-live-activity/actions/workflows/test.yml/badge.svg)](https://github.com/bisman-automations/ha-appliance-live-activity/actions/workflows/test.yml)
+[![Validate](https://github.com/bisman-automations/ha-appliance-live-activity/actions/workflows/validate.yml/badge.svg)](https://github.com/bisman-automations/ha-appliance-live-activity/actions/workflows/validate.yml)
+[![License](https://img.shields.io/github/license/bisman-automations/ha-appliance-live-activity)](LICENSE)
 
 Live Activities (iOS) and Live Updates (Android) for your appliances in Home
 Assistant — plus critical alerts when something is left open or left on.
@@ -25,21 +34,24 @@ Everything is in the integration — no blueprints, helpers or YAML needed.
 - Companion app: iOS **17.2+** (Live Activities) or Android **16+** (Live Updates)
 - iOS: allow **Critical Alerts** for the Companion app (Settings → Notifications → Home Assistant)
 
-## Install via HACS
+## Installation
+
+### HACS
 
 [![Open your Home Assistant instance and open this repository in HACS.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=bisman-automations&repository=ha-appliance-live-activity&category=integration)
 
-1. Click the button above (or HACS → ⋮ → **Custom repositories** → add
-   `https://github.com/bisman-automations/ha-appliance-live-activity`, category
-   **Integration**).
-2. Install **Appliance Live Activity** and restart Home Assistant.
-3. Add the integration:
+1. Click the button above, or in HACS open the menu, choose **Custom repositories**, and add `https://github.com/bisman-automations/ha-appliance-live-activity` as an **Integration**.
+2. Download **Appliance Live Activity** and restart Home Assistant.
 
-   [![Open your Home Assistant instance and start setting up Appliance Live Activity.](https://my.home-assistant.io/badges/config_flow_start.svg)](https://my.home-assistant.io/redirect/config_flow_start/?domain=appliance_live_activity)
+Requires **Home Assistant 2026.7 or newer**.
 
-   or Settings → Devices & services → **Add integration** → *Appliance Live Activity*.
+### Manual
+
+Download `appliance_live_activity.zip` from the [latest release](https://github.com/bisman-automations/ha-appliance-live-activity/releases/latest), unzip it into `config/custom_components/appliance_live_activity/`, and restart Home Assistant.
 
 ## Setup
+
+[![Open your Home Assistant instance and start setting up Appliance Live Activity.](https://my.home-assistant.io/badges/config_flow_start.svg)](https://my.home-assistant.io/redirect/config_flow_start/?domain=appliance_live_activity)
 
 Add one entry per appliance.
 
@@ -263,6 +275,13 @@ Home Assistant app (the GE appliance's own page for GE setups).
   activity if it was dismissed from the notification center.
 - `appliance_live_activity.update` re-sends an appliance's Live Activity.
 
+## Adding an appliance type
+
+Appliance types are plugins in
+`custom_components/appliance_live_activity/appliances/`. Add a file with an
+`ApplianceDefinition` (see `washer.py`) and one import line in
+`appliances/__init__.py`.
+
 ## Troubleshooting
 
 - **Settings → Repairs** tells you when a phone can't receive alerts (e.g.
@@ -272,22 +291,41 @@ Home Assistant app (the GE appliance's own page for GE setups).
   appliance reports and what the integration is doing — attach it to bug
   reports.
 
-## Adding an appliance type
+### Diagnostics and debug logs
 
-Appliance types are plugins in
-`custom_components/appliance_live_activity/appliances/`. Add a file with an
-`ApplianceDefinition` (see `washer.py`) and one import line in
-`appliances/__init__.py`.
+When something goes wrong, download diagnostics from **Settings → Devices & services → Appliance Live Activity → ⋮ → Download diagnostics** and check the file before you share it.
+
+For debug logs, use **Enable debug logging** on the integration page, or add this to `configuration.yaml` and restart:
+
+```yaml
+logger:
+  logs:
+    custom_components.appliance_live_activity: debug
+```
+
+Then open an [issue](https://github.com/bisman-automations/ha-appliance-live-activity/issues/new/choose) with the diagnostics, the log, and your Home Assistant and Appliance Live Activity versions.
 
 ## Development
 
+Tests run inside a real Home Assistant through
+[pytest-homeassistant-custom-component](https://github.com/MatthewFlamm/pytest-homeassistant-custom-component).
+You need Python 3.14 for the current Home Assistant.
+
 ```bash
-pip install pytest-homeassistant-custom-component
+python3.14 -m venv .venv && . .venv/bin/activate
+pip install -r requirements_test.txt
+ruff check . && ruff format --check .
 pytest
 ```
 
-CI runs hassfest, HACS validation and the tests.
+To test against the oldest supported Home Assistant (2026.7), use Python 3.14 and
+`pip install -r requirements_test_min.txt` instead.
+
+CI runs the same checks on every push and pull request, on both Home Assistant
+versions, plus hassfest, HACS validation and the shared repo standards, using the
+workflows in [bisman-automations/.github](https://github.com/bisman-automations/.github).
+Releases are drafted from [CHANGELOG.md](CHANGELOG.md); see [CLAUDE.md](CLAUDE.md).
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+MIT. See [LICENSE](LICENSE).
