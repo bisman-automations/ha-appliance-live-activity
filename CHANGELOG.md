@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.11.1] - 2026-10-26
+
+### Changed
+
+- The README follows the same layout as the other bisman-automations integrations: a button that opens it in HACS, a button that starts setup, and troubleshooting steps for debug logs and diagnostics.
+- Each release now includes `appliance_live_activity.zip` for installing without HACS.
+
+### Fixed
+
+- **Entity IDs no longer repeat the appliance name**: on Home Assistant 2026.7 and newer, an appliance linked to its GE or other brand's device got IDs like `sensor.kitchen_dishwasher_live_activity_kitchen_dishwasher_status`. New entities are named `sensor.kitchen_dishwasher_status` again. Existing entity IDs are not changed, so automations keep working; rename them in **Settings → Entities** if you like.
+- **Ready for Home Assistant 2027.8**: finding the integration's own device no longer uses a device registry call that Home Assistant 2026.10 deprecated and 2027.8 removes.
+- **Delayed start**: when the delay countdown reached 0 a moment before the washer started, the Live Activity briefly showed "Scheduled" without a start time.
+- Reloading or removing an appliance cancels the pending removal of "resolved" notifications instead of leaving it running.
+
 ## [1.11.0] - 2026-10-24
 
 ### Added
@@ -455,7 +469,8 @@ Initial release.
 - Status and Progress sensors per appliance for dashboards.
 - `appliance_live_activity.update` service for forcing a manual refresh.
 
-[Unreleased]: https://github.com/bisman-automations/ha-appliance-live-activity/compare/v1.11.0...HEAD
+[Unreleased]: https://github.com/bisman-automations/ha-appliance-live-activity/compare/v1.11.1...HEAD
+[1.11.1]: https://github.com/bisman-automations/ha-appliance-live-activity/compare/v1.11.0...v1.11.1
 [1.11.0]: https://github.com/bisman-automations/ha-appliance-live-activity/compare/v1.10.1...v1.11.0
 [1.10.1]: https://github.com/bisman-automations/ha-appliance-live-activity/compare/v1.10.0...v1.10.1
 [1.10.0]: https://github.com/bisman-automations/ha-appliance-live-activity/compare/v1.9.5...v1.10.0
