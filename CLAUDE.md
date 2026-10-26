@@ -33,8 +33,6 @@ first, plus any other brand or a plain door/contact sensor set up manually.
 
 - Each release's `CHANGELOG.md` entries are user-facing: what changed and why,
   with **bold lead-ins** like the existing entries.
-- Keep history to roughly one commit per release; group related work into one
-  commit.
 
 ## Layout (`custom_components/appliance_live_activity/`)
 
@@ -63,6 +61,19 @@ first, plus any other brand or a plain door/contact sensor set up manually.
   `via_device` for this. Gate behavior that differs on older HA with
   `LINKED_DEVICES_SUPPORTED`. Avoid `DeviceEntry.config_entries` and
   `primary_config_entry` on new HA; use `config_entry_id`.
+- **Finding our device**: use `own_device(hass, entry)` (`device.py`).
+  `device_registry.async_get_device` is deprecated from 2026.10 (stops
+  working in 2027.8); `own_device` uses `async_get_device_by_identifier` when
+  it exists and falls back on older HA. Tests use it too.
+- **Entity IDs**: our entities don't use `has_entity_name`, and their names
+  start with the appliance name. Since HA 2026.7 such entities get their
+  device's name in front of the ID unless the name already starts with it,
+  and our linked device is "<appliance> Live Activity". `attach_to_appliance`
+  therefore suggests `<platform>.<slug of the entity name>`; pass every new
+  entity's platform and name to it.
+- **Timers**: cancel every `async_call_later` when the entry unloads (see
+  `pending_clears` for the "resolved" notification clears). The test harness
+  fails a test that leaves a timer behind.
 - **Config entry reloads**: Configure uses `OptionsFlowWithReload`;
   Reconfigure uses `async_update_reload_and_abort`. Don't add an
   `add_update_listener` reload: HA warns about combining an update
