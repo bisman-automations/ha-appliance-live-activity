@@ -5,7 +5,7 @@ from __future__ import annotations
 
 from homeassistant.components.number import NumberMode, RestoreNumber
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import UnitOfTemperature
+from homeassistant.const import Platform, UnitOfTemperature
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
@@ -40,7 +40,7 @@ class ProbeTargetNumber(RestoreNumber):
             300 if unit == UnitOfTemperature.FAHRENHEIT else 150
         )
         self._attr_native_value = 0
-        attach_to_appliance(self, coordinator, entry)
+        attach_to_appliance(self, coordinator, entry, Platform.NUMBER, self._attr_name)
 
     async def async_added_to_hass(self) -> None:
         await super().async_added_to_hass()

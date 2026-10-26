@@ -763,7 +763,9 @@ async def async_resolve(
     or not at all, and it can arrive before an alert sent seconds earlier
     -- leaving that alert on screen. Replacing the alert with a quiet
     "resolved" notification on the same tag always works; that one is then
-    removed a couple of minutes later (unless the problem came back).
+    removed a couple of minutes later (unless the problem came back). The
+    removal is cancelled if the entry unloads first, so a reload or restart
+    never leaves a timer calling into an unloaded appliance.
     """
     await _async_send(
         hass,
@@ -779,7 +781,9 @@ async def async_resolve(
 
     @callback
     def _later(_now) -> None:
+        coordinator.pending_clears.discard(cancel)
         if still_resolved is None or still_resolved():
             hass.async_create_task(async_clear_tag(hass, coordinator, tag, devices))
 
-    async_call_later(hass, RESOLVED_CLEAR_SECONDS, _later)
+    cancel = async_call_later(hass, RESOLVED_CLEAR_SECONDS, _later)
+    coordinator.pending_clears.add(cancel)

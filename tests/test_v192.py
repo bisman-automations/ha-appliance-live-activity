@@ -5,8 +5,20 @@ from __future__ import annotations
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.appliance_live_activity.const import DOMAIN
+from custom_components.appliance_live_activity.device import own_device
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry as dr
+
+
+def _owners(device: dr.DeviceEntry) -> set[str]:
+    """The config entries a device belongs to, on any Home Assistant.
+
+    2026.8 gave each device a single owner (``config_entry_id``) and 2026.10
+    deprecated ``config_entries``.
+    """
+    if hasattr(device, "config_entry_id"):
+        return {device.config_entry_id}
+    return set(device.config_entries)
 
 
 async def test_own_device_linked_to_ge_appliance(
@@ -54,14 +66,14 @@ async def test_own_device_linked_to_ge_appliance(
     await hass.async_block_till_done()
 
     # Our own device again, holding all our entities; GE's device untouched
-    own = dev_reg.async_get_device(identifiers={(DOMAIN, entry.entry_id)})
+    own = own_device(hass, entry)
     assert own is not None and own.id != dishwasher.id
     assert own.name == "Kitchen Dishwasher Live Activity"
     assert own.entry_type == dr.DeviceEntryType.SERVICE
     ours = er.async_entries_for_config_entry(ent_reg, entry.entry_id)
     assert ours and {e.device_id for e in ours} == {own.id}
     assert ent_reg.async_get("sensor.kitchen_dishwasher_status").device_id == own.id
-    assert dev_reg.async_get(dishwasher.id).config_entries == {ge.entry_id}
+    assert _owners(dev_reg.async_get(dishwasher.id)) == {ge.entry_id}
     assert dev_reg.async_get(dishwasher.id).name == "Kitchen Dishwasher"
     coordinator = hass.data[DOMAIN][entry.entry_id]
     assert coordinator.tap_path() == f"/config/devices/device/{dishwasher.id}"
@@ -96,7 +108,7 @@ async def test_renamed_device_titles_activity(
     assert await hass.config_entries.async_setup(entry.entry_id)
     await hass.async_block_till_done()
     dev_reg = dr.async_get(hass)
-    own = dev_reg.async_get_device(identifiers={(DOMAIN, entry.entry_id)})
+    own = own_device(hass, entry)
     dev_reg.async_update_device(own.id, name_by_user="Big Door")
     assert hass.data[DOMAIN][entry.entry_id].display_title == "Big Door"
 
@@ -120,7 +132,7 @@ async def test_manual_appliance_not_linked(
     assert await hass.config_entries.async_setup(entry.entry_id)
     await hass.async_block_till_done()
     # No device behind the sensor: just our device, named after the appliance
-    own = dr.async_get(hass).async_get_device(identifiers={(DOMAIN, entry.entry_id)})
+    own = own_device(hass, entry)
     assert own is not None and own.name == "Garage Door"
     assert own.identifiers == {(DOMAIN, entry.entry_id)}
 
@@ -157,11 +169,11 @@ async def test_other_brand_linked(hass: HomeAssistant, enable_custom_integration
     entry.add_to_hass(hass)
     assert await hass.config_entries.async_setup(entry.entry_id)
     await hass.async_block_till_done()
-    own = dev_reg.async_get_device(identifiers={(DOMAIN, entry.entry_id)})
+    own = own_device(hass, entry)
     assert own is not None and own.name == "LG Washer Live Activity"
     status = er.async_get(hass).async_get("sensor.lg_washer_status")
     assert status is not None and status.device_id == own.id
-    assert dev_reg.async_get(washer.id).config_entries == {lg.entry_id}
+    assert _owners(dev_reg.async_get(washer.id)) == {lg.entry_id}
     coordinator = hass.data[DOMAIN][entry.entry_id]
     assert coordinator.tap_path() == f"/config/devices/device/{washer.id}"
 

@@ -11,6 +11,7 @@ from pytest_homeassistant_custom_component.common import (
 
 from custom_components.appliance_live_activity import config_flow as cf
 from custom_components.appliance_live_activity.const import DOMAIN
+from custom_components.appliance_live_activity.device import own_device
 from homeassistant import config_entries
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.translation import async_get_translations
@@ -188,7 +189,7 @@ async def test_custom_and_renamed_titles(
     )
     # Renaming the integration's washer device in Home Assistant is followed
     dev_reg = dr.async_get(hass)
-    device = dev_reg.async_get_device(identifiers={(DOMAIN, washer.entry_id)})
+    device = own_device(hass, washer)
     dev_reg.async_update_device(device.id, name_by_user="Washer")
     await _run(hass, "washer")
     await _run(hass, "dryer")

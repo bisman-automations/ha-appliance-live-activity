@@ -22,6 +22,7 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import device_registry as dr, entity_registry as er
 from homeassistant.helpers.device_registry import DeviceEntryType, DeviceInfo
 from homeassistant.helpers.entity import Entity
+from homeassistant.util import slugify
 
 from .const import DOMAIN
 
@@ -77,9 +78,41 @@ def own_device_info(coordinator, entry: ConfigEntry) -> DeviceInfo:
     return info
 
 
-def attach_to_appliance(entity: Entity, coordinator, entry: ConfigEntry) -> None:
-    """Put an entity on this integration's device for the appliance."""
+def own_device(hass: HomeAssistant, entry: ConfigEntry) -> dr.DeviceEntry | None:
+    """This integration's device for the appliance, if it has been created.
+
+    Looked up by our own identifier within our own config entry. Home
+    Assistant 2026.10 deprecated ``async_get_device`` (identifiers and
+    connections are no longer unique across config entries; it stops working
+    in 2027.8) in favour of ``async_get_device_by_identifier``, which takes the
+    owning entry. Older releases only have ``async_get_device``, where our
+    identifier is unique anyway.
+    """
+    dev_reg = dr.async_get(hass)
+    identifier = (DOMAIN, entry.entry_id)
+    if hasattr(dev_reg, "async_get_device_by_identifier"):
+        return dev_reg.async_get_device_by_identifier(identifier, entry.entry_id)
+    return dev_reg.async_get_device(identifiers={identifier})
+
+
+def attach_to_appliance(
+    entity: Entity, coordinator, entry: ConfigEntry, platform: str, name: str
+) -> None:
+    """Put an entity on this integration's device for the appliance.
+
+    Also suggests its entity ID from its own name ("Laundry Room Washer
+    Status" -> ``sensor.laundry_room_washer_status``), as every release has
+    created it. Since Home Assistant 2026.7 an entity without
+    ``has_entity_name`` gets its device's name put in front of its ID unless
+    its name already starts with it, and our device is named "... Live
+    Activity" when it is linked to the appliance's own device, which gave
+    ``sensor.laundry_room_washer_live_activity_laundry_room_washer_status``.
+    The suggestion only applies when the entity is first registered: IDs
+    already in the entity registry, including ones the user renamed, are
+    kept, and Home Assistant adds a suffix if the ID is taken.
+    """
     entity._attr_device_info = own_device_info(coordinator, entry)
+    entity.entity_id = f"{platform}.{slugify(name)}"
 
 
 @callback

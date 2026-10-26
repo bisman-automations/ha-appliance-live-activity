@@ -454,6 +454,9 @@ class ApplianceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._sent_at: float = 0.0
 
         self._unsubs: list[CALLBACK_TYPE] = []
+        # Timers that remove a "resolved" notification a little later
+        # (notify.async_resolve); cancelled when the entry unloads.
+        self.pending_clears: set[CALLBACK_TYPE] = set()
         self._finish_time: datetime | None = None
         self._dismiss_unsub: CALLBACK_TYPE | None = None
         self._stop_unsub: CALLBACK_TYPE | None = None
@@ -571,7 +574,7 @@ class ApplianceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     def display_title(self) -> str:
         if self.custom_title:
             return self.custom_title
-        from .device import appliance_device_id  # noqa: PLC0415
+        from .device import appliance_device_id, own_device  # noqa: PLC0415
 
         dev_reg = dr.async_get(self.hass)
         # A name given to the appliance's device, else to ours (whose own
@@ -579,7 +582,7 @@ class ApplianceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         linked = appliance_device_id(self.hass, self)
         for device in (
             dev_reg.async_get(linked) if linked else None,
-            dev_reg.async_get_device(identifiers={(DOMAIN, self.entry.entry_id)}),
+            own_device(self.hass, self.entry),
         ):
             if device is not None and device.name_by_user:
                 return device.name_by_user
@@ -791,13 +794,12 @@ class ApplianceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         one, else this integration's device for the appliance, else the
         integration page.
         """
-        from .device import appliance_device_id  # noqa: PLC0415
+        from .device import appliance_device_id, own_device  # noqa: PLC0415
 
-        dev_reg = dr.async_get(self.hass)
         appliance = appliance_device_id(self.hass, self)
         if appliance is not None:
             return f"/config/devices/device/{appliance}"
-        own = dev_reg.async_get_device(identifiers={(DOMAIN, self.entry.entry_id)})
+        own = own_device(self.hass, self.entry)
         if own is not None:
             return f"/config/devices/device/{own.id}"
         return f"/config/integrations/integration/{DOMAIN}"
@@ -885,6 +887,9 @@ class ApplianceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         for unsub in self._unsubs:
             unsub()
         self._unsubs.clear()
+        for cancel in list(self.pending_clears):
+            cancel()
+        self.pending_clears.clear()
         self._cancel_dismiss()
         for monitor in self.monitors:
             await monitor.async_unload()
@@ -1208,9 +1213,12 @@ class ApplianceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         if value != self._delay_value or self._delay_target is None:
             self._delay_value = value
             target = now + minutes * 60 if minutes > 0 else None
-            if (
-                target is None
-                or self._delay_target is None
+            # A countdown that reaches 0 keeps the start time already shown:
+            # GE reports 0 a moment before the state leaves "Delay Run", and
+            # clearing it pushed a "Scheduled" update without a time right
+            # before the cycle's own countdown replaced it.
+            if target is not None and (
+                self._delay_target is None
                 or abs(target - self._delay_target) > DRIFT_MINUTES * 60
             ):
                 self._delay_target = target
