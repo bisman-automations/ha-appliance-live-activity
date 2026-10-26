@@ -8,6 +8,7 @@ already on when the oven started is left alone, and so is one the user
 turned off while cooking. A blip where the oven reports "unavailable"
 changes nothing.
 """
+
 from __future__ import annotations
 
 import logging

@@ -1,4 +1,5 @@
 """Buttons for manually updating an appliance's Live Activity."""
+
 from __future__ import annotations
 
 from homeassistant.components.button import ButtonEntity

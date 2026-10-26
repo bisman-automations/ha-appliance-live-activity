@@ -1,5 +1,6 @@
 """Probe Target number: the meat probe's target temperature (GE ovens don't
 report the one set on the oven)."""
+
 from __future__ import annotations
 
 from homeassistant.components.number import NumberMode, RestoreNumber
@@ -8,8 +9,8 @@ from homeassistant.const import UnitOfTemperature
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .device import attach_to_appliance
 from .const import DOMAIN
+from .device import attach_to_appliance
 
 
 async def async_setup_entry(
@@ -35,7 +36,9 @@ class ProbeTargetNumber(RestoreNumber):
         self._attr_name = f"{coordinator.name} Probe Target"
         unit = coordinator.hass.config.units.temperature_unit
         self._attr_native_unit_of_measurement = unit
-        self._attr_native_max_value = 300 if unit == UnitOfTemperature.FAHRENHEIT else 150
+        self._attr_native_max_value = (
+            300 if unit == UnitOfTemperature.FAHRENHEIT else 150
+        )
         self._attr_native_value = 0
         attach_to_appliance(self, coordinator, entry)
 

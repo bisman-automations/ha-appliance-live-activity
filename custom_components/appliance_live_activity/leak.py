@@ -7,19 +7,28 @@
   are dry; a new leak after that alerts again.
 * All sensors dry -> the critical alert is replaced with "leak cleared".
 """
+
 from __future__ import annotations
 
-import logging
 from datetime import timedelta
+import logging
 from typing import TYPE_CHECKING
 
 from homeassistant.const import ATTR_FRIENDLY_NAME, STATE_ON
 from homeassistant.core import CALLBACK_TYPE, Event, HomeAssistant, callback
-from homeassistant.helpers.event import async_track_state_change_event, async_track_time_interval
+from homeassistant.helpers.event import (
+    async_track_state_change_event,
+    async_track_time_interval,
+)
 from homeassistant.util import dt as dt_util
 
 from .const import ACTION_SILENCE_LEAK, EVENT_NOTIFICATION_ACTION
-from .notify import async_clear_tag, async_send_leak, async_send_leak_cleared, async_speak
+from .notify import (
+    async_clear_tag,
+    async_send_leak,
+    async_send_leak_cleared,
+    async_speak,
+)
 
 if TYPE_CHECKING:
     from .coordinator import ApplianceCoordinator
@@ -63,7 +72,8 @@ class LeakMonitor:
         return [
             e
             for e in self.entities
-            if (state := self.hass.states.get(e)) is not None and state.state == STATE_ON
+            if (state := self.hass.states.get(e)) is not None
+            and state.state == STATE_ON
         ]
 
     @property
@@ -72,7 +82,9 @@ class LeakMonitor:
 
     def _label(self, entity_id: str) -> str:
         state = self.hass.states.get(entity_id)
-        name = (state.attributes.get(ATTR_FRIENDLY_NAME) if state else None) or entity_id
+        name = (
+            state.attributes.get(ATTR_FRIENDLY_NAME) if state else None
+        ) or entity_id
         # "Kitchen Dishwasher Leak Sensor Water leak" -> "Leak Sensor"
         name = name.removesuffix(" Water leak").removesuffix(" Moisture")
         if name.lower().startswith(self.coordinator.name.lower() + " "):
@@ -81,9 +93,13 @@ class LeakMonitor:
 
     async def async_setup(self) -> None:
         self._unsubs.append(
-            async_track_state_change_event(self.hass, self.entities, self._handle_change)
+            async_track_state_change_event(
+                self.hass, self.entities, self._handle_change
+            )
         )
-        self._unsubs.append(async_track_time_interval(self.hass, self._handle_change, TICK))
+        self._unsubs.append(
+            async_track_time_interval(self.hass, self._handle_change, TICK)
+        )
         self._unsubs.append(
             self.hass.bus.async_listen(EVENT_NOTIFICATION_ACTION, self._handle_action)
         )
@@ -128,7 +144,9 @@ class LeakMonitor:
         first = self._last_alert is None
         self._last_alert = now
         labels = [self._label(e) for e in wet]
-        _LOGGER.warning("%s: water leak detected by %s", self.coordinator.name, ", ".join(wet))
+        _LOGGER.warning(
+            "%s: water leak detected by %s", self.coordinator.name, ", ".join(wet)
+        )
         await async_send_leak(
             self.hass,
             self.coordinator,

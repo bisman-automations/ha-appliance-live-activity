@@ -1,5 +1,6 @@
 """Download diagnostics: settings, what the appliance reports, and what the
 integration is doing -- attach this to bug reports."""
+
 from __future__ import annotations
 
 from typing import Any
@@ -12,10 +13,16 @@ from .const import DOMAIN
 from .notify import notify_services_for_device, phone_is_home
 
 
-async def async_get_config_entry_diagnostics(hass: HomeAssistant, entry: ConfigEntry) -> dict[str, Any]:
+async def async_get_config_entry_diagnostics(
+    hass: HomeAssistant, entry: ConfigEntry
+) -> dict[str, Any]:
     coordinator = hass.data.get(DOMAIN, {}).get(entry.entry_id)
     result: dict[str, Any] = {
-        "entry": {"title": entry.title, "data": dict(entry.data), "options": dict(entry.options)},
+        "entry": {
+            "title": entry.title,
+            "data": dict(entry.data),
+            "options": dict(entry.options),
+        },
     }
     if coordinator is None:
         return result
@@ -34,7 +41,11 @@ async def async_get_config_entry_diagnostics(hass: HomeAssistant, entry: ConfigE
     for entity_id in coordinator.configured_entities():
         state = hass.states.get(entity_id)
         entities[entity_id] = (
-            {"state": state.state, "attributes": dict(state.attributes), "last_changed": state.last_changed.isoformat()}
+            {
+                "state": state.state,
+                "attributes": dict(state.attributes),
+                "last_changed": state.last_changed.isoformat(),
+            }
             if state
             else None
         )
@@ -42,7 +53,10 @@ async def async_get_config_entry_diagnostics(hass: HomeAssistant, entry: ConfigE
     result.update(
         {
             "appliance_type": coordinator.appliance_type,
-            "data": {k: (v.isoformat() if hasattr(v, "isoformat") else v) for k, v in (coordinator.data or {}).items()},
+            "data": {
+                k: (v.isoformat() if hasattr(v, "isoformat") else v)
+                for k, v in (coordinator.data or {}).items()
+            },
             "phones": phones,
             "entities": entities,
             "internal": coordinator.diagnostics(),

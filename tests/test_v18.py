@@ -1,4 +1,5 @@
 """v1.8.0: who's home, dishwasher ready to unload, events, history, Repairs, diagnostics."""
+
 from __future__ import annotations
 
 from datetime import timedelta
@@ -10,13 +11,17 @@ from pytest_homeassistant_custom_component.common import (
     async_mock_service,
 )
 
+from custom_components.appliance_live_activity.const import DOMAIN
+from custom_components.appliance_live_activity.diagnostics import (
+    async_get_config_entry_diagnostics,
+)
 from homeassistant import config_entries
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers import device_registry as dr, entity_registry as er
-from homeassistant.helpers import issue_registry as ir
-
-from custom_components.appliance_live_activity.const import DOMAIN
-from custom_components.appliance_live_activity.diagnostics import async_get_config_entry_diagnostics
+from homeassistant.helpers import (
+    device_registry as dr,
+    entity_registry as er,
+    issue_registry as ir,
+)
 
 
 async def _ge_device(hass, ge, uid, name, states):
@@ -26,8 +31,14 @@ async def _ge_device(hass, ge, uid, name, states):
     )
     for eid, (state, attrs) in states.items():
         domain, obj = eid.split(".")
-        ent_reg.async_get_or_create(domain, "ge_home", obj, suggested_object_id=obj,
-                                    device_id=device.id, config_entry=ge)
+        ent_reg.async_get_or_create(
+            domain,
+            "ge_home",
+            obj,
+            suggested_object_id=obj,
+            device_id=device.id,
+            config_entry=ge,
+        )
         hass.states.async_set(eid, state, attrs)
     return device
 
@@ -39,8 +50,12 @@ def _phone(hass, entry, uid, name, tracker_state=None):
     if tracker_state is not None:
         obj = name.lower().replace(" ", "_")
         er.async_get(hass).async_get_or_create(
-            "device_tracker", "mobile_app", uid, suggested_object_id=obj,
-            device_id=device.id, config_entry=entry,
+            "device_tracker",
+            "mobile_app",
+            uid,
+            suggested_object_id=obj,
+            device_id=device.id,
+            config_entry=entry,
         )
         hass.states.async_set(f"device_tracker.{obj}", tracker_state)
     return device
@@ -56,11 +71,19 @@ async def env(hass: HomeAssistant, enable_custom_integrations):
 
 
 async def _setup(hass, device_id, notify_input):
-    result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": config_entries.SOURCE_USER})
-    result = await hass.config_entries.flow.async_configure(result["flow_id"], {"next_step_id": "ge_home"})
-    result = await hass.config_entries.flow.async_configure(result["flow_id"], {"source_device": device_id})
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": config_entries.SOURCE_USER}
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {"next_step_id": "ge_home"}
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {"source_device": device_id}
+    )
     assert result["step_id"] == "notify", result
-    result = await hass.config_entries.flow.async_configure(result["flow_id"], notify_input)
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], notify_input
+    )
     await hass.async_block_till_done()
     assert result["type"] == "create_entry", result
     return result
@@ -92,7 +115,12 @@ WASHER = {
 
 async def _cycle(hass, freezer=None, minutes=40, prefix="laundry_room_washer"):
     _set(hass, f"binary_sensor.{prefix}_end_of_cycle", "off")
-    _set(hass, f"sensor.{prefix}_time_remaining", str(minutes), {"unit_of_measurement": "min"})
+    _set(
+        hass,
+        f"sensor.{prefix}_time_remaining",
+        str(minutes),
+        {"unit_of_measurement": "min"},
+    )
     _set(hass, f"sensor.{prefix}_state", "Run")
     await hass.async_block_till_done()
     if freezer is not None:
@@ -123,7 +151,9 @@ async def test_only_people_who_are_home(hass: HomeAssistant, env, freezer):
     _set(hass, "device_tracker.my_phone", "not_home")
     _set(hass, "binary_sensor.laundry_room_washer_door", "on", {"device_class": "door"})
     await hass.async_block_till_done()
-    _set(hass, "binary_sensor.laundry_room_washer_door", "off", {"device_class": "door"})
+    _set(
+        hass, "binary_sensor.laundry_room_washer_door", "off", {"device_class": "door"}
+    )
     await _cycle(hass)
     assert len(_titled(mine_calls, "✅")) == 2
     assert len(_titled(their_calls, "✅")) == 1
@@ -156,19 +186,34 @@ async def test_dishwasher_ready_to_unload(hass: HomeAssistant, env, freezer):
     calls = async_mock_service(hass, "notify", "mobile_app_my_phone")
     dw = await _ge_device(hass, ge, "dw", "Kitchen Dishwasher", DW)
     result = await _setup(hass, dw.id, {"devices": [me.id], "dismiss_minutes": 30})
-    assert result["data"]["clean_entity"] == "binary_sensor.kitchen_dishwasher_dishwasher_is_clean"
+    assert (
+        result["data"]["clean_entity"]
+        == "binary_sensor.kitchen_dishwasher_dishwasher_is_clean"
+    )
 
-    _set(hass, "sensor.kitchen_dishwasher_time_remaining", "2.0", {"unit_of_measurement": "h"})
+    _set(
+        hass,
+        "sensor.kitchen_dishwasher_time_remaining",
+        "2.0",
+        {"unit_of_measurement": "h"},
+    )
     _set(hass, "sensor.kitchen_dishwasher_operating_mode", "Cycle Active")
     await hass.async_block_till_done()
     _set(hass, "binary_sensor.kitchen_dishwasher_dishwasher_is_clean", "on")
-    _set(hass, "sensor.kitchen_dishwasher_time_remaining", "0.0", {"unit_of_measurement": "h"})
+    _set(
+        hass,
+        "sensor.kitchen_dishwasher_time_remaining",
+        "0.0",
+        {"unit_of_measurement": "h"},
+    )
     _set(hass, "sensor.kitchen_dishwasher_operating_mode", "Cycle Complete")
     await hass.async_block_till_done()
     done = [c for c in calls if c.data["data"].get("critical_text") == "Done"][-1]
     assert "ready to unload" in done.data["message"]
 
-    cleared = lambda: [c for c in calls if c.data.get("message") == "clear_notification"]  # noqa: E731
+    cleared = lambda: [  # noqa: E731
+        c for c in calls if c.data.get("message") == "clear_notification"
+    ]
     await _tick(hass, freezer, timedelta(minutes=95))
     assert cleared() == []
     _set(hass, "binary_sensor.kitchen_dishwasher_door", "on", {"device_class": "door"})
@@ -189,15 +234,30 @@ async def test_cycle_events_and_history(hass: HomeAssistant, env, freezer):
     assert "finished" in state.attributes["event_types"]
 
     events = []
-    hass.bus.async_listen("state_changed", lambda e: e.data["entity_id"] == event_entity and events.append(
-        e.data["new_state"].attributes.get("event_type")))
+    hass.bus.async_listen(
+        "state_changed",
+        lambda e: (
+            e.data["entity_id"] == event_entity
+            and events.append(e.data["new_state"].attributes.get("event_type"))
+        ),
+    )
 
-    _set(hass, "sensor.laundry_room_washer_time_remaining", "45", {"unit_of_measurement": "min"})
+    _set(
+        hass,
+        "sensor.laundry_room_washer_time_remaining",
+        "45",
+        {"unit_of_measurement": "min"},
+    )
     _set(hass, "sensor.laundry_room_washer_state", "Run")
     await hass.async_block_till_done()
     assert hass.states.get(event_entity).attributes["event_type"] == "started"
     await _tick(hass, freezer, timedelta(minutes=45))
-    _set(hass, "sensor.laundry_room_washer_time_remaining", "0", {"unit_of_measurement": "min"})
+    _set(
+        hass,
+        "sensor.laundry_room_washer_time_remaining",
+        "0",
+        {"unit_of_measurement": "min"},
+    )
     _set(hass, "binary_sensor.laundry_room_washer_end_of_cycle", "on")
     _set(hass, "sensor.laundry_room_washer_state", "Finished")
     await hass.async_block_till_done()
@@ -212,7 +272,12 @@ async def test_cycle_events_and_history(hass: HomeAssistant, env, freezer):
 
     # Cancelled: stopped with lots of time left
     _set(hass, "binary_sensor.laundry_room_washer_end_of_cycle", "off")
-    _set(hass, "sensor.laundry_room_washer_time_remaining", "40", {"unit_of_measurement": "min"})
+    _set(
+        hass,
+        "sensor.laundry_room_washer_time_remaining",
+        "40",
+        {"unit_of_measurement": "min"},
+    )
     _set(hass, "sensor.laundry_room_washer_state", "Run")
     await hass.async_block_till_done()
     _set(hass, "sensor.laundry_room_washer_state", "Off")
@@ -230,18 +295,40 @@ async def test_door_events(hass: HomeAssistant, env, freezer):
     mobile, ge = env
     me = _phone(hass, mobile, "a", "My Phone")
     async_mock_service(hass, "notify", "mobile_app_my_phone")
-    fridge = await _ge_device(hass, ge, "fridge", "Kitchen Refrigerator", {
-        "binary_sensor.kitchen_refrigerator_freezer_door": ("off", {"device_class": "door"}),
-        "sensor.kitchen_refrigerator_water_filter_status": ("Good", {}),
-    })
+    fridge = await _ge_device(
+        hass,
+        ge,
+        "fridge",
+        "Kitchen Refrigerator",
+        {
+            "binary_sensor.kitchen_refrigerator_freezer_door": (
+                "off",
+                {"device_class": "door"},
+            ),
+            "sensor.kitchen_refrigerator_water_filter_status": ("Good", {}),
+        },
+    )
     await _setup(hass, fridge.id, {"devices": [me.id]})
     entity = "event.kitchen_refrigerator_door"
-    assert hass.states.get(entity).attributes["event_types"] == ["door_left_open", "door_closed"]
-    _set(hass, "binary_sensor.kitchen_refrigerator_freezer_door", "on", {"device_class": "door"})
+    assert hass.states.get(entity).attributes["event_types"] == [
+        "door_left_open",
+        "door_closed",
+    ]
+    _set(
+        hass,
+        "binary_sensor.kitchen_refrigerator_freezer_door",
+        "on",
+        {"device_class": "door"},
+    )
     await hass.async_block_till_done()
     await _tick(hass, freezer, timedelta(minutes=5, seconds=15))
     assert hass.states.get(entity).attributes["event_type"] == "door_left_open"
-    _set(hass, "binary_sensor.kitchen_refrigerator_freezer_door", "off", {"device_class": "door"})
+    _set(
+        hass,
+        "binary_sensor.kitchen_refrigerator_freezer_door",
+        "off",
+        {"device_class": "door"},
+    )
     await hass.async_block_till_done()
     state = hass.states.get(entity)
     assert state.attributes["event_type"] == "door_closed"
@@ -274,7 +361,10 @@ async def test_repairs(hass: HomeAssistant, env, freezer):
     assert registry.async_get_issue(DOMAIN, f"phone_{entry_id}_{gone.id}") is None
     missing = registry.async_get_issue(DOMAIN, f"missing_entities_{entry_id}")
     assert missing is not None
-    assert missing.translation_placeholders["entities"] == "binary_sensor.laundry_room_washer_door"
+    assert (
+        missing.translation_placeholders["entities"]
+        == "binary_sensor.laundry_room_washer_door"
+    )
 
     # Removing the appliance removes its issues
     await hass.config_entries.async_remove(entry_id)
@@ -292,6 +382,10 @@ async def test_diagnostics(hass: HomeAssistant, env, freezer):
     await _cycle(hass, freezer)
     diag = await async_get_config_entry_diagnostics(hass, entry)
     assert diag["appliance_type"] == "washer"
-    assert diag["phones"][me.id] == {"name": "My Phone", "notify_services": ["mobile_app_my_phone"], "home": True}
+    assert diag["phones"][me.id] == {
+        "name": "My Phone",
+        "notify_services": ["mobile_app_my_phone"],
+        "home": True,
+    }
     assert diag["entities"]["sensor.laundry_room_washer_state"]["state"] == "Finished"
     assert diag["internal"]["history"] and diag["data"]["status"] == "complete"

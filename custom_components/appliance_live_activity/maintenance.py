@@ -13,19 +13,28 @@
   or has expired, a critical alert if it reports a leak; dishwasher -- a
   notification when the filter needs cleaning.
 """
+
 from __future__ import annotations
 
+from datetime import timedelta
 import logging
 import re
-from datetime import timedelta
 from typing import TYPE_CHECKING
 
 from homeassistant.const import ATTR_FRIENDLY_NAME, ATTR_UNIT_OF_MEASUREMENT, STATE_ON
 from homeassistant.core import CALLBACK_TYPE, HomeAssistant, callback
-from homeassistant.helpers.event import async_track_state_change_event, async_track_time_interval
+from homeassistant.helpers.event import (
+    async_track_state_change_event,
+    async_track_time_interval,
+)
 from homeassistant.util import dt as dt_util
 
-from .const import SUPPLY_LOW_PERCENT, UNAVAILABLE_STATES, VENT_REPEAT_MINUTES, WARM_REPEAT_MINUTES
+from .const import (
+    SUPPLY_LOW_PERCENT,
+    UNAVAILABLE_STATES,
+    VENT_REPEAT_MINUTES,
+    WARM_REPEAT_MINUTES,
+)
 from .notify import async_clear_tag, async_resolve, async_send_alert, async_speak
 
 if TYPE_CHECKING:
@@ -66,7 +75,12 @@ def supply_low(state: str, unit: str | None, low: float) -> bool | None:
 
 
 class _Base:
-    def __init__(self, hass: HomeAssistant, coordinator: ApplianceCoordinator, entities: list[str]):
+    def __init__(
+        self,
+        hass: HomeAssistant,
+        coordinator: ApplianceCoordinator,
+        entities: list[str],
+    ):
         self.hass = hass
         self.coordinator = coordinator
         self.entities = entities
@@ -74,9 +88,13 @@ class _Base:
 
     async def async_setup(self) -> None:
         self._unsubs.append(
-            async_track_state_change_event(self.hass, self.entities, self._handle_change)
+            async_track_state_change_event(
+                self.hass, self.entities, self._handle_change
+            )
         )
-        self._unsubs.append(async_track_time_interval(self.hass, self._handle_change, TICK))
+        self._unsubs.append(
+            async_track_time_interval(self.hass, self._handle_change, TICK)
+        )
         await self.async_evaluate()
 
     async def async_unload(self) -> None:
@@ -95,7 +113,14 @@ class _Base:
 class VentMonitor(_Base):
     """GE 'blocked vent fault' -> critical alert."""
 
-    def __init__(self, hass, coordinator, entity: str, tts_entity: str | None, speakers: list[str]):
+    def __init__(
+        self,
+        hass,
+        coordinator,
+        entity: str,
+        tts_entity: str | None,
+        speakers: list[str],
+    ):
         super().__init__(hass, coordinator, [entity])
         self.tag = f"{coordinator.notification_tag}_vent"
         self.tts_entity = tts_entity
@@ -123,7 +148,10 @@ class VentMonitor(_Base):
                     )
                 self.coordinator.async_update_listeners()
             return
-        if self._last_alert is not None and now - self._last_alert < VENT_REPEAT_MINUTES * 60 - 1:
+        if (
+            self._last_alert is not None
+            and now - self._last_alert < VENT_REPEAT_MINUTES * 60 - 1
+        ):
             return
         first = self._last_alert is None
         self._last_alert = now
@@ -162,7 +190,9 @@ class SupplyMonitor(_Base):
             if re.search(pattern, entity_id):
                 return label, unit
         state = self.hass.states.get(entity_id)
-        name = (state.attributes.get(ATTR_FRIENDLY_NAME) if state else None) or entity_id
+        name = (
+            state.attributes.get(ATTR_FRIENDLY_NAME) if state else None
+        ) or entity_id
         if name.lower().startswith(self.coordinator.name.lower() + " "):
             name = name[len(self.coordinator.name) + 1 :]
         return name, ""
@@ -186,7 +216,14 @@ class SupplyMonitor(_Base):
             if unit == "%":
                 result.append((entity_id, f"{label}: {round(value)}% left"))
             else:
-                result.append((entity_id, f"{label}: {round(value)} {unit or count_unit} left".replace("  ", " ")))
+                result.append(
+                    (
+                        entity_id,
+                        f"{label}: {round(value)} {unit or count_unit} left".replace(
+                            "  ", " "
+                        ),
+                    )
+                )
         return result
 
     async def async_evaluate(self) -> None:
@@ -196,7 +233,9 @@ class SupplyMonitor(_Base):
 
     async def async_after_cycle(self) -> None:
         """Called by the coordinator when a cycle finishes."""
-        items = [(e, text) for e, text in self.low_supplies() if e not in self._reminded]
+        items = [
+            (e, text) for e, text in self.low_supplies() if e not in self._reminded
+        ]
         if not items or not self.coordinator.devices:
             return
         self._reminded |= {e for e, _ in items}
@@ -259,7 +298,8 @@ class FilterMonitor(_Base):
                 self.coordinator,
                 tag=self.tag,
                 title=f"🚰 {self.coordinator.name}: replace the water filter",
-                message="The water filter has expired." if status == "expired"
+                message="The water filter has expired."
+                if status == "expired"
                 else "The water filter is due to be replaced.",
                 level="active",
             )
@@ -298,7 +338,9 @@ class FridgeMonitor(_Base):
         ice_entity: str | None,
     ):
         super().__init__(
-            hass, coordinator, [e for e, _ in zones.values()] + ([ice_entity] if ice_entity else [])
+            hass,
+            coordinator,
+            [e for e, _ in zones.values()] + ([ice_entity] if ice_entity else []),
         )
         self.zones = zones
         self.warm_after = warm_minutes * 60
@@ -312,7 +354,9 @@ class FridgeMonitor(_Base):
         if state is None:
             return None, ""
         try:
-            return float(state.state), state.attributes.get(ATTR_UNIT_OF_MEASUREMENT) or "°"
+            return float(state.state), state.attributes.get(
+                ATTR_UNIT_OF_MEASUREMENT
+            ) or "°"
         except ValueError:
             return None, ""
 
@@ -330,7 +374,10 @@ class FridgeMonitor(_Base):
             label = "Fridge" if zone == "fridge" else "Freezer"
             if temp <= limit:
                 self._warm_since.pop(zone, None)
-                if self._warm_alert.pop(zone, None) is not None and self.coordinator.devices:
+                if (
+                    self._warm_alert.pop(zone, None) is not None
+                    and self.coordinator.devices
+                ):
                     await async_send_alert(
                         self.hass,
                         self.coordinator,
@@ -350,7 +397,9 @@ class FridgeMonitor(_Base):
                 continue
             self._warm_alert[zone] = now
             minutes = round((now - since) / 60)
-            _LOGGER.warning("%s: %s at %s for %s min", self.coordinator.name, zone, temp, minutes)
+            _LOGGER.warning(
+                "%s: %s at %s for %s min", self.coordinator.name, zone, temp, minutes
+            )
             if self.coordinator.devices:
                 await async_send_alert(
                     self.hass,

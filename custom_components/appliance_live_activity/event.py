@@ -5,6 +5,7 @@ finished, cancelled. Fridges and doors: door_left_open (when critical alerts
 start), door_closed. Event attributes carry details such as the cycle name
 and how long it ran.
 """
+
 from __future__ import annotations
 
 from typing import Any
@@ -14,8 +15,8 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .device import attach_to_appliance
 from .const import CYCLE_EVENTS, DOMAIN, DOOR_EVENTS, DOOR_TYPES
+from .device import attach_to_appliance
 
 
 async def async_setup_entry(

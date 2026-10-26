@@ -1,28 +1,40 @@
 """v1.9.2: the appliance's device is connected via the GE appliance."""
+
 from __future__ import annotations
 
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
+from custom_components.appliance_live_activity.const import DOMAIN
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry as dr
 
-from custom_components.appliance_live_activity.const import DOMAIN
 
-
-async def test_own_device_linked_to_ge_appliance(hass: HomeAssistant, enable_custom_integrations, monkeypatch):
+async def test_own_device_linked_to_ge_appliance(
+    hass: HomeAssistant, enable_custom_integrations, monkeypatch
+):
     ge = MockConfigEntry(domain="ge_home")
     ge.add_to_hass(hass)
     dev_reg = dr.async_get(hass)
     dishwasher = dev_reg.async_get_or_create(
-        config_entry_id=ge.entry_id, identifiers={("ge_home", "DW123")},
-        connections={("mac", "aa:bb:cc:dd:ee:ff")}, name="Kitchen Dishwasher",
+        config_entry_id=ge.entry_id,
+        identifiers={("ge_home", "DW123")},
+        connections={("mac", "aa:bb:cc:dd:ee:ff")},
+        name="Kitchen Dishwasher",
     )
     hass.states.async_set("sensor.kitchen_dishwasher_operating_mode", "Off")
-    entry = MockConfigEntry(domain=DOMAIN, data={
-        "source": "ge_home", "source_device": dishwasher.id, "appliance_type": "dishwasher",
-        "name": "Kitchen Dishwasher", "state_entity": "sensor.kitchen_dishwasher_operating_mode",
-        "notification_tag": "kitchen_dishwasher", "devices": [], "ge_discovery": 99,
-    })
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        data={
+            "source": "ge_home",
+            "source_device": dishwasher.id,
+            "appliance_type": "dishwasher",
+            "name": "Kitchen Dishwasher",
+            "state_entity": "sensor.kitchen_dishwasher_operating_mode",
+            "notification_tag": "kitchen_dishwasher",
+            "devices": [],
+            "ge_discovery": 99,
+        },
+    )
     entry.add_to_hass(hass)
 
     # 1.9.4 put our entities on the GE device
@@ -30,8 +42,12 @@ async def test_own_device_linked_to_ge_appliance(hass: HomeAssistant, enable_cus
 
     ent_reg = er.async_get(hass)
     ent_reg.async_get_or_create(
-        "sensor", DOMAIN, f"{entry.entry_id}_status", suggested_object_id="kitchen_dishwasher_status",
-        device_id=dishwasher.id, config_entry=entry,
+        "sensor",
+        DOMAIN,
+        f"{entry.entry_id}_status",
+        suggested_object_id="kitchen_dishwasher_status",
+        device_id=dishwasher.id,
+        config_entry=entry,
     )
 
     assert await hass.config_entries.async_setup(entry.entry_id)
@@ -61,12 +77,21 @@ async def test_own_device_linked_to_ge_appliance(hass: HomeAssistant, enable_cus
     assert info["entry_type"] == dr.DeviceEntryType.SERVICE
 
 
-async def test_renamed_device_titles_activity(hass: HomeAssistant, enable_custom_integrations):
+async def test_renamed_device_titles_activity(
+    hass: HomeAssistant, enable_custom_integrations
+):
     hass.states.async_set("binary_sensor.garage_door", "off")
-    entry = MockConfigEntry(domain=DOMAIN, data={
-        "source": "manual", "appliance_type": "door", "name": "Garage Door",
-        "state_entity": "binary_sensor.garage_door", "notification_tag": "garage_door", "devices": [],
-    })
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        data={
+            "source": "manual",
+            "appliance_type": "door",
+            "name": "Garage Door",
+            "state_entity": "binary_sensor.garage_door",
+            "notification_tag": "garage_door",
+            "devices": [],
+        },
+    )
     entry.add_to_hass(hass)
     assert await hass.config_entries.async_setup(entry.entry_id)
     await hass.async_block_till_done()
@@ -76,12 +101,21 @@ async def test_renamed_device_titles_activity(hass: HomeAssistant, enable_custom
     assert hass.data[DOMAIN][entry.entry_id].display_title == "Big Door"
 
 
-async def test_manual_appliance_not_linked(hass: HomeAssistant, enable_custom_integrations):
+async def test_manual_appliance_not_linked(
+    hass: HomeAssistant, enable_custom_integrations
+):
     hass.states.async_set("binary_sensor.garage_door", "off")
-    entry = MockConfigEntry(domain=DOMAIN, data={
-        "source": "manual", "appliance_type": "door", "name": "Garage Door",
-        "state_entity": "binary_sensor.garage_door", "notification_tag": "garage_door", "devices": [],
-    })
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        data={
+            "source": "manual",
+            "appliance_type": "door",
+            "name": "Garage Door",
+            "state_entity": "binary_sensor.garage_door",
+            "notification_tag": "garage_door",
+            "devices": [],
+        },
+    )
     entry.add_to_hass(hass)
     assert await hass.config_entries.async_setup(entry.entry_id)
     await hass.async_block_till_done()
@@ -101,14 +135,25 @@ async def test_other_brand_linked(hass: HomeAssistant, enable_custom_integration
     from homeassistant.helpers import entity_registry as er  # noqa: PLC0415
 
     er.async_get(hass).async_get_or_create(
-        "sensor", "lg_thinq", "wm1_state", suggested_object_id="lg_washer_state",
-        device_id=washer.id, config_entry=lg,
+        "sensor",
+        "lg_thinq",
+        "wm1_state",
+        suggested_object_id="lg_washer_state",
+        device_id=washer.id,
+        config_entry=lg,
     )
     hass.states.async_set("sensor.lg_washer_state", "Off")
-    entry = MockConfigEntry(domain=DOMAIN, data={
-        "source": "manual", "appliance_type": "washer", "name": "LG Washer",
-        "state_entity": "sensor.lg_washer_state", "notification_tag": "lg_washer", "devices": [],
-    })
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        data={
+            "source": "manual",
+            "appliance_type": "washer",
+            "name": "LG Washer",
+            "state_entity": "sensor.lg_washer_state",
+            "notification_tag": "lg_washer",
+            "devices": [],
+        },
+    )
     entry.add_to_hass(hass)
     assert await hass.config_entries.async_setup(entry.entry_id)
     await hass.async_block_till_done()
@@ -130,13 +175,17 @@ from pytest_homeassistant_custom_component.common import (  # noqa: E402
 )
 
 
-async def test_oven_off_shows_off_then_ends(hass: HomeAssistant, enable_custom_integrations, freezer):
+async def test_oven_off_shows_off_then_ends(
+    hass: HomeAssistant, enable_custom_integrations, freezer
+):
     """Oven used without a cook timer: turning it off updates the Live Activity
     to "Off" (real-world bug: it stayed on the last cooking state)."""
     phone_entry = MockConfigEntry(domain="mobile_app")
     phone_entry.add_to_hass(hass)
     me = dr.async_get(hass).async_get_or_create(
-        config_entry_id=phone_entry.entry_id, identifiers={("mobile_app", "p")}, name="My Phone"
+        config_entry_id=phone_entry.entry_id,
+        identifiers={("mobile_app", "p")},
+        name="My Phone",
     )
     calls = async_mock_service(hass, "notify", "mobile_app_my_phone")
     for entity, state in (
@@ -144,13 +193,22 @@ async def test_oven_off_shows_off_then_ends(hass: HomeAssistant, enable_custom_i
         ("sensor.oven_cook_mode", "Off"),
         ("sensor.oven_cook_time_remaining", "0.0"),
     ):
-        hass.states.async_set(entity, state, {"unit_of_measurement": "h"} if "remaining" in entity else {})
-    entry = MockConfigEntry(domain=DOMAIN, data={
-        "source": "manual", "appliance_type": "oven", "name": "Kitchen Oven",
-        "state_entity": "sensor.oven_current_state", "phase_entity": "sensor.oven_cook_mode",
-        "remaining_entity": "sensor.oven_cook_time_remaining",
-        "notification_tag": "kitchen_oven", "devices": [me.id],
-    })
+        hass.states.async_set(
+            entity, state, {"unit_of_measurement": "h"} if "remaining" in entity else {}
+        )
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        data={
+            "source": "manual",
+            "appliance_type": "oven",
+            "name": "Kitchen Oven",
+            "state_entity": "sensor.oven_current_state",
+            "phase_entity": "sensor.oven_cook_mode",
+            "remaining_entity": "sensor.oven_cook_time_remaining",
+            "notification_tag": "kitchen_oven",
+            "devices": [me.id],
+        },
+    )
     entry.add_to_hass(hass)
     assert await hass.config_entries.async_setup(entry.entry_id)
     await hass.async_block_till_done()

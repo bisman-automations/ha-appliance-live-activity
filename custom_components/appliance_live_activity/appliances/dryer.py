@@ -1,4 +1,5 @@
 """Dryer appliance definition."""
+
 from ..appliance import ApplianceDefinition, register
 
 register(

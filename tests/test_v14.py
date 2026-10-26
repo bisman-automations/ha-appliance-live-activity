@@ -1,4 +1,5 @@
 """v1.4.0: oven preheat, water leak alerts, washer -> dryer reminder."""
+
 from __future__ import annotations
 
 from datetime import timedelta
@@ -10,13 +11,15 @@ from pytest_homeassistant_custom_component.common import (
     async_mock_service,
 )
 
+from custom_components.appliance_live_activity.const import DOMAIN
+from custom_components.appliance_live_activity.ge import (
+    entity_prefix,
+    leak_sensors_for_prefix,
+)
 from homeassistant import config_entries
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry as dr, entity_registry as er
-
 from tests.conftest import suggested_values
-from custom_components.appliance_live_activity.const import DOMAIN
-from custom_components.appliance_live_activity.ge import entity_prefix, leak_sensors_for_prefix
 
 
 async def _ge_device(hass, ge, uid, name, states: dict[str, tuple[str, dict]]):
@@ -26,8 +29,14 @@ async def _ge_device(hass, ge, uid, name, states: dict[str, tuple[str, dict]]):
     )
     for eid, (state, attrs) in states.items():
         domain, obj = eid.split(".")
-        ent_reg.async_get_or_create(domain, "ge_home", obj, suggested_object_id=obj,
-                                    device_id=device.id, config_entry=ge)
+        ent_reg.async_get_or_create(
+            domain,
+            "ge_home",
+            obj,
+            suggested_object_id=obj,
+            device_id=device.id,
+            config_entry=ge,
+        )
         hass.states.async_set(eid, state, attrs)
     return device
 
@@ -37,7 +46,9 @@ async def phone(hass: HomeAssistant, enable_custom_integrations):
     entry = MockConfigEntry(domain="mobile_app")
     entry.add_to_hass(hass)
     device = dr.async_get(hass).async_get_or_create(
-        config_entry_id=entry.entry_id, identifiers={("mobile_app", "p")}, name="My Phone"
+        config_entry_id=entry.entry_id,
+        identifiers={("mobile_app", "p")},
+        name="My Phone",
     )
     ge = MockConfigEntry(domain="ge_home")
     ge.add_to_hass(hass)
@@ -45,12 +56,20 @@ async def phone(hass: HomeAssistant, enable_custom_integrations):
 
 
 async def _setup(hass, device_id, notify_input):
-    result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": config_entries.SOURCE_USER})
-    result = await hass.config_entries.flow.async_configure(result["flow_id"], {"next_step_id": "ge_home"})
-    result = await hass.config_entries.flow.async_configure(result["flow_id"], {"source_device": device_id})
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": config_entries.SOURCE_USER}
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {"next_step_id": "ge_home"}
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {"source_device": device_id}
+    )
     assert result["step_id"] == "notify", result
     suggested = suggested_values(result)
-    result = await hass.config_entries.flow.async_configure(result["flow_id"], notify_input)
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], notify_input
+    )
     await hass.async_block_till_done()
     return result, suggested
 
@@ -67,8 +86,15 @@ def _titled(calls, start):
 
 # ---------------------------------------------------------------- pure
 def test_prefix_and_leak_matching():
-    assert entity_prefix(["sensor.kitchen_dishwasher_operating_mode",
-                          "binary_sensor.kitchen_dishwasher_door"]) == "kitchen_dishwasher_"
+    assert (
+        entity_prefix(
+            [
+                "sensor.kitchen_dishwasher_operating_mode",
+                "binary_sensor.kitchen_dishwasher_door",
+            ]
+        )
+        == "kitchen_dishwasher_"
+    )
     states = [
         ("binary_sensor.kitchen_dishwasher_leak_sensor_water_leak", "moisture"),
         ("binary_sensor.kitchen_refrigerator_leak_sensor_water_leak", "moisture"),
@@ -93,10 +119,17 @@ async def test_oven_preheat(hass: HomeAssistant, phone, freezer):
     me, ge, calls = phone
     oven = await _ge_device(hass, ge, "oven", "Kitchen Oven", OVEN)
     result, _ = await _setup(hass, oven.id, {"devices": [me.id]})
-    assert result["data"]["target_temperature_entity"] == "water_heater.kitchen_oven_set_temperature"
+    assert (
+        result["data"]["target_temperature_entity"]
+        == "water_heater.kitchen_oven_set_temperature"
+    )
 
-    hass.states.async_set("water_heater.kitchen_oven_set_temperature", "Bake", {"temperature": 350})
-    hass.states.async_set("sensor.kitchen_oven_display_temperature", "100", {"unit_of_measurement": "°F"})
+    hass.states.async_set(
+        "water_heater.kitchen_oven_set_temperature", "Bake", {"temperature": 350}
+    )
+    hass.states.async_set(
+        "sensor.kitchen_oven_display_temperature", "100", {"unit_of_measurement": "°F"}
+    )
     hass.states.async_set("sensor.kitchen_oven_current_state", "Preheat")
     await hass.async_block_till_done()
     live = [c for c in calls if c.data["data"].get("live_update")]
@@ -105,14 +138,20 @@ async def test_oven_preheat(hass: HomeAssistant, phone, freezer):
 
     # Climbing in small steps: only ~10 % progress steps are pushed
     for t in range(105, 330, 5):
-        hass.states.async_set("sensor.kitchen_oven_display_temperature", str(t), {"unit_of_measurement": "°F"})
+        hass.states.async_set(
+            "sensor.kitchen_oven_display_temperature",
+            str(t),
+            {"unit_of_measurement": "°F"},
+        )
         await hass.async_block_till_done()
     live = [c for c in calls if c.data["data"].get("live_update")]
     assert len(live) <= 11
     assert _titled(calls, "🔥 Kitchen Oven preheated") == []
 
     # Reached: state switches to Bake
-    hass.states.async_set("sensor.kitchen_oven_display_temperature", "350", {"unit_of_measurement": "°F"})
+    hass.states.async_set(
+        "sensor.kitchen_oven_display_temperature", "350", {"unit_of_measurement": "°F"}
+    )
     hass.states.async_set("sensor.kitchen_oven_current_state", "Bake")
     await hass.async_block_till_done()
     alerts = _titled(calls, "🔥 Kitchen Oven preheated")
@@ -121,14 +160,20 @@ async def test_oven_preheat(hass: HomeAssistant, phone, freezer):
     # Temperature wobbling while baking: no more preheat alerts or pushes
     sent = len(calls)
     for t in ("345", "352", "348"):
-        hass.states.async_set("sensor.kitchen_oven_display_temperature", t, {"unit_of_measurement": "°F"})
+        hass.states.async_set(
+            "sensor.kitchen_oven_display_temperature", t, {"unit_of_measurement": "°F"}
+        )
         await hass.async_block_till_done()
     assert len(calls) == sent
 
     # Oven off -> preheat alert removed
     hass.states.async_set("sensor.kitchen_oven_current_state", "Off")
     await hass.async_block_till_done()
-    cleared = [c.data["data"]["tag"] for c in calls if c.data.get("message") == "clear_notification"]
+    cleared = [
+        c.data["data"]["tag"]
+        for c in calls
+        if c.data.get("message") == "clear_notification"
+    ]
     assert any(t.endswith("_preheat") for t in cleared)
 
 
@@ -143,15 +188,35 @@ DW = {
 async def test_leak_auto_found_and_alerts(hass: HomeAssistant, phone, freezer):
     me, ge, calls = phone
     leak = "binary_sensor.kitchen_dishwasher_leak_sensor_water_leak"
-    hass.states.async_set(leak, "off", {"device_class": "moisture",
-                                        "friendly_name": "Kitchen Dishwasher Leak Sensor Water leak"})
-    hass.states.async_set("binary_sensor.garage_leak_sensor_water_leak", "off", {"device_class": "moisture"})
+    hass.states.async_set(
+        leak,
+        "off",
+        {
+            "device_class": "moisture",
+            "friendly_name": "Kitchen Dishwasher Leak Sensor Water leak",
+        },
+    )
+    hass.states.async_set(
+        "binary_sensor.garage_leak_sensor_water_leak",
+        "off",
+        {"device_class": "moisture"},
+    )
     dw = await _ge_device(hass, ge, "dw", "Kitchen Dishwasher", DW)
-    result, suggested = await _setup(hass, dw.id, {"devices": [me.id], "leak_entities": [leak]})
-    assert suggested["leak_entities"] == [leak]  # pre-filled, garage sensor not included
+    result, suggested = await _setup(
+        hass, dw.id, {"devices": [me.id], "leak_entities": [leak]}
+    )
+    assert suggested["leak_entities"] == [
+        leak
+    ]  # pre-filled, garage sensor not included
 
-    hass.states.async_set(leak, "on", {"device_class": "moisture",
-                                       "friendly_name": "Kitchen Dishwasher Leak Sensor Water leak"})
+    hass.states.async_set(
+        leak,
+        "on",
+        {
+            "device_class": "moisture",
+            "friendly_name": "Kitchen Dishwasher Leak Sensor Water leak",
+        },
+    )
     await hass.async_block_till_done()
     alerts = _titled(calls, "💧")
     assert len(alerts) == 1
@@ -191,15 +256,27 @@ async def _washer(hass, phone):
     await _ge_device(hass, ge, "dryer", "Laundry Room Dryer", DRYER)
     washer = await _ge_device(hass, ge, "washer", "Laundry Room Washer", WASHER)
     result, suggested = await _setup(
-        hass, washer.id,
-        {"devices": [me.id], "move_reminder_minutes": 15, "move_repeat_minutes": 15,
-         "move_max_reminders": 3, "dryer_entity": "sensor.laundry_room_dryer_state"},
+        hass,
+        washer.id,
+        {
+            "devices": [me.id],
+            "move_reminder_minutes": 15,
+            "move_repeat_minutes": 15,
+            "move_max_reminders": 3,
+            "dryer_entity": "sensor.laundry_room_dryer_state",
+        },
     )
     assert suggested["dryer_entity"] == "sensor.laundry_room_dryer_state"
-    hass.states.async_set("sensor.laundry_room_washer_time_remaining", "40", {"unit_of_measurement": "min"})
+    hass.states.async_set(
+        "sensor.laundry_room_washer_time_remaining",
+        "40",
+        {"unit_of_measurement": "min"},
+    )
     hass.states.async_set("sensor.laundry_room_washer_state", "Run")
     await hass.async_block_till_done()
-    hass.states.async_set("sensor.laundry_room_washer_time_remaining", "0", {"unit_of_measurement": "min"})
+    hass.states.async_set(
+        "sensor.laundry_room_washer_time_remaining", "0", {"unit_of_measurement": "min"}
+    )
     hass.states.async_set("binary_sensor.laundry_room_washer_end_of_cycle", "on")
     hass.states.async_set("sensor.laundry_room_washer_state", "Finished")
     await hass.async_block_till_done()
@@ -217,7 +294,11 @@ async def test_move_reminder_until_dryer_starts(hass: HomeAssistant, phone, free
 
     hass.states.async_set("sensor.laundry_room_dryer_state", "Run")
     await hass.async_block_till_done()
-    cleared = [c.data["data"]["tag"] for c in calls if c.data.get("message") == "clear_notification"]
+    cleared = [
+        c.data["data"]["tag"]
+        for c in calls
+        if c.data.get("message") == "clear_notification"
+    ]
     assert any(t.endswith("_move") for t in cleared)
     await _tick(hass, freezer, timedelta(minutes=30))
     assert len(_titled(calls, "🧺")) == 2

@@ -1,4 +1,5 @@
 """Oven: cooktop left-on critical alerts (GE auto-setup)."""
+
 from __future__ import annotations
 
 from datetime import timedelta
@@ -10,11 +11,10 @@ from pytest_homeassistant_custom_component.common import (
     async_mock_service,
 )
 
+from custom_components.appliance_live_activity.const import DOMAIN
 from homeassistant import config_entries
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry as dr, entity_registry as er
-
-from custom_components.appliance_live_activity.const import DOMAIN
 
 OVEN = {
     "sensor.kitchen_oven_current_state": "Off",
@@ -31,24 +31,42 @@ async def oven(hass: HomeAssistant, enable_custom_integrations):
     ge = MockConfigEntry(domain="ge_home")
     ge.add_to_hass(hass)
     device = dev_reg.async_get_or_create(
-        config_entry_id=ge.entry_id, identifiers={("ge_home", "oven")}, name="Kitchen Oven"
+        config_entry_id=ge.entry_id,
+        identifiers={("ge_home", "oven")},
+        name="Kitchen Oven",
     )
     for eid, st in OVEN.items():
         domain, obj = eid.split(".")
-        ent_reg.async_get_or_create(domain, "ge_home", obj, suggested_object_id=obj,
-                                    device_id=device.id, config_entry=ge)
-        hass.states.async_set(eid, st, {"unit_of_measurement": "h"} if "remaining" in eid else {})
+        ent_reg.async_get_or_create(
+            domain,
+            "ge_home",
+            obj,
+            suggested_object_id=obj,
+            device_id=device.id,
+            config_entry=ge,
+        )
+        hass.states.async_set(
+            eid, st, {"unit_of_measurement": "h"} if "remaining" in eid else {}
+        )
     phone_entry = MockConfigEntry(domain="mobile_app")
     phone_entry.add_to_hass(hass)
     phone = dev_reg.async_get_or_create(
-        config_entry_id=phone_entry.entry_id, identifiers={("mobile_app", "p")}, name="My Phone"
+        config_entry_id=phone_entry.entry_id,
+        identifiers={("mobile_app", "p")},
+        name="My Phone",
     )
     calls = async_mock_service(hass, "notify", "mobile_app_my_phone")
     tts = async_mock_service(hass, "tts", "speak")
 
-    result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": config_entries.SOURCE_USER})
-    result = await hass.config_entries.flow.async_configure(result["flow_id"], {"next_step_id": "ge_home"})
-    result = await hass.config_entries.flow.async_configure(result["flow_id"], {"source_device": device.id})
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": config_entries.SOURCE_USER}
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {"next_step_id": "ge_home"}
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {"source_device": device.id}
+    )
     assert result["step_id"] == "notify"
     cooking = result["data_schema"].schema["cooking"].schema.schema
     assert "cooktop_alert_minutes" in [str(k) for k in cooking]
@@ -64,7 +82,9 @@ async def oven(hass: HomeAssistant, enable_custom_integrations):
     )
     assert result["data"]["appliance_type"] == "oven"
     assert result["data"]["notification_tag"] == "kitchen_oven"
-    assert result["data"]["cooktop_entities"] == ["binary_sensor.kitchen_oven_cooktop_status"]
+    assert result["data"]["cooktop_entities"] == [
+        "binary_sensor.kitchen_oven_cooktop_status"
+    ]
     await hass.async_block_till_done()
     return calls, tts
 

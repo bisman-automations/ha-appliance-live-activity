@@ -1,4 +1,5 @@
 """Refrigerator door flow: Live Activity -> critical alerts -> Closed -> cleared."""
+
 from __future__ import annotations
 
 from datetime import timedelta
@@ -10,11 +11,10 @@ from pytest_homeassistant_custom_component.common import (
     async_mock_service,
 )
 
+from custom_components.appliance_live_activity.const import DOMAIN
 from homeassistant import config_entries
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry as dr, entity_registry as er
-
-from custom_components.appliance_live_activity.const import DOMAIN
 
 PREFIX = "kitchen_refrigerator"
 DOORS = ["door", "freezer_door", "fridge_left_door", "fridge_right_door"]
@@ -32,33 +32,56 @@ async def fridge(hass: HomeAssistant, enable_custom_integrations):
     ge_entry = MockConfigEntry(domain="ge_home")
     ge_entry.add_to_hass(hass)
     device = dev_reg.async_get_or_create(
-        config_entry_id=ge_entry.entry_id, identifiers={("ge_home", "fridge1")}, name="Kitchen Refrigerator"
+        config_entry_id=ge_entry.entry_id,
+        identifiers={("ge_home", "fridge1")},
+        name="Kitchen Refrigerator",
     )
     for suffix in DOORS:
         ent_reg.async_get_or_create(
-            "binary_sensor", "ge_home", f"fridge1_{suffix}",
-            suggested_object_id=f"{PREFIX}_{suffix}", device_id=device.id, config_entry=ge_entry,
+            "binary_sensor",
+            "ge_home",
+            f"fridge1_{suffix}",
+            suggested_object_id=f"{PREFIX}_{suffix}",
+            device_id=device.id,
+            config_entry=ge_entry,
         )
         _door(hass, suffix, "off")
     for extra in ("water_filter_status", "doors"):
         ent_reg.async_get_or_create(
-            "sensor", "ge_home", f"fridge1_{extra}",
-            suggested_object_id=f"{PREFIX}_{extra}", device_id=device.id, config_entry=ge_entry,
+            "sensor",
+            "ge_home",
+            f"fridge1_{extra}",
+            suggested_object_id=f"{PREFIX}_{extra}",
+            device_id=device.id,
+            config_entry=ge_entry,
         )
     phone_entry = MockConfigEntry(domain="mobile_app")
     phone_entry.add_to_hass(hass)
     phone = dev_reg.async_get_or_create(
-        config_entry_id=phone_entry.entry_id, identifiers={("mobile_app", "p")}, name="My Phone"
+        config_entry_id=phone_entry.entry_id,
+        identifiers={("mobile_app", "p")},
+        name="My Phone",
     )
     calls = async_mock_service(hass, "notify", "mobile_app_my_phone")
 
-    result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": config_entries.SOURCE_USER})
-    result = await hass.config_entries.flow.async_configure(result["flow_id"], {"next_step_id": "ge_home"})
-    result = await hass.config_entries.flow.async_configure(result["flow_id"], {"source_device": device.id})
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": config_entries.SOURCE_USER}
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {"next_step_id": "ge_home"}
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {"source_device": device.id}
+    )
     assert result["step_id"] == "notify"
     result = await hass.config_entries.flow.async_configure(
         result["flow_id"],
-        {"devices": [phone.id], "open_delay_seconds": 30, "critical_after_minutes": 5, "critical_repeat_minutes": 1},
+        {
+            "devices": [phone.id],
+            "open_delay_seconds": 30,
+            "critical_after_minutes": 5,
+            "critical_repeat_minutes": 1,
+        },
     )
     assert result["data"]["appliance_type"] == "refrigerator"
     assert len(result["data"]["door_entities"]) == 4
@@ -69,8 +92,12 @@ async def fridge(hass: HomeAssistant, enable_custom_integrations):
 
 def _door(hass, suffix, state):
     hass.states.async_set(
-        f"binary_sensor.{PREFIX}_{suffix}", state,
-        {"friendly_name": f"Kitchen Refrigerator {NAMES[suffix]}", "device_class": "door"},
+        f"binary_sensor.{PREFIX}_{suffix}",
+        state,
+        {
+            "friendly_name": f"Kitchen Refrigerator {NAMES[suffix]}",
+            "device_class": "door",
+        },
     )
 
 
@@ -79,7 +106,12 @@ def _live(calls):
 
 
 def _critical(calls):
-    return [c for c in calls if c.data.get("data", {}).get("push", {}).get("interruption-level") == "critical"]
+    return [
+        c
+        for c in calls
+        if c.data.get("data", {}).get("push", {}).get("interruption-level")
+        == "critical"
+    ]
 
 
 async def test_door_flow(hass: HomeAssistant, fridge, freezer):
@@ -130,7 +162,9 @@ async def test_door_flow(hass: HomeAssistant, fridge, freezer):
     # Closed -> critical cleared, activity shows Closed
     _door(hass, "freezer_door", "off")
     await hass.async_block_till_done()
-    resolved = [c for c in calls if c.data["data"].get("tag", "").endswith("_critical")][-1]
+    resolved = [
+        c for c in calls if c.data["data"].get("tag", "").endswith("_critical")
+    ][-1]
     assert resolved.data["title"] == "✅ Kitchen Refrigerator: closed"
     assert resolved.data["data"]["push"]["interruption-level"] == "passive"
     assert _live(calls)[-1].data["data"]["critical_text"] == "Closed"
@@ -148,14 +182,22 @@ async def test_door_flow(hass: HomeAssistant, fridge, freezer):
     assert calls[-1].data["data"]["tag"].endswith("_critical")
 
 
-async def test_generic_door_escalation(hass: HomeAssistant, enable_custom_integrations, freezer):
+async def test_generic_door_escalation(
+    hass: HomeAssistant, enable_custom_integrations, freezer
+):
     dev_reg = dr.async_get(hass)
     phone_entry = MockConfigEntry(domain="mobile_app")
     phone_entry.add_to_hass(hass)
-    me = dev_reg.async_get_or_create(config_entry_id=phone_entry.entry_id,
-                                     identifiers={("mobile_app", "a")}, name="My Phone")
-    partner = dev_reg.async_get_or_create(config_entry_id=phone_entry.entry_id,
-                                          identifiers={("mobile_app", "b")}, name="Partner Phone")
+    me = dev_reg.async_get_or_create(
+        config_entry_id=phone_entry.entry_id,
+        identifiers={("mobile_app", "a")},
+        name="My Phone",
+    )
+    partner = dev_reg.async_get_or_create(
+        config_entry_id=phone_entry.entry_id,
+        identifiers={("mobile_app", "b")},
+        name="Partner Phone",
+    )
     mine = async_mock_service(hass, "notify", "mobile_app_my_phone")
     theirs = async_mock_service(hass, "notify", "mobile_app_partner_phone")
     scene_create = async_mock_service(hass, "scene", "create")
@@ -163,24 +205,40 @@ async def test_generic_door_escalation(hass: HomeAssistant, enable_custom_integr
     scene_on = async_mock_service(hass, "scene", "turn_on")
     async_mock_service(hass, "scene", "delete")
     tts = async_mock_service(hass, "tts", "speak")
-    hass.states.async_set("binary_sensor.garage_door", "off", {"friendly_name": "Garage Door"})
+    hass.states.async_set(
+        "binary_sensor.garage_door", "off", {"friendly_name": "Garage Door"}
+    )
 
-    result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": config_entries.SOURCE_USER})
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": config_entries.SOURCE_USER}
+    )
     assert result["step_id"] == "manual"
     result = await hass.config_entries.flow.async_configure(
-        result["flow_id"], {"appliance_type": "door", "name": "Garage"})
+        result["flow_id"], {"appliance_type": "door", "name": "Garage"}
+    )
     result = await hass.config_entries.flow.async_configure(
-        result["flow_id"], {"state_entity": "binary_sensor.garage_door"})
+        result["flow_id"], {"state_entity": "binary_sensor.garage_door"}
+    )
     result = await hass.config_entries.flow.async_configure(
         result["flow_id"],
-        {"devices": [me.id], "open_delay_seconds": 0, "critical_after_minutes": 10,
-         "critical_repeat_minutes": 2, "escalate_after": 1, "escalation_devices": [partner.id],
-         "tts_entity": "tts.home", "speakers": ["media_player.kitchen"], "alert_lights": ["light.hall"]},
+        {
+            "devices": [me.id],
+            "open_delay_seconds": 0,
+            "critical_after_minutes": 10,
+            "critical_repeat_minutes": 2,
+            "escalate_after": 1,
+            "escalation_devices": [partner.id],
+            "tts_entity": "tts.home",
+            "speakers": ["media_player.kitchen"],
+            "alert_lights": ["light.hall"],
+        },
     )
     assert result["type"] == "create_entry"
     await hass.async_block_till_done()
 
-    hass.states.async_set("binary_sensor.garage_door", "on", {"friendly_name": "Garage Door"})
+    hass.states.async_set(
+        "binary_sensor.garage_door", "on", {"friendly_name": "Garage Door"}
+    )
     await hass.async_block_till_done()
     assert len(_live(mine)) == 1  # no start delay
     # Manual setup: tapping opens this integration's device for the door
@@ -199,7 +257,9 @@ async def test_generic_door_escalation(hass: HomeAssistant, enable_custom_integr
     assert len(_critical(mine)) == 2 and len(_critical(theirs)) == 1
     assert len(tts) == 1 and len(scene_create) == 1 and len(light_on) == 1
 
-    hass.states.async_set("binary_sensor.garage_door", "off", {"friendly_name": "Garage Door"})
+    hass.states.async_set(
+        "binary_sensor.garage_door", "off", {"friendly_name": "Garage Door"}
+    )
     await hass.async_block_till_done()
     assert len(scene_on) == 1  # lights restored
     assert theirs[-1].data["title"] == "✅ Garage: closed"  # escalated phones too
@@ -216,7 +276,9 @@ async def test_reopened_while_closed_is_showing(hass: HomeAssistant, fridge, fre
     freezer.tick(timedelta(seconds=31))
     async_fire_time_changed(hass)
     await hass.async_block_till_done()
-    assert _live(calls)[-1].data["message"] == "Fridge Right Door is open"  # not "Door & …"
+    assert (
+        _live(calls)[-1].data["message"] == "Fridge Right Door is open"
+    )  # not "Door & …"
 
     _door(hass, "fridge_right_door", "off")
     _door(hass, "door", "off")

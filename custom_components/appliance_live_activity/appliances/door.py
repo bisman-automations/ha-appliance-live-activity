@@ -3,6 +3,7 @@
 Uses the same door monitoring as refrigerators (DoorCoordinator): Live
 Activity while open, critical alerts if left open, then "Closed".
 """
+
 from ..appliance import ApplianceDefinition, register
 
 register(

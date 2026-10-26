@@ -14,29 +14,28 @@ Flow for one appliance (any of its doors):
 3. Closed -> critical notifications are removed, lights are restored, the
    activity shows "Closed" for a minute, then it is ended.
 """
+
 from __future__ import annotations
 
-import logging
-
 from datetime import timedelta
+import logging
+from typing import Any
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import ATTR_FRIENDLY_NAME, STATE_ON, STATE_OPEN
 from homeassistant.core import CALLBACK_TYPE, Event, HomeAssistant, callback
-from homeassistant.util import dt as dt_util
 from homeassistant.helpers.event import (
     async_call_later,
     async_track_state_change_event,
     async_track_time_interval,
 )
-
-from typing import Any
+from homeassistant.util import dt as dt_util
 
 from .const import (
     ACTION_SNOOZE_DOOR,
     CLOSED_DISPLAY_SECONDS,
-    CONF_CRITICAL_AFTER_MINUTES,
     CONF_ALERT_LIGHTS,
+    CONF_CRITICAL_AFTER_MINUTES,
     CONF_CRITICAL_REPEAT_MINUTES,
     CONF_DOOR_ENTITIES,
     CONF_DOOR_ENTITY,
@@ -85,18 +84,33 @@ class DoorCoordinator(ApplianceCoordinator):
             if single and single not in doors:
                 doors.insert(0, single)
         self.doors = doors
-        self.open_delay = float(cfg.get(CONF_OPEN_DELAY_SECONDS, DEFAULT_OPEN_DELAY_SECONDS))
-        self.critical_after = float(cfg.get(CONF_CRITICAL_AFTER_MINUTES, DEFAULT_CRITICAL_AFTER_MINUTES)) * 60
+        self.open_delay = float(
+            cfg.get(CONF_OPEN_DELAY_SECONDS, DEFAULT_OPEN_DELAY_SECONDS)
+        )
+        self.critical_after = (
+            float(cfg.get(CONF_CRITICAL_AFTER_MINUTES, DEFAULT_CRITICAL_AFTER_MINUTES))
+            * 60
+        )
         self.critical_repeat = max(
-            30.0, float(cfg.get(CONF_CRITICAL_REPEAT_MINUTES, DEFAULT_CRITICAL_REPEAT_MINUTES)) * 60
+            30.0,
+            float(
+                cfg.get(CONF_CRITICAL_REPEAT_MINUTES, DEFAULT_CRITICAL_REPEAT_MINUTES)
+            )
+            * 60,
         )
         self.critical_tag = f"{self.notification_tag}_critical"
-        self.escalation_devices: list[str] = list(cfg.get(CONF_ESCALATION_DEVICES) or [])
-        self.escalate_after = int(cfg.get(CONF_ESCALATE_AFTER, DEFAULT_ESCALATE_AFTER) or 0)
+        self.escalation_devices: list[str] = list(
+            cfg.get(CONF_ESCALATION_DEVICES) or []
+        )
+        self.escalate_after = int(
+            cfg.get(CONF_ESCALATE_AFTER, DEFAULT_ESCALATE_AFTER) or 0
+        )
         self.alert_lights: list[str] = list(cfg.get(CONF_ALERT_LIGHTS) or [])
         self.tts_entity: str | None = cfg.get(CONF_TTS_ENTITY) or None
         self.speakers: list[str] = list(cfg.get(CONF_SPEAKERS) or [])
-        self.snooze_minutes = float(cfg.get(CONF_SNOOZE_MINUTES, DEFAULT_SNOOZE_MINUTES) or 0)
+        self.snooze_minutes = float(
+            cfg.get(CONF_SNOOZE_MINUTES, DEFAULT_SNOOZE_MINUTES) or 0
+        )
         self._snooze_until: float | None = None
         self._critical_count = 0
         self._lights_scene: str = f"scene.{self.notification_tag}_lights"
@@ -111,9 +125,13 @@ class DoorCoordinator(ApplianceCoordinator):
     async def async_setup(self) -> None:
         if self.doors:
             self._unsubs.append(
-                async_track_state_change_event(self.hass, self.doors, self._handle_door_event)
+                async_track_state_change_event(
+                    self.hass, self.doors, self._handle_door_event
+                )
             )
-        self._unsubs.append(async_track_time_interval(self.hass, self._handle_tick, TICK))
+        self._unsubs.append(
+            async_track_time_interval(self.hass, self._handle_tick, TICK)
+        )
         await self.async_evaluate(send=True)
         await self._async_setup_monitors()
 
@@ -148,7 +166,9 @@ class DoorCoordinator(ApplianceCoordinator):
         if self._open_since is None:
             return
         self._snooze_until = dt_util.utcnow().timestamp() + self.snooze_minutes * 60
-        _LOGGER.debug("%s: door alerts snoozed for %s min", self.name, self.snooze_minutes)
+        _LOGGER.debug(
+            "%s: door alerts snoozed for %s min", self.name, self.snooze_minutes
+        )
         if self._last_critical is not None:
             # Replace the critical alert (a silent clear isn't reliable on iOS)
             await async_send_alert(
@@ -165,7 +185,10 @@ class DoorCoordinator(ApplianceCoordinator):
 
     @property
     def snoozed(self) -> bool:
-        return self._snooze_until is not None and dt_util.utcnow().timestamp() < self._snooze_until
+        return (
+            self._snooze_until is not None
+            and dt_util.utcnow().timestamp() < self._snooze_until
+        )
 
     # ------------------------------------------------------------------
     def _is_open(self, entity_id: str) -> bool:
@@ -174,7 +197,9 @@ class DoorCoordinator(ApplianceCoordinator):
 
     def _label(self, entity_id: str) -> str:
         state = self.hass.states.get(entity_id)
-        name = (state.attributes.get(ATTR_FRIENDLY_NAME) if state else None) or entity_id
+        name = (
+            state.attributes.get(ATTR_FRIENDLY_NAME) if state else None
+        ) or entity_id
         # "Kitchen Refrigerator Freezer Door" -> "Freezer Door"
         if name.lower().startswith(self.name.lower() + " "):
             name = name[len(self.name) + 1 :]
@@ -201,32 +226,51 @@ class DoorCoordinator(ApplianceCoordinator):
             labels = [self._label(d) for d in open_doors]
             if len(labels) > 1:
                 # GE also has an overall "Door" sensor: name the specific doors
-                labels = [label for label in labels if label.lower() != "door"] or labels
+                labels = [
+                    label for label in labels if label.lower() != "door"
+                ] or labels
 
-            if send and self.devices and (self._activity_started or elapsed >= self.open_delay):
+            if (
+                send
+                and self.devices
+                and (self._activity_started or elapsed >= self.open_delay)
+            ):
                 critical = elapsed >= self.critical_after
                 signature = (tuple(labels), critical)
                 if force or signature != self._sent_signature:
                     await async_send_door_open(
-                        self.hass, self, labels=labels, opened_at=self._open_since, critical=critical
+                        self.hass,
+                        self,
+                        labels=labels,
+                        opened_at=self._open_since,
+                        critical=critical,
                     )
                     self._sent_signature = signature
                     self._activity_started = True
-                if critical and not self.snoozed and (
-                    self._last_critical is None
-                    or now - self._last_critical >= self.critical_repeat - 1
-                    or self._snooze_until is not None
+                if (
+                    critical
+                    and not self.snoozed
+                    and (
+                        self._last_critical is None
+                        or now - self._last_critical >= self.critical_repeat - 1
+                        or self._snooze_until is not None
+                    )
                 ):
                     self._snooze_until = None
                     self._critical_count += 1
                     if self._critical_count == 1:
                         self.fire_event(
                             EVENT_DOOR_LEFT_OPEN,
-                            {"doors": ", ".join(labels), "minutes_open": round(elapsed / 60)},
+                            {
+                                "doors": ", ".join(labels),
+                                "minutes_open": round(elapsed / 60),
+                            },
                         )
                     escalated = self._critical_count > self.escalate_after
                     minutes_open = round(elapsed / 60)
-                    devices = self.devices + (self.escalation_devices if escalated else [])
+                    devices = self.devices + (
+                        self.escalation_devices if escalated else []
+                    )
                     await async_send_door_critical(
                         self.hass,
                         self,
@@ -255,7 +299,9 @@ class DoorCoordinator(ApplianceCoordinator):
                     "progress": 0,
                     "open_minutes": round(elapsed / 60, 1),
                     "snoozed_until": (
-                        dt_util.utc_from_timestamp(self._snooze_until) if self.snoozed else None
+                        dt_util.utc_from_timestamp(self._snooze_until)
+                        if self.snoozed
+                        else None
                     ),
                 }
             )
@@ -287,7 +333,13 @@ class DoorCoordinator(ApplianceCoordinator):
         self._snooze_until = None
         self._critical_count = 0
         self.async_set_updated_data(
-            {"status": STATUS_IDLE, "phase": "", "cycle": "", "remaining": 0, "progress": 0}
+            {
+                "status": STATUS_IDLE,
+                "phase": "",
+                "cycle": "",
+                "remaining": 0,
+                "progress": 0,
+            }
         )
 
     # ------------------------------------------------------------------
@@ -298,13 +350,15 @@ class DoorCoordinator(ApplianceCoordinator):
         scene_id = self._lights_scene.split(".", 1)[1]
         try:
             await self.hass.services.async_call(
-                "scene", "create",
+                "scene",
+                "create",
                 {"scene_id": scene_id, "snapshot_entities": self.alert_lights},
                 blocking=True,
             )
             self._lights_saved = True
             await self.hass.services.async_call(
-                "light", "turn_on",
+                "light",
+                "turn_on",
                 {"rgb_color": [255, 0, 0], "brightness_pct": 100},
                 target={"entity_id": self.alert_lights},
                 blocking=False,
@@ -318,10 +372,16 @@ class DoorCoordinator(ApplianceCoordinator):
         self._lights_saved = False
         try:
             await self.hass.services.async_call(
-                "scene", "turn_on", target={"entity_id": self._lights_scene}, blocking=True
+                "scene",
+                "turn_on",
+                target={"entity_id": self._lights_scene},
+                blocking=True,
             )
             await self.hass.services.async_call(
-                "scene", "delete", target={"entity_id": self._lights_scene}, blocking=False
+                "scene",
+                "delete",
+                target={"entity_id": self._lights_scene},
+                blocking=False,
             )
         except Exception:  # noqa: BLE001
             _LOGGER.exception("Could not restore alert lights")
@@ -332,9 +392,13 @@ class DoorCoordinator(ApplianceCoordinator):
         @callback
         def _fire(_now) -> None:
             self._closed_clear_unsub = None
-            self.hass.async_create_task(async_clear_tag(self.hass, self, self.notification_tag))
+            self.hass.async_create_task(
+                async_clear_tag(self.hass, self, self.notification_tag)
+            )
 
-        self._closed_clear_unsub = async_call_later(self.hass, CLOSED_DISPLAY_SECONDS, _fire)
+        self._closed_clear_unsub = async_call_later(
+            self.hass, CLOSED_DISPLAY_SECONDS, _fire
+        )
 
     def _cancel_closed_clear(self) -> None:
         if self._closed_clear_unsub is not None:

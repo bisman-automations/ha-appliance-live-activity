@@ -8,14 +8,15 @@ https://companion.home-assistant.io/docs/notifications/live-activities/
   countdown itself, so we don't need (and iOS won't accept) a push per minute
 - ``message: clear_notification`` with the same ``tag`` ends it
 """
+
 from __future__ import annotations
 
 import logging
 from typing import TYPE_CHECKING, Any
 
 from homeassistant.core import HomeAssistant, callback
-from homeassistant.helpers.event import async_call_later
 from homeassistant.helpers import device_registry as dr, entity_registry as er
+from homeassistant.helpers.event import async_call_later
 from homeassistant.util import slugify
 
 if TYPE_CHECKING:
@@ -26,7 +27,9 @@ _LOGGER = logging.getLogger(__name__)
 NOTIFY = "notify"
 
 
-def notify_services_for_device(hass: HomeAssistant, device_id: str, warn: bool = True) -> list[str]:
+def notify_services_for_device(
+    hass: HomeAssistant, device_id: str, warn: bool = True
+) -> list[str]:
     """Return notify service names (without the 'notify.' prefix) for a phone.
 
     The Companion app registers a legacy service ``notify.mobile_app_<device
@@ -40,14 +43,20 @@ def notify_services_for_device(hass: HomeAssistant, device_id: str, warn: bool =
         for name in (device.name, device.name_by_user):
             if name:
                 candidate = f"mobile_app_{slugify(name)}"
-                if hass.services.has_service(NOTIFY, candidate) and candidate not in services:
+                if (
+                    hass.services.has_service(NOTIFY, candidate)
+                    and candidate not in services
+                ):
                     services.append(candidate)
 
     ent_reg = er.async_get(hass)
     for entry in er.async_entries_for_device(ent_reg, device_id):
         if entry.domain == NOTIFY:
             candidate = entry.entity_id.split(".", 1)[1]
-            if hass.services.has_service(NOTIFY, candidate) and candidate not in services:
+            if (
+                hass.services.has_service(NOTIFY, candidate)
+                and candidate not in services
+            ):
                 services.append(candidate)
 
     if not services and warn:
@@ -82,7 +91,9 @@ async def _async_send(
     home_filter = devices is None and _deferrable(payload)
     if payload.get("message") == "clear_notification":
         coordinator.drop_deferred(tag)
-    elif (_deferrable(payload) if deferrable is None else deferrable) and coordinator.quiet_now():
+    elif (
+        _deferrable(payload) if deferrable is None else deferrable
+    ) and coordinator.quiet_now():
         coordinator.defer(tag, payload, devices, home_filter)
         return
     await async_deliver(hass, coordinator, payload, devices, home_filter)
@@ -147,7 +158,9 @@ async def async_send_progress(
 ) -> None:
     """Start or update the Live Activity for a running / paused appliance."""
     definition = coordinator.definition
-    headline = definition.paused_message if paused else (phase or definition.running_message)
+    headline = (
+        definition.paused_message if paused else (phase or definition.running_message)
+    )
     minutes_left = round(remaining)
     message = _join(
         headline,
@@ -172,7 +185,9 @@ async def async_send_progress(
         data["when"] = int(remaining * 60)
         data["when_relative"] = True
     await _async_send(
-        hass, coordinator, {"title": coordinator.activity_title, "message": message, "data": data}
+        hass,
+        coordinator,
+        {"title": coordinator.activity_title, "message": message, "data": data},
     )
 
 
@@ -202,7 +217,9 @@ async def async_send_done(
     )
 
 
-def _with_actions(data: dict[str, Any], actions: list[dict[str, str]] | None) -> dict[str, Any]:
+def _with_actions(
+    data: dict[str, Any], actions: list[dict[str, str]] | None
+) -> dict[str, Any]:
     """Add notification buttons (they come back as mobile_app_notification_action)."""
     if actions:
         data["actions"] = list(actions)
@@ -215,11 +232,18 @@ async def async_send_stopped(
     """Show that the appliance turned off before finishing (e.g. an oven used
     without a cook timer). A Live Activity *update* always shows; the
     activity is ended a minute later."""
-    ran = f"{'cooked' if coordinator.appliance_type == 'oven' else 'ran'} {round(minutes)} min" if minutes and minutes >= 1 else ""
+    ran = (
+        f"{'cooked' if coordinator.appliance_type == 'oven' else 'ran'} {round(minutes)} min"
+        if minutes and minutes >= 1
+        else ""
+    )
     if coordinator.appliance_type == "oven":
         headline, message = "Off", _join("Oven off", ran)
     else:
-        headline, message = "Stopped", _join(f"{coordinator.definition.display_name} stopped", ran)
+        headline, message = (
+            "Stopped",
+            _join(f"{coordinator.definition.display_name} stopped", ran),
+        )
     await _async_send(
         hass,
         coordinator,
@@ -277,7 +301,9 @@ async def async_send_delayed(
     starts_at: str,
 ) -> None:
     """Live Activity for a delayed start: counts down to when the cycle starts."""
-    message = _join("Delayed start", cycle, f"starts at {starts_at}" if starts_at else "")
+    message = _join(
+        "Delayed start", cycle, f"starts at {starts_at}" if starts_at else ""
+    )
     data: dict[str, Any] = {
         "tag": coordinator.activity_tag,
         "live_update": True,
@@ -290,10 +316,16 @@ async def async_send_delayed(
         data["chronometer"] = True
         data["when"] = int(starts_in * 60)
         data["when_relative"] = True
-    await _async_send(hass, coordinator, {"title": coordinator.activity_title, "message": message, "data": data})
+    await _async_send(
+        hass,
+        coordinator,
+        {"title": coordinator.activity_title, "message": message, "data": data},
+    )
 
 
-async def async_send_dryer_remote_off(hass: HomeAssistant, coordinator: ApplianceCoordinator) -> None:
+async def async_send_dryer_remote_off(
+    hass: HomeAssistant, coordinator: ApplianceCoordinator
+) -> None:
     """'Start dryer' was tapped but the dryer isn't accepting remote starts."""
     await _async_send(
         hass,
@@ -320,7 +352,10 @@ async def async_clear(
     await _async_send(
         hass,
         coordinator,
-        {"message": "clear_notification", "data": {"tag": tag or coordinator.activity_tag}},
+        {
+            "message": "clear_notification",
+            "data": {"tag": tag or coordinator.activity_tag},
+        },
     )
 
 
@@ -412,7 +447,9 @@ async def async_send_door_closed(
         coordinator,
         {
             "title": coordinator.name,
-            "message": f"Closed · was open {minutes_open} min" if minutes_open else "Closed",
+            "message": f"Closed · was open {minutes_open} min"
+            if minutes_open
+            else "Closed",
             "data": {
                 "tag": coordinator.notification_tag,
                 "live_update": True,
@@ -426,11 +463,17 @@ async def async_send_door_closed(
 
 
 async def async_clear_tag(
-    hass: HomeAssistant, coordinator: ApplianceCoordinator, tag: str, devices: list[str] | None = None
+    hass: HomeAssistant,
+    coordinator: ApplianceCoordinator,
+    tag: str,
+    devices: list[str] | None = None,
 ) -> None:
     """Remove a notification by tag."""
     await _async_send(
-        hass, coordinator, {"message": "clear_notification", "data": {"tag": tag}}, devices
+        hass,
+        coordinator,
+        {"message": "clear_notification", "data": {"tag": tag}},
+        devices,
     )
 
 
@@ -503,7 +546,9 @@ async def async_send_preheated(
         coordinator,
         {
             "title": f"🔥 {coordinator.name} preheated",
-            "message": f"It's at {temperature} — ready to cook." if temperature else "Ready to cook.",
+            "message": f"It's at {temperature} — ready to cook."
+            if temperature
+            else "Ready to cook.",
             "data": {
                 "tag": f"{coordinator.notification_tag}_preheat",
                 "push": {"interruption-level": "time-sensitive"},
@@ -650,7 +695,9 @@ async def async_send_live(
         data["chronometer"] = True
         data["when"] = int(countdown_minutes * 60)
         data["when_relative"] = True
-    await _async_send(hass, coordinator, {"title": title, "message": message, "data": data})
+    await _async_send(
+        hass, coordinator, {"title": title, "message": message, "data": data}
+    )
 
 
 LEVELS = {

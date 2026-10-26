@@ -1,11 +1,11 @@
 """Shared fixtures."""
+
 from __future__ import annotations
 
 import pytest
 
-from homeassistant import data_entry_flow
-
 from custom_components.appliance_live_activity.config_flow import SECTION_OF, SECTIONS
+from homeassistant import data_entry_flow
 
 
 def sectioned(user_input):

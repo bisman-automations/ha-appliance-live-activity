@@ -11,19 +11,28 @@ Ported from the "Critical Gas Cooktop Left On Alert" blueprint:
 
 This never turns the cooktop off.
 """
+
 from __future__ import annotations
 
-import logging
 from datetime import timedelta
+import logging
 from typing import TYPE_CHECKING
 
 from homeassistant.const import STATE_ON
 from homeassistant.core import CALLBACK_TYPE, Event, HomeAssistant, callback
-from homeassistant.helpers.event import async_track_state_change_event, async_track_time_interval
+from homeassistant.helpers.event import (
+    async_track_state_change_event,
+    async_track_time_interval,
+)
 from homeassistant.util import dt as dt_util
 
 from .const import EVENT_NOTIFICATION_ACTION
-from .notify import async_clear_tag, async_resolve, async_send_cooktop_critical, async_speak
+from .notify import (
+    async_clear_tag,
+    async_resolve,
+    async_send_cooktop_critical,
+    async_speak,
+)
 
 if TYPE_CHECKING:
     from .coordinator import ApplianceCoordinator
@@ -77,9 +86,13 @@ class CooktopMonitor:
 
     async def async_setup(self) -> None:
         self._unsubs.append(
-            async_track_state_change_event(self.hass, self.entities, self._handle_change)
+            async_track_state_change_event(
+                self.hass, self.entities, self._handle_change
+            )
         )
-        self._unsubs.append(async_track_time_interval(self.hass, self._handle_change, TICK))
+        self._unsubs.append(
+            async_track_time_interval(self.hass, self._handle_change, TICK)
+        )
         self._unsubs.append(
             self.hass.bus.async_listen(EVENT_NOTIFICATION_ACTION, self._handle_action)
         )
@@ -98,7 +111,9 @@ class CooktopMonitor:
     def _handle_action(self, event: Event) -> None:
         if event.data.get("action") == self.ack_action and self._on_since is not None:
             self._acknowledged = True
-            self.hass.async_create_task(async_clear_tag(self.hass, self.coordinator, self.tag))
+            self.hass.async_create_task(
+                async_clear_tag(self.hass, self.coordinator, self.tag)
+            )
 
     async def async_evaluate(self) -> None:
         now = dt_util.utcnow().timestamp()
@@ -122,7 +137,8 @@ class CooktopMonitor:
             on_states = [
                 state.last_changed.timestamp()
                 for e in self.entities
-                if (state := self.hass.states.get(e)) is not None and state.state == STATE_ON
+                if (state := self.hass.states.get(e)) is not None
+                and state.state == STATE_ON
             ]
             self._on_since = min(on_states) if on_states else now
             self.coordinator.async_update_listeners()

@@ -7,18 +7,19 @@ appliance, not six sensors. ha_gehome names entities
 both friendly-named and serial-named devices.
 
 """
+
 from __future__ import annotations
 
-import re
 from dataclasses import dataclass, field
+import re
 
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry as dr, entity_registry as er
 
 from .const import (
+    CONF_CLEAN_ENTITY,
     CONF_COOKTOP_ENTITIES,
     CONF_CYCLE_ENTITY,
-    CONF_CLEAN_ENTITY,
     CONF_DELAY_ENTITY,
     CONF_DONE_ENTITY,
     CONF_DOOR_ENTITIES,
@@ -29,18 +30,18 @@ from .const import (
     CONF_FREEZER_TEMP_ENTITY,
     CONF_FRIDGE_TEMP_ENTITY,
     CONF_ICE_ENTITY,
+    CONF_LEAK_ENTITIES,
     CONF_OVEN_CAVITY,
+    CONF_PHASE_ENTITY,
     CONF_PROBE_ENTITY,
+    CONF_REMAINING_ENTITY,
+    CONF_STATE_ENTITY,
     CONF_SUPPLY_ENTITIES,
+    CONF_TARGET_TEMPERATURE_ENTITY,
+    CONF_TEMPERATURE_ENTITY,
     CONF_TIMER_ENTITY,
     CONF_TUMBLE_ENTITY,
     CONF_VENT_ENTITY,
-    CONF_LEAK_ENTITIES,
-    CONF_PHASE_ENTITY,
-    CONF_REMAINING_ENTITY,
-    CONF_STATE_ENTITY,
-    CONF_TARGET_TEMPERATURE_ENTITY,
-    CONF_TEMPERATURE_ENTITY,
     GE_HOME_DOMAIN,
 )
 
@@ -117,9 +118,13 @@ class GEDiscovery:
         return result
 
 
-def _first(entity_ids: list[str], pattern: str, exclude: str | None = None) -> str | None:
+def _first(
+    entity_ids: list[str], pattern: str, exclude: str | None = None
+) -> str | None:
     for entity_id in entity_ids:
-        if re.search(pattern, entity_id) and not (exclude and re.search(exclude, entity_id)):
+        if re.search(pattern, entity_id) and not (
+            exclude and re.search(exclude, entity_id)
+        ):
             return entity_id
     return None
 
@@ -132,12 +137,17 @@ def oven_cavities(entity_ids: list[str]) -> list[str]:
     found = [
         cavity
         for cavity in CAVITIES
-        if any(re.search(rf"^sensor\..*{cavity}_oven_current_state$", e) for e in entity_ids)
+        if any(
+            re.search(rf"^sensor\..*{cavity}_oven_current_state$", e)
+            for e in entity_ids
+        )
     ]
     return found if len(found) == 2 else []
 
 
-def discover_from_entity_ids(entity_ids: list[str], cavity: str | None = None) -> GEDiscovery:
+def discover_from_entity_ids(
+    entity_ids: list[str], cavity: str | None = None
+) -> GEDiscovery:
     """Pure discovery logic (no Home Assistant objects) so it can be unit tested.
 
     ``cavity`` picks one oven of a double oven ("upper" / "lower").
@@ -181,7 +191,9 @@ def discover_from_entity_ids(entity_ids: list[str], cavity: str | None = None) -
             door_entities=doors,
             filter_entity=_first(ids, r"^sensor\..*water_filter_status$"),
             fridge_temp_entity=_first(ids, r"^sensor\..*_current_temperature_fridge$"),
-            freezer_temp_entity=_first(ids, r"^sensor\..*_current_temperature_freezer$"),
+            freezer_temp_entity=_first(
+                ids, r"^sensor\..*_current_temperature_freezer$"
+            ),
             ice_entity=_first(ids, r"^sensor\..*_ice_maker_bucket_status$"),
             prefix=entity_prefix(ids),
         )
@@ -211,7 +223,9 @@ def discover_from_entity_ids(entity_ids: list[str], cavity: str | None = None) -
         done_entity=_first(ids, r"^binary_sensor\..*_end_of_cycle$"),
         door_entity=_first(ids, r"^binary_sensor\..*_door$"),
         temperature_entity=_first(ids, r"^sensor\..*_display_temperature$"),
-        cooktop_entities=[e for e in ids if re.search(r"^binary_sensor\..*_cooktop_status$", e)],
+        cooktop_entities=[
+            e for e in ids if re.search(r"^binary_sensor\..*_cooktop_status$", e)
+        ],
         target_temperature_entity=_first(ids, r"^water_heater\..*_set_temperature$"),
         # Washer / dryer / oven count down; GE dishwashers only report the
         # chosen delay (hours)
@@ -223,9 +237,13 @@ def discover_from_entity_ids(entity_ids: list[str], cavity: str | None = None) -
         tumble_entity=_first(ids, r"^sensor\..*_tumble_status$"),
         vent_entity=_first(ids, r"^binary_sensor\..*_blocked_vent(_fault)?$"),
         supply_entities=_supplies(ids, appliance_type),
-        clean_entity=_first(ids, r"^binary_sensor\..*_is_clean$") if appliance_type == "dishwasher" else None,
+        clean_entity=_first(ids, r"^binary_sensor\..*_is_clean$")
+        if appliance_type == "dishwasher"
+        else None,
         # GE dishwashers: "Reminders Clean Filter"
-        filter_entity=_first(ids, r"^sensor\..*_clean_filter$") if appliance_type == "dishwasher" else None,
+        filter_entity=_first(ids, r"^sensor\..*_clean_filter$")
+        if appliance_type == "dishwasher"
+        else None,
         cavities=cavities,
         cavity=cavity,
         prefix=entity_prefix(ids),
@@ -235,8 +253,14 @@ def discover_from_entity_ids(entity_ids: list[str], cavity: str | None = None) -
 def _supplies(ids: list[str], appliance_type: str | None) -> list[str]:
     """Detergent, pods, rinse aid and dryer-sheet sensors for refill reminders."""
     patterns = {
-        "washer": [r"^sensor\..*_smart_dispense_loads_left$", r"^sensor\..*_tank_status$"],
-        "dishwasher": [r"^(number|sensor)\..*_pods_remaining(_value)?$", r"^sensor\..*_add_rinse_aid$"],
+        "washer": [
+            r"^sensor\..*_smart_dispense_loads_left$",
+            r"^sensor\..*_tank_status$",
+        ],
+        "dishwasher": [
+            r"^(number|sensor)\..*_pods_remaining(_value)?$",
+            r"^sensor\..*_add_rinse_aid$",
+        ],
         "dryer": [r"^(number|sensor)\..*_sheet_inventory$"],
     }.get(appliance_type or "", [])
     found: list[str] = []
@@ -263,7 +287,9 @@ def entity_prefix(entity_ids: list[str]) -> str:
     return prefix[: cut + 1] if cut > 0 else ""
 
 
-def leak_sensors_for_prefix(states: list[tuple[str, str | None]], prefix: str) -> list[str]:
+def leak_sensors_for_prefix(
+    states: list[tuple[str, str | None]], prefix: str
+) -> list[str]:
     """Moisture sensors named after the appliance, e.g. a SwitchBot sensor called
     'Kitchen Dishwasher Leak Sensor' -> binary_sensor.kitchen_dishwasher_leak_sensor_water_leak.
 
@@ -274,11 +300,14 @@ def leak_sensors_for_prefix(states: list[tuple[str, str | None]], prefix: str) -
     return sorted(
         entity_id
         for entity_id, device_class in states
-        if entity_id.startswith(f"binary_sensor.{prefix}") and device_class == "moisture"
+        if entity_id.startswith(f"binary_sensor.{prefix}")
+        and device_class == "moisture"
     )
 
 
-def async_discover(hass: HomeAssistant, device_id: str, cavity: str | None = None) -> GEDiscovery:
+def async_discover(
+    hass: HomeAssistant, device_id: str, cavity: str | None = None
+) -> GEDiscovery:
     """Discover entities for a ge_home device from the entity registry."""
     ent_reg = er.async_get(hass)
     entity_ids = [
@@ -304,7 +333,9 @@ def async_discover(hass: HomeAssistant, device_id: str, cavity: str | None = Non
     return found
 
 
-def async_find_ge_appliance(hass: HomeAssistant, appliance_type: str) -> GEDiscovery | None:
+def async_find_ge_appliance(
+    hass: HomeAssistant, appliance_type: str
+) -> GEDiscovery | None:
     """Entities of the first GE appliance of this type (e.g. the dryer)."""
     dev_reg = dr.async_get(hass)
     ent_reg = er.async_get(hass)
@@ -331,7 +362,9 @@ def async_remote_status_entity(hass: HomeAssistant, entity_id: str) -> str | Non
     if entry is None or entry.device_id is None:
         return None
     for other in er.async_entries_for_device(ent_reg, entry.device_id):
-        if re.search(r"^binary_sensor\..*_remote_(status|enable|enabled)$", other.entity_id):
+        if re.search(
+            r"^binary_sensor\..*_remote_(status|enable|enabled)$", other.entity_id
+        ):
             return other.entity_id
     return None
 
@@ -342,7 +375,9 @@ def async_has_ge_devices(hass: HomeAssistant) -> bool:
     if not entries:
         return False
     dev_reg = dr.async_get(hass)
-    return any(dr.async_entries_for_config_entry(dev_reg, entry.entry_id) for entry in entries)
+    return any(
+        dr.async_entries_for_config_entry(dev_reg, entry.entry_id) for entry in entries
+    )
 
 
 def device_name(hass: HomeAssistant, device_id: str) -> str | None:

@@ -1,4 +1,5 @@
 """Unit tests for pure helpers and GE discovery."""
+
 from custom_components.appliance_live_activity.const import (
     DEFAULT_IDLE_STATES,
     STATUS_COMPLETE,

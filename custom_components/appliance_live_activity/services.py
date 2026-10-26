@@ -1,4 +1,5 @@
 """Services exposed by the Appliance Live Activity integration."""
+
 from __future__ import annotations
 
 import voluptuous as vol
@@ -20,7 +21,9 @@ async def async_setup_services(hass: HomeAssistant) -> None:
             return
         await coordinator.async_evaluate(send=True, force=True)
 
-    hass.services.async_register(DOMAIN, SERVICE_UPDATE, handle_update, schema=SERVICE_UPDATE_SCHEMA)
+    hass.services.async_register(
+        DOMAIN, SERVICE_UPDATE, handle_update, schema=SERVICE_UPDATE_SCHEMA
+    )
 
 
 async def async_unload_services(hass: HomeAssistant) -> None:

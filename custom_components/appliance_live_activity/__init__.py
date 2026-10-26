@@ -1,4 +1,5 @@
 """The Appliance Live Activity integration."""
+
 from __future__ import annotations
 
 from homeassistant.config_entries import ConfigEntry
@@ -70,7 +71,10 @@ def _async_move_filter_out_of_supplies(hass: HomeAssistant, entry: ConfigEntry) 
         filters = [e for e in supplies if e.endswith("_clean_filter")]
         if not filters:
             continue
-        new = {**stored, CONF_SUPPLY_ENTITIES: [e for e in supplies if e not in filters] or None}
+        new = {
+            **stored,
+            CONF_SUPPLY_ENTITIES: [e for e in supplies if e not in filters] or None,
+        }
         if not stored.get(CONF_FILTER_ENTITY):
             new[CONF_FILTER_ENTITY] = filters[0]
         hass.config_entries.async_update_entry(entry, **{update: new})

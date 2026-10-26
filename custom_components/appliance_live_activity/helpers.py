@@ -1,9 +1,10 @@
 """Small shared helpers (pure functions, easy to unit test)."""
+
 from __future__ import annotations
 
-import re
 from collections.abc import Iterable
 from datetime import time
+import re
 
 from .const import (
     STATUS_COMPLETE,
@@ -117,7 +118,7 @@ def color_to_hex(value, default: str = "#03A9F4") -> str:
     if isinstance(value, (list, tuple)) and len(value) == 3:
         try:
             r, g, b = (max(0, min(255, int(c))) for c in value)
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             return default
         return f"#{r:02X}{g:02X}{b:02X}"
     if isinstance(value, str) and value.strip():

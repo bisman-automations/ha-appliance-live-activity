@@ -7,6 +7,7 @@
 Checked a few minutes after start (so other integrations have loaded) and
 then every 30 minutes; issues disappear by themselves once fixed.
 """
+
 from __future__ import annotations
 
 from datetime import timedelta
@@ -14,8 +15,11 @@ from typing import TYPE_CHECKING
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
-from homeassistant.helpers import device_registry as dr, entity_registry as er
-from homeassistant.helpers import issue_registry as ir
+from homeassistant.helpers import (
+    device_registry as dr,
+    entity_registry as er,
+    issue_registry as ir,
+)
 from homeassistant.helpers.event import async_call_later, async_track_time_interval
 
 from .const import DOMAIN, HEALTH_CHECK_MINUTES, HEALTH_FIRST_CHECK_SECONDS
@@ -52,7 +56,12 @@ def async_check_health(hass: HomeAssistant, coordinator: ApplianceCoordinator) -
     entry_id = coordinator.entry.entry_id
     dev_reg = dr.async_get(hass)
 
-    phones = list(dict.fromkeys(coordinator.devices + list(getattr(coordinator, "escalation_devices", []) or [])))
+    phones = list(
+        dict.fromkeys(
+            coordinator.devices
+            + list(getattr(coordinator, "escalation_devices", []) or [])
+        )
+    )
     for device_id in phones:
         issue_id = _phone_issue(entry_id, device_id)
         if notify_services_for_device(hass, device_id, warn=False):

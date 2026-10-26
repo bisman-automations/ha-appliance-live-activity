@@ -6,6 +6,7 @@ color, and messaging. The coordinator is completely generic and only
 ever talks to this registry -- adding a new appliance type never
 requires touching coordinator.py, notify.py, or config_flow.py.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field

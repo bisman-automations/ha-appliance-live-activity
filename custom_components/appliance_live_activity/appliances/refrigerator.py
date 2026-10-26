@@ -5,6 +5,7 @@ a Live Activity while a door is open, critical alerts if it stays open,
 then "Closed" for a minute. Point it at one or more door binary sensors
 ("on" = open) or door status sensors ("Open"/"Closed").
 """
+
 from ..appliance import ApplianceDefinition, register
 
 register(

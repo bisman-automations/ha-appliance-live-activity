@@ -1,5 +1,6 @@
 """v1.6.0: kitchen timer, meat probe, double ovens, dryer tumble, shared laundry
 Live Activity, blocked vent, refill reminders, water filter."""
+
 from __future__ import annotations
 
 from datetime import timedelta
@@ -11,13 +12,15 @@ from pytest_homeassistant_custom_component.common import (
     async_mock_service,
 )
 
+from custom_components.appliance_live_activity.const import DOMAIN
+from custom_components.appliance_live_activity.ge import (
+    discover_from_entity_ids,
+    oven_cavities,
+)
+from custom_components.appliance_live_activity.maintenance import supply_low
 from homeassistant import config_entries
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry as dr, entity_registry as er
-
-from custom_components.appliance_live_activity.const import DOMAIN
-from custom_components.appliance_live_activity.ge import discover_from_entity_ids, oven_cavities
-from custom_components.appliance_live_activity.maintenance import supply_low
 
 
 async def _ge_device(hass, ge, uid, name, states: dict[str, tuple[str, dict]]):
@@ -27,8 +30,14 @@ async def _ge_device(hass, ge, uid, name, states: dict[str, tuple[str, dict]]):
     )
     for eid, (state, attrs) in states.items():
         domain, obj = eid.split(".")
-        ent_reg.async_get_or_create(domain, "ge_home", obj, suggested_object_id=obj,
-                                    device_id=device.id, config_entry=ge)
+        ent_reg.async_get_or_create(
+            domain,
+            "ge_home",
+            obj,
+            suggested_object_id=obj,
+            device_id=device.id,
+            config_entry=ge,
+        )
         hass.states.async_set(eid, state, attrs)
     return device
 
@@ -38,7 +47,9 @@ async def phone(hass: HomeAssistant, enable_custom_integrations):
     entry = MockConfigEntry(domain="mobile_app")
     entry.add_to_hass(hass)
     device = dr.async_get(hass).async_get_or_create(
-        config_entry_id=entry.entry_id, identifiers={("mobile_app", "p")}, name="My Phone"
+        config_entry_id=entry.entry_id,
+        identifiers={("mobile_app", "p")},
+        name="My Phone",
     )
     ge = MockConfigEntry(domain="ge_home")
     ge.add_to_hass(hass)
@@ -46,15 +57,23 @@ async def phone(hass: HomeAssistant, enable_custom_integrations):
 
 
 async def _start(hass, device_id):
-    result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": config_entries.SOURCE_USER})
-    result = await hass.config_entries.flow.async_configure(result["flow_id"], {"next_step_id": "ge_home"})
-    return await hass.config_entries.flow.async_configure(result["flow_id"], {"source_device": device_id})
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": config_entries.SOURCE_USER}
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {"next_step_id": "ge_home"}
+    )
+    return await hass.config_entries.flow.async_configure(
+        result["flow_id"], {"source_device": device_id}
+    )
 
 
 async def _setup(hass, device_id, notify_input):
     result = await _start(hass, device_id)
     assert result["step_id"] == "notify", result
-    result = await hass.config_entries.flow.async_configure(result["flow_id"], notify_input)
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], notify_input
+    )
     await hass.async_block_till_done()
     assert result["type"] == "create_entry", result
     return result
@@ -68,8 +87,10 @@ async def _tick(hass, freezer, delta):
 
 def _live(calls, tag=None):
     return [
-        c for c in calls
-        if c.data.get("data", {}).get("live_update") and (tag is None or c.data["data"]["tag"] == tag)
+        c
+        for c in calls
+        if c.data.get("data", {}).get("live_update")
+        and (tag is None or c.data["data"]["tag"] == tag)
     ]
 
 
@@ -78,7 +99,11 @@ def _titled(calls, start):
 
 
 def _cleared(calls):
-    return [c.data["data"]["tag"] for c in calls if c.data.get("message") == "clear_notification"]
+    return [
+        c.data["data"]["tag"]
+        for c in calls
+        if c.data.get("message") == "clear_notification"
+    ]
 
 
 # ---------------------------------------------------------------- discovery
@@ -105,7 +130,9 @@ def test_discovery():
     assert upper.cooktop_entities == ["binary_sensor.kitchen_oven_cooktop_status"]
     lower = discover_from_entity_ids(DOUBLE_OVEN, "lower")
     assert lower.state_entity == "sensor.kitchen_oven_lower_oven_current_state"
-    assert lower.remaining_entity == "sensor.kitchen_oven_lower_oven_cook_time_remaining"
+    assert (
+        lower.remaining_entity == "sensor.kitchen_oven_lower_oven_cook_time_remaining"
+    )
     assert lower.timer_entity == "sensor.kitchen_oven_lower_oven_kitchen_timer"
     assert lower.probe_entity is None and lower.cooktop_entities == []
 
@@ -119,22 +146,28 @@ def test_discovery():
     assert dryer.supply_entities == ["sensor.laundry_room_dryer_sheet_inventory"]
 
     washer = discover_from_entity_ids(list(WASHER))
-    assert washer.supply_entities == ["sensor.laundry_room_washer_smart_dispense_loads_left"]
+    assert washer.supply_entities == [
+        "sensor.laundry_room_washer_smart_dispense_loads_left"
+    ]
 
-    dw = discover_from_entity_ids([
-        "sensor.kitchen_dishwasher_operating_mode",
-        "number.kitchen_dishwasher_pods_remaining_value",
-        "sensor.kitchen_dishwasher_add_rinse_aid",
-    ])
+    dw = discover_from_entity_ids(
+        [
+            "sensor.kitchen_dishwasher_operating_mode",
+            "number.kitchen_dishwasher_pods_remaining_value",
+            "sensor.kitchen_dishwasher_add_rinse_aid",
+        ]
+    )
     assert dw.supply_entities == [
         "number.kitchen_dishwasher_pods_remaining_value",
         "sensor.kitchen_dishwasher_add_rinse_aid",
     ]
 
-    fridge = discover_from_entity_ids([
-        "binary_sensor.kitchen_refrigerator_freezer_door",
-        "sensor.kitchen_refrigerator_water_filter_status",
-    ])
+    fridge = discover_from_entity_ids(
+        [
+            "binary_sensor.kitchen_refrigerator_freezer_door",
+            "sensor.kitchen_refrigerator_water_filter_status",
+        ]
+    )
     assert fridge.filter_entity == "sensor.kitchen_refrigerator_water_filter_status"
 
 
@@ -168,7 +201,11 @@ async def _oven(hass, phone):
 
 
 def _timer(hass, minutes):
-    hass.states.async_set("sensor.kitchen_oven_kitchen_timer", str(minutes), {"unit_of_measurement": "min"})
+    hass.states.async_set(
+        "sensor.kitchen_oven_kitchen_timer",
+        str(minutes),
+        {"unit_of_measurement": "min"},
+    )
 
 
 async def test_kitchen_timer(hass: HomeAssistant, phone, freezer):
@@ -186,7 +223,12 @@ async def test_kitchen_timer(hass: HomeAssistant, phone, freezer):
         _timer(hass, left)
         await hass.async_block_till_done()
     assert len(_live(calls, "kitchen_oven_timer")) == 1
-    assert hass.states.get("sensor.kitchen_oven_status").attributes["kitchen_timer_minutes"] == 1
+    assert (
+        hass.states.get("sensor.kitchen_oven_status").attributes[
+            "kitchen_timer_minutes"
+        ]
+        == 1
+    )
 
     await _tick(hass, freezer, timedelta(minutes=1))
     _timer(hass, 0)
@@ -207,7 +249,11 @@ async def test_kitchen_timer_cancelled(hass: HomeAssistant, phone, freezer):
 
 
 def _probe(hass, temp):
-    hass.states.async_set("sensor.kitchen_oven_probe_display_temp", str(temp), {"unit_of_measurement": "°F"})
+    hass.states.async_set(
+        "sensor.kitchen_oven_probe_display_temp",
+        str(temp),
+        {"unit_of_measurement": "°F"},
+    )
 
 
 async def test_probe(hass: HomeAssistant, phone, freezer):
@@ -224,7 +270,9 @@ async def test_probe(hass: HomeAssistant, phone, freezer):
     await hass.async_block_till_done()
     assert len(_live(calls, "kitchen_oven_probe")) == 1
 
-    await hass.services.async_call("number", "set_value", {"entity_id": number, "value": 145}, blocking=True)
+    await hass.services.async_call(
+        "number", "set_value", {"entity_id": number, "value": 145}, blocking=True
+    )
     await hass.async_block_till_done()
     live = _live(calls, "kitchen_oven_probe")
     assert live[-1].data["message"] == "Probe 62°F → 145°F"
@@ -240,7 +288,9 @@ async def test_probe(hass: HomeAssistant, phone, freezer):
     await hass.async_block_till_done()
     alerts = _titled(calls, "🍖 Kitchen Oven: probe at 146°F")
     assert len(alerts) == 1 and "145°F" in alerts[0].data["message"]
-    assert _live(calls, "kitchen_oven_probe")[-1].data["data"]["critical_text"] == "Ready"
+    assert (
+        _live(calls, "kitchen_oven_probe")[-1].data["data"]["critical_text"] == "Ready"
+    )
     _probe(hass, 150)
     await hass.async_block_till_done()
     assert len(_titled(calls, "🍖")) == 1
@@ -261,23 +311,35 @@ async def test_double_oven_setup(hass: HomeAssistant, phone):
 
     result = await _start(hass, oven.id)
     assert result["step_id"] == "oven_cavity"
-    result = await hass.config_entries.flow.async_configure(result["flow_id"], {"oven_cavity": "upper"})
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {"oven_cavity": "upper"}
+    )
     assert result["step_id"] == "notify"
-    result = await hass.config_entries.flow.async_configure(result["flow_id"], {"devices": [me.id]})
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {"devices": [me.id]}
+    )
     await hass.async_block_till_done()
     assert result["title"] == "Kitchen Oven Upper"
-    assert result["data"]["state_entity"] == "sensor.kitchen_oven_upper_oven_current_state"
+    assert (
+        result["data"]["state_entity"] == "sensor.kitchen_oven_upper_oven_current_state"
+    )
 
     # Second time only the lower oven is offered
     result = await _start(hass, oven.id)
     assert result["step_id"] == "oven_cavity"
     options = result["data_schema"].schema["oven_cavity"].config["options"]
     assert [o["value"] for o in options] == ["lower"]
-    result = await hass.config_entries.flow.async_configure(result["flow_id"], {"oven_cavity": "lower"})
-    result = await hass.config_entries.flow.async_configure(result["flow_id"], {"devices": [me.id]})
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {"oven_cavity": "lower"}
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {"devices": [me.id]}
+    )
     await hass.async_block_till_done()
     assert result["title"] == "Kitchen Oven Lower"
-    assert result["data"]["timer_entity"] == "sensor.kitchen_oven_lower_oven_kitchen_timer"
+    assert (
+        result["data"]["timer_entity"] == "sensor.kitchen_oven_lower_oven_kitchen_timer"
+    )
     assert "cooktop_entities" not in result["data"]
 
     result = await _start(hass, oven.id)
@@ -292,7 +354,10 @@ WASHER = {
     "sensor.laundry_room_washer_time_remaining": ("0", {"unit_of_measurement": "min"}),
     "binary_sensor.laundry_room_washer_end_of_cycle": ("off", {}),
     "binary_sensor.laundry_room_washer_door": ("off", {"device_class": "door"}),
-    "sensor.laundry_room_washer_smart_dispense_loads_left": ("2", {"unit_of_measurement": "loads"}),
+    "sensor.laundry_room_washer_smart_dispense_loads_left": (
+        "2",
+        {"unit_of_measurement": "loads"},
+    ),
 }
 DRYER = {
     "sensor.laundry_room_dryer_state": ("Off", {}),
@@ -303,7 +368,10 @@ DRYER = {
     "binary_sensor.laundry_room_dryer_door": ("off", {"device_class": "door"}),
     "sensor.laundry_room_dryer_tumble_status": ("Enable", {}),
     "binary_sensor.laundry_room_dryer_blocked_vent_fault": ("off", {}),
-    "sensor.laundry_room_dryer_sheet_inventory": ("20", {"unit_of_measurement": "sheets"}),
+    "sensor.laundry_room_dryer_sheet_inventory": (
+        "20",
+        {"unit_of_measurement": "sheets"},
+    ),
 }
 
 
@@ -312,7 +380,12 @@ def _set(hass, entity, state, attrs=None):
 
 
 async def _run(hass, prefix, minutes=40):
-    _set(hass, f"sensor.{prefix}_time_remaining", str(minutes), {"unit_of_measurement": "min"})
+    _set(
+        hass,
+        f"sensor.{prefix}_time_remaining",
+        str(minutes),
+        {"unit_of_measurement": "min"},
+    )
     _set(hass, f"binary_sensor.{prefix}_end_of_cycle", "off")
     _set(hass, f"sensor.{prefix}_state", "Run")
     await hass.async_block_till_done()
@@ -329,7 +402,9 @@ async def _finish(hass, prefix, sub_cycle="---"):
 async def _dryer_only(hass, phone, **extra):
     me, ge, calls = phone
     dryer = await _ge_device(hass, ge, "dryer", "Laundry Room Dryer", DRYER)
-    result = await _setup(hass, dryer.id, {"devices": [me.id], "dismiss_minutes": 30, **extra})
+    result = await _setup(
+        hass, dryer.id, {"devices": [me.id], "dismiss_minutes": 30, **extra}
+    )
     assert result["data"]["tumble_entity"] == "sensor.laundry_room_dryer_tumble_status"
     return calls
 
@@ -338,7 +413,12 @@ async def test_dryer_extended_tumble(hass: HomeAssistant, phone, freezer):
     calls = await _dryer_only(hass, phone)
     await _run(hass, "laundry_room_dryer")
     # GE: cycle over, the drum tumbles now and then
-    _set(hass, "sensor.laundry_room_dryer_time_remaining", "0", {"unit_of_measurement": "min"})
+    _set(
+        hass,
+        "sensor.laundry_room_dryer_time_remaining",
+        "0",
+        {"unit_of_measurement": "min"},
+    )
     _set(hass, "sensor.laundry_room_dryer_sub_cycle", "Extended Tumble")
     await hass.async_block_till_done()
     done = _live(calls)[-1]
@@ -379,7 +459,9 @@ async def test_dryer_tumble_setting_until_off(hass: HomeAssistant, phone, freeze
 
 
 async def test_blocked_vent(hass: HomeAssistant, phone, freezer):
-    calls = await _dryer_only(hass, phone, vent_entity="binary_sensor.laundry_room_dryer_blocked_vent_fault")
+    calls = await _dryer_only(
+        hass, phone, vent_entity="binary_sensor.laundry_room_dryer_blocked_vent_fault"
+    )
     _set(hass, "binary_sensor.laundry_room_dryer_blocked_vent_fault", "on")
     await hass.async_block_till_done()
     alerts = _titled(calls, "🔥 Laundry Room Dryer: vent blocked")
@@ -394,7 +476,10 @@ async def test_blocked_vent(hass: HomeAssistant, phone, freezer):
     assert calls[-1].data["title"] == "✅ Laundry Room Dryer: vent clear"
     await _tick(hass, freezer, timedelta(minutes=2, seconds=5))
     assert "laundry_room_dryer_vent" in _cleared(calls)
-    assert hass.states.get("sensor.laundry_room_dryer_status").attributes["vent_blocked"] is False
+    assert (
+        hass.states.get("sensor.laundry_room_dryer_status").attributes["vent_blocked"]
+        is False
+    )
 
 
 async def _laundry_pair(hass, phone, combine=True):
@@ -402,11 +487,16 @@ async def _laundry_pair(hass, phone, combine=True):
     dryer = await _ge_device(hass, ge, "dryer", "Laundry Room Dryer", DRYER)
     washer = await _ge_device(hass, ge, "washer", "Laundry Room Washer", WASHER)
     await _setup(hass, dryer.id, {"devices": [me.id]})
-    await _setup(hass, washer.id, {
-        "devices": [me.id], "dryer_entity": "sensor.laundry_room_dryer_state",
-        "combine_laundry": combine,
-        "supply_entities": ["sensor.laundry_room_washer_smart_dispense_loads_left"],
-    })
+    await _setup(
+        hass,
+        washer.id,
+        {
+            "devices": [me.id],
+            "dryer_entity": "sensor.laundry_room_dryer_state",
+            "combine_laundry": combine,
+            "supply_entities": ["sensor.laundry_room_washer_smart_dispense_loads_left"],
+        },
+    )
     return calls
 
 
@@ -464,9 +554,19 @@ async def test_refill_reminder(hass: HomeAssistant, phone, freezer):
     await _finish(hass, "laundry_room_washer")
     assert len(_titled(calls, "🧴")) == 1
 
-    _set(hass, "sensor.laundry_room_washer_smart_dispense_loads_left", "30", {"unit_of_measurement": "loads"})
+    _set(
+        hass,
+        "sensor.laundry_room_washer_smart_dispense_loads_left",
+        "30",
+        {"unit_of_measurement": "loads"},
+    )
     await _tick(hass, freezer, timedelta(minutes=2))
-    _set(hass, "sensor.laundry_room_washer_smart_dispense_loads_left", "3", {"unit_of_measurement": "loads"})
+    _set(
+        hass,
+        "sensor.laundry_room_washer_smart_dispense_loads_left",
+        "3",
+        {"unit_of_measurement": "loads"},
+    )
     await _tick(hass, freezer, timedelta(minutes=2))
     await _run(hass, "laundry_room_washer")
     await _finish(hass, "laundry_room_washer")
@@ -476,13 +576,27 @@ async def test_refill_reminder(hass: HomeAssistant, phone, freezer):
 # ---------------------------------------------------------------- fridge
 async def test_water_filter(hass: HomeAssistant, phone, freezer):
     me, ge, calls = phone
-    fridge = await _ge_device(hass, ge, "fridge", "Kitchen Refrigerator", {
-        "binary_sensor.kitchen_refrigerator_freezer_door": ("off", {"device_class": "door"}),
-        "sensor.kitchen_refrigerator_water_filter_status": ("Good", {}),
-    })
-    await _setup(hass, fridge.id, {
-        "devices": [me.id], "filter_entity": "sensor.kitchen_refrigerator_water_filter_status",
-    })
+    fridge = await _ge_device(
+        hass,
+        ge,
+        "fridge",
+        "Kitchen Refrigerator",
+        {
+            "binary_sensor.kitchen_refrigerator_freezer_door": (
+                "off",
+                {"device_class": "door"},
+            ),
+            "sensor.kitchen_refrigerator_water_filter_status": ("Good", {}),
+        },
+    )
+    await _setup(
+        hass,
+        fridge.id,
+        {
+            "devices": [me.id],
+            "filter_entity": "sensor.kitchen_refrigerator_water_filter_status",
+        },
+    )
     _set(hass, "sensor.kitchen_refrigerator_water_filter_status", "Replace")
     await hass.async_block_till_done()
     await _tick(hass, freezer, timedelta(minutes=5))
@@ -500,11 +614,20 @@ async def test_existing_entry_backfills_v16(hass: HomeAssistant, phone):
     me, ge, calls = phone
     oven = await _ge_device(hass, ge, "oven", "Kitchen Oven", OVEN)
     # As created by 1.5.0 (delay key present, no discovery version)
-    entry = MockConfigEntry(domain=DOMAIN, data={
-        "source": "ge_home", "source_device": oven.id, "appliance_type": "oven",
-        "name": "Kitchen Oven", "state_entity": "sensor.kitchen_oven_current_state",
-        "notification_tag": "kitchen_oven", "devices": [me.id], "delay_entity": None,
-    }, options={"probe_entity": None})
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        data={
+            "source": "ge_home",
+            "source_device": oven.id,
+            "appliance_type": "oven",
+            "name": "Kitchen Oven",
+            "state_entity": "sensor.kitchen_oven_current_state",
+            "notification_tag": "kitchen_oven",
+            "devices": [me.id],
+            "delay_entity": None,
+        },
+        options={"probe_entity": None},
+    )
     entry.add_to_hass(hass)
     assert await hass.config_entries.async_setup(entry.entry_id)
     await hass.async_block_till_done()

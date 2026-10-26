@@ -1,4 +1,5 @@
 """Config flow (GE path) + Live Activity lifecycle."""
+
 from __future__ import annotations
 
 from datetime import timedelta
@@ -10,14 +11,13 @@ from pytest_homeassistant_custom_component.common import (
     async_mock_service,
 )
 
+from custom_components.appliance_live_activity.const import DOMAIN
 from homeassistant import config_entries
 from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResultType
 from homeassistant.helpers import device_registry as dr, entity_registry as er
 from homeassistant.util import dt as dt_util
-
 from tests.conftest import suggested_values
-from custom_components.appliance_live_activity.const import DOMAIN
 
 PREFIX = "laundry_room_washer"
 WASHER_ENTITIES = {
@@ -40,12 +40,18 @@ async def setup_devices(hass: HomeAssistant, enable_custom_integrations):
     ge_entry = MockConfigEntry(domain="ge_home")
     ge_entry.add_to_hass(hass)
     washer = dev_reg.async_get_or_create(
-        config_entry_id=ge_entry.entry_id, identifiers={("ge_home", "washer1")}, name="Laundry Room Washer"
+        config_entry_id=ge_entry.entry_id,
+        identifiers={("ge_home", "washer1")},
+        name="Laundry Room Washer",
     )
     for (domain, suffix), state in WASHER_ENTITIES.items():
         ent_reg.async_get_or_create(
-            domain, "ge_home", f"washer1_{suffix}",
-            suggested_object_id=f"{PREFIX}_{suffix}", device_id=washer.id, config_entry=ge_entry,
+            domain,
+            "ge_home",
+            f"washer1_{suffix}",
+            suggested_object_id=f"{PREFIX}_{suffix}",
+            device_id=washer.id,
+            config_entry=ge_entry,
         )
         attrs = {"unit_of_measurement": "min"} if suffix == "time_remaining" else {}
         hass.states.async_set(f"{domain}.{PREFIX}_{suffix}", state, attrs)
@@ -53,23 +59,35 @@ async def setup_devices(hass: HomeAssistant, enable_custom_integrations):
     phone_entry = MockConfigEntry(domain="mobile_app")
     phone_entry.add_to_hass(hass)
     phone = dev_reg.async_get_or_create(
-        config_entry_id=phone_entry.entry_id, identifiers={("mobile_app", "phone1")}, name="My Phone"
+        config_entry_id=phone_entry.entry_id,
+        identifiers={("mobile_app", "phone1")},
+        name="My Phone",
     )
     calls = async_mock_service(hass, "notify", "mobile_app_my_phone")
     return washer, phone, calls
 
 
 async def _create_entry(hass, washer, phone):
-    result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": config_entries.SOURCE_USER})
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": config_entries.SOURCE_USER}
+    )
     assert result["type"] is FlowResultType.MENU
-    result = await hass.config_entries.flow.async_configure(result["flow_id"], {"next_step_id": "ge_home"})
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {"next_step_id": "ge_home"}
+    )
     assert result["step_id"] == "ge_home"
     result = await hass.config_entries.flow.async_configure(
         result["flow_id"], {"source_device": washer.id, "appliance_type": "auto"}
     )
     assert result["step_id"] == "notify"
     result = await hass.config_entries.flow.async_configure(
-        result["flow_id"], {"devices": [phone.id], "finished_alert": True, "dismiss_minutes": 30, "icon_color": [0, 188, 212]}
+        result["flow_id"],
+        {
+            "devices": [phone.id],
+            "finished_alert": True,
+            "dismiss_minutes": 30,
+            "icon_color": [0, 188, 212],
+        },
     )
     assert result["type"] is FlowResultType.CREATE_ENTRY
     data = result["data"]
@@ -98,7 +116,10 @@ async def test_ge_flow_and_lifecycle(hass: HomeAssistant, setup_devices):
     assert calls, "running update expected"
     data = calls[-1].data["data"]
     assert hass.states.get("sensor.laundry_room_washer_time_left").state == "60"
-    assert hass.states.get("sensor.laundry_room_washer_finishes_at").state not in ("unknown", "unavailable")
+    assert hass.states.get("sensor.laundry_room_washer_finishes_at").state not in (
+        "unknown",
+        "unavailable",
+    )
     assert data["live_update"] is True
     assert data["notification_icon_color"] == "#00BCD4"
     # Tapping opens the GE washer's device page
@@ -154,7 +175,11 @@ async def test_ge_flow_and_lifecycle(hass: HomeAssistant, setup_devices):
     _set(hass, "end_of_cycle", "on", domain="binary_sensor")
     await hass.async_block_till_done()
     new = calls[sent:]
-    assert [c.data["data"].get("critical_text") for c in new if c.data["data"].get("live_update")] == ["Done"]
+    assert [
+        c.data["data"].get("critical_text")
+        for c in new
+        if c.data["data"].get("live_update")
+    ] == ["Done"]
     assert any(c.data.get("title", "").startswith("✅") for c in new)
     sent = len(calls)
 
@@ -201,7 +226,8 @@ async def test_options_flow(hass: HomeAssistant, setup_devices):
     assert suggested["icon_color"] == [0, 188, 212]
     before = hass.data[DOMAIN][entry.entry_id]
     result = await hass.config_entries.options.async_configure(
-        result["flow_id"], {"devices": [phone.id], "finished_alert": False, "dismiss_minutes": 10}
+        result["flow_id"],
+        {"devices": [phone.id], "finished_alert": False, "dismiss_minutes": 10},
     )
     assert result["type"] is FlowResultType.CREATE_ENTRY
     assert entry.options["finished_alert"] is False
@@ -213,7 +239,9 @@ async def test_options_flow(hass: HomeAssistant, setup_devices):
 
 async def test_manual_flow(hass: HomeAssistant, enable_custom_integrations):
     hass.states.async_set("sensor.lg_washer_state", "Off")
-    result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": config_entries.SOURCE_USER})
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": config_entries.SOURCE_USER}
+    )
     assert result["step_id"] == "manual"  # no GE devices -> straight to manual
     result = await hass.config_entries.flow.async_configure(
         result["flow_id"], {"appliance_type": "washer", "name": "LG Washer"}
@@ -221,5 +249,7 @@ async def test_manual_flow(hass: HomeAssistant, enable_custom_integrations):
     result = await hass.config_entries.flow.async_configure(
         result["flow_id"], {"state_entity": "sensor.lg_washer_state"}
     )
-    result = await hass.config_entries.flow.async_configure(result["flow_id"], {"devices": []})
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {"devices": []}
+    )
     assert result["type"] is FlowResultType.CREATE_ENTRY

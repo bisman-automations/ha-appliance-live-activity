@@ -4,6 +4,7 @@ GE Home (SmartHQ) dishwashers report "Cycle Active" on their operating-mode
 sensor while running; that's covered by the active list (and by
 ``unknown_is_running`` for other integrations' wording).
 """
+
 from ..appliance import ApplianceDefinition, register
 
 register(

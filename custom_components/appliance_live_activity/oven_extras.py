@@ -15,15 +15,19 @@ Meat probe
 
 Both only push when something visible changes so iOS doesn't throttle them.
 """
+
 from __future__ import annotations
 
-import logging
 from datetime import timedelta
+import logging
 from typing import TYPE_CHECKING
 
 from homeassistant.const import ATTR_UNIT_OF_MEASUREMENT
 from homeassistant.core import CALLBACK_TYPE, HomeAssistant, callback
-from homeassistant.helpers.event import async_track_state_change_event, async_track_time_interval
+from homeassistant.helpers.event import (
+    async_track_state_change_event,
+    async_track_time_interval,
+)
 from homeassistant.util import dt as dt_util
 
 from .const import UNAVAILABLE_STATES
@@ -49,7 +53,9 @@ PROBE_STEP_PERCENT = 10
 class _Monitor:
     """Shared plumbing: listen to one entity plus a tick."""
 
-    def __init__(self, hass: HomeAssistant, coordinator: ApplianceCoordinator, entity: str) -> None:
+    def __init__(
+        self, hass: HomeAssistant, coordinator: ApplianceCoordinator, entity: str
+    ) -> None:
         self.hass = hass
         self.coordinator = coordinator
         self.entity = entity
@@ -57,9 +63,13 @@ class _Monitor:
 
     async def async_setup(self) -> None:
         self._unsubs.append(
-            async_track_state_change_event(self.hass, [self.entity], self._handle_change)
+            async_track_state_change_event(
+                self.hass, [self.entity], self._handle_change
+            )
         )
-        self._unsubs.append(async_track_time_interval(self.hass, self._handle_change, TICK))
+        self._unsubs.append(
+            async_track_time_interval(self.hass, self._handle_change, TICK)
+        )
         await self.async_evaluate()
 
     async def async_unload(self) -> None:
@@ -82,7 +92,9 @@ class _Monitor:
 class KitchenTimerMonitor(_Monitor):
     """Oven kitchen timer -> its own countdown Live Activity."""
 
-    def __init__(self, hass: HomeAssistant, coordinator: ApplianceCoordinator, entity: str) -> None:
+    def __init__(
+        self, hass: HomeAssistant, coordinator: ApplianceCoordinator, entity: str
+    ) -> None:
         super().__init__(hass, coordinator, entity)
         self.tag = f"{coordinator.notification_tag}_timer"
         self.done_tag = f"{coordinator.notification_tag}_timer_done"
@@ -99,7 +111,9 @@ class KitchenTimerMonitor(_Monitor):
         state = self.hass.states.get(self.entity)
         if state is None or state.state.strip().lower() in UNAVAILABLE_STATES:
             return
-        remaining = to_minutes(state.state, state.attributes.get(ATTR_UNIT_OF_MEASUREMENT))
+        remaining = to_minutes(
+            state.state, state.attributes.get(ATTR_UNIT_OF_MEASUREMENT)
+        )
         now = dt_util.utcnow().timestamp()
         expected = self._sent_remaining - (now - self._sent_at) / 60
 
@@ -110,7 +124,9 @@ class KitchenTimerMonitor(_Monitor):
                 if self._send:
                     await async_clear_tag(self.hass, self.coordinator, self.done_tag)
             self._last_remaining = remaining
-            if self._send and (first or abs(remaining - expected) > TIMER_DRIFT_MINUTES):
+            if self._send and (
+                first or abs(remaining - expected) > TIMER_DRIFT_MINUTES
+            ):
                 await async_send_live(
                     self.hass,
                     self.coordinator,
@@ -149,7 +165,9 @@ class KitchenTimerMonitor(_Monitor):
 class ProbeMonitor(_Monitor):
     """Meat probe temperature -> Live Activity + "reached target" alert."""
 
-    def __init__(self, hass: HomeAssistant, coordinator: ApplianceCoordinator, entity: str) -> None:
+    def __init__(
+        self, hass: HomeAssistant, coordinator: ApplianceCoordinator, entity: str
+    ) -> None:
         super().__init__(hass, coordinator, entity)
         self.tag = f"{coordinator.notification_tag}_probe"
         self.done_tag = f"{coordinator.notification_tag}_probe_done"
@@ -176,7 +194,7 @@ class ProbeMonitor(_Monitor):
         state = self.hass.states.get(self.entity)
         try:
             temp = float(state.state) if state is not None else 0.0
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             temp = 0.0
         if temp != self.temperature:
             self.temperature = temp
@@ -204,8 +222,14 @@ class ProbeMonitor(_Monitor):
         reached = target > 0 and temp >= target
         progress: int | None = None
         if target > 0:
-            start = self._start if self._start is not None and self._start < target else 0.0
-            progress = 100 if reached else max(0, round((temp - start) / (target - start) * 100))
+            start = (
+                self._start if self._start is not None and self._start < target else 0.0
+            )
+            progress = (
+                100
+                if reached
+                else max(0, round((temp - start) / (target - start) * 100))
+            )
 
         if reached and not self._alerted:
             self._alerted = True
@@ -228,14 +252,24 @@ class ProbeMonitor(_Monitor):
         if not self._send or signature == self._sent_signature:
             return
         if reached:
-            message = f"Probe {round(temp)}{unit} · target {round(target)}{unit} reached"
+            message = (
+                f"Probe {round(temp)}{unit} · target {round(target)}{unit} reached"
+            )
             critical, icon, color = "Ready", "mdi:check-circle", "#4CAF50"
         elif target > 0:
             message = f"Probe {round(temp)}{unit} → {round(target)}{unit}"
-            critical, icon, color = f"{round(temp)}{unit}", "mdi:thermometer-probe", None
+            critical, icon, color = (
+                f"{round(temp)}{unit}",
+                "mdi:thermometer-probe",
+                None,
+            )
         else:
             message = f"Probe {round(temp)}{unit}"
-            critical, icon, color = f"{round(temp)}{unit}", "mdi:thermometer-probe", None
+            critical, icon, color = (
+                f"{round(temp)}{unit}",
+                "mdi:thermometer-probe",
+                None,
+            )
         await async_send_live(
             self.hass,
             self.coordinator,

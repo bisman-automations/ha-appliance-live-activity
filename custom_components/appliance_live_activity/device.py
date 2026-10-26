@@ -14,6 +14,7 @@ shows up on a Rain Bird controller. So each page links to the other.
 Before 2026.8 devices with shared identifiers were merged into one, so
 there our device keeps only its own identifier.
 """
+
 from __future__ import annotations
 
 from homeassistant.config_entries import ConfigEntry

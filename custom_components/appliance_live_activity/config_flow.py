@@ -5,6 +5,7 @@ automatically -> pick phones.
 
 Anything else: pick appliance type -> pick entities -> pick phones.
 """
+
 from __future__ import annotations
 
 from typing import Any
@@ -28,12 +29,12 @@ from .const import (
     CONF_ALERT_LIGHTS,
     CONF_APPLIANCE_TYPE,
     CONF_CLEAN_ENTITY,
+    CONF_COMBINE_LAUNDRY,
     CONF_COOKTOP_ALERT_MINUTES,
     CONF_COOKTOP_ENTITIES,
     CONF_COOKTOP_REPEAT_MINUTES,
     CONF_CRITICAL_AFTER_MINUTES,
     CONF_CRITICAL_REPEAT_MINUTES,
-    CONF_COMBINE_LAUNDRY,
     CONF_CYCLE_ENTITY,
     CONF_DELAY_ENTITY,
     CONF_DELAY_START,
@@ -52,9 +53,9 @@ from .const import (
     CONF_FREEZER_TEMP_ENTITY,
     CONF_FRIDGE_MAX_TEMP,
     CONF_FRIDGE_TEMP_ENTITY,
+    CONF_GE_DISCOVERY,
     CONF_ICE_ENTITY,
     CONF_ICE_FULL_ALERT,
-    CONF_GE_DISCOVERY,
     CONF_ICON,
     CONF_ICON_COLOR,
     CONF_LAUNDRY_TITLE,
@@ -68,8 +69,8 @@ from .const import (
     CONF_ONLY_HOME,
     CONF_OPEN_DELAY_SECONDS,
     CONF_OVEN_CAVITY,
-    CONF_PHASE_ENTITY,
     CONF_OVEN_LIGHT_ENTITY,
+    CONF_PHASE_ENTITY,
     CONF_PREHEAT_ALERT,
     CONF_PROBE_ENTITY,
     CONF_QUIET_END,
@@ -97,11 +98,11 @@ from .const import (
     DEFAULT_DRYER_MAX_REMINDERS,
     DEFAULT_DRYER_REMINDER_MINUTES,
     DEFAULT_DRYER_REPEAT_MINUTES,
+    DEFAULT_ESCALATE_AFTER,
     DEFAULT_FREEZER_MAX_C,
     DEFAULT_FREEZER_MAX_F,
     DEFAULT_FRIDGE_MAX_C,
     DEFAULT_FRIDGE_MAX_F,
-    DEFAULT_ESCALATE_AFTER,
     DEFAULT_LEAK_REPEAT_MINUTES,
     DEFAULT_MOVE_MAX_REMINDERS,
     DEFAULT_MOVE_REMINDER_MINUTES,
@@ -117,9 +118,9 @@ from .const import (
     SOURCE_MANUAL,
 )
 from .ge import async_discover, async_has_ge_devices, device_name
+from .helpers import hex_to_rgb, slugify_tag
 
 GE_DISCOVERY_VERSION = 5  # keep in sync with __init__.GE_DISCOVERY_VERSION
-from .helpers import hex_to_rgb, slugify_tag
 
 AUTO = "auto"
 
@@ -130,9 +131,13 @@ def _type_selector(include_auto: bool) -> selector.SelectSelector:
         for key, defn in APPLIANCE_REGISTRY.items()
     ]
     if include_auto:
-        options.insert(0, selector.SelectOptionDict(value=AUTO, label="Detect automatically"))
+        options.insert(
+            0, selector.SelectOptionDict(value=AUTO, label="Detect automatically")
+        )
     return selector.SelectSelector(
-        selector.SelectSelectorConfig(options=options, mode=selector.SelectSelectorMode.DROPDOWN)
+        selector.SelectSelectorConfig(
+            options=options, mode=selector.SelectSelectorMode.DROPDOWN
+        )
     )
 
 
@@ -148,15 +153,25 @@ def _phones_selector() -> selector.DeviceSelector:
 def _dismiss_selector() -> selector.NumberSelector:
     return selector.NumberSelector(
         selector.NumberSelectorConfig(
-            min=0, max=240, step=5, unit_of_measurement="min", mode=selector.NumberSelectorMode.BOX
+            min=0,
+            max=240,
+            step=5,
+            unit_of_measurement="min",
+            mode=selector.NumberSelectorMode.BOX,
         )
     )
 
 
-def _number(min_: float, max_: float, step: float, unit: str) -> selector.NumberSelector:
+def _number(
+    min_: float, max_: float, step: float, unit: str
+) -> selector.NumberSelector:
     return selector.NumberSelector(
         selector.NumberSelectorConfig(
-            min=min_, max=max_, step=step, unit_of_measurement=unit, mode=selector.NumberSelectorMode.BOX
+            min=min_,
+            max=max_,
+            step=step,
+            unit_of_measurement=unit,
+            mode=selector.NumberSelectorMode.BOX,
         )
     )
 
@@ -310,7 +325,10 @@ def _behaviour_fields(
     appliance_type: str,
     current: dict[str, Any],
     has_cooktop: bool,
-    temperature_defaults: tuple[float, float] = (DEFAULT_FRIDGE_MAX_F, DEFAULT_FREEZER_MAX_F),
+    temperature_defaults: tuple[float, float] = (
+        DEFAULT_FRIDGE_MAX_F,
+        DEFAULT_FREEZER_MAX_F,
+    ),
 ) -> dict:
     """Alert settings for the appliance type, flat (see _sectioned). Entity
     pickers are pre-filled via suggested values."""
@@ -320,15 +338,21 @@ def _behaviour_fields(
             {
                 vol.Optional(
                     CONF_OPEN_DELAY_SECONDS,
-                    default=current.get(CONF_OPEN_DELAY_SECONDS, DEFAULT_OPEN_DELAY_SECONDS),
+                    default=current.get(
+                        CONF_OPEN_DELAY_SECONDS, DEFAULT_OPEN_DELAY_SECONDS
+                    ),
                 ): _number(0, 600, 5, "s"),
                 vol.Optional(
                     CONF_CRITICAL_AFTER_MINUTES,
-                    default=current.get(CONF_CRITICAL_AFTER_MINUTES, DEFAULT_CRITICAL_AFTER_MINUTES),
+                    default=current.get(
+                        CONF_CRITICAL_AFTER_MINUTES, DEFAULT_CRITICAL_AFTER_MINUTES
+                    ),
                 ): _number(1, 120, 1, "min"),
                 vol.Optional(
                     CONF_CRITICAL_REPEAT_MINUTES,
-                    default=current.get(CONF_CRITICAL_REPEAT_MINUTES, DEFAULT_CRITICAL_REPEAT_MINUTES),
+                    default=current.get(
+                        CONF_CRITICAL_REPEAT_MINUTES, DEFAULT_CRITICAL_REPEAT_MINUTES
+                    ),
                 ): _number(1, 60, 1, "min"),
                 vol.Optional(
                     CONF_SNOOZE_MINUTES,
@@ -371,7 +395,8 @@ def _behaviour_fields(
                         )
                     ),
                     vol.Optional(
-                        CONF_SUPPLY_LOW, default=current.get(CONF_SUPPLY_LOW, DEFAULT_SUPPLY_LOW)
+                        CONF_SUPPLY_LOW,
+                        default=current.get(CONF_SUPPLY_LOW, DEFAULT_SUPPLY_LOW),
                     ): _number(0, 50, 1, "left"),
                 }
             )
@@ -385,16 +410,26 @@ def _behaviour_fields(
         )
     if appliance_type == "oven":
         fields[
-            vol.Optional(CONF_PREHEAT_ALERT, default=current.get(CONF_PREHEAT_ALERT, True))
+            vol.Optional(
+                CONF_PREHEAT_ALERT, default=current.get(CONF_PREHEAT_ALERT, True)
+            )
         ] = selector.BooleanSelector()
         fields[vol.Optional(CONF_OVEN_LIGHT_ENTITY)] = selector.EntitySelector(
             selector.EntitySelectorConfig(domain=["select", "light", "switch"])
         )
     if appliance_type in ("washer", "dryer"):
         if appliance_type == "dryer":
-            defaults = (DEFAULT_DRYER_REMINDER_MINUTES, DEFAULT_DRYER_REPEAT_MINUTES, DEFAULT_DRYER_MAX_REMINDERS)
+            defaults = (
+                DEFAULT_DRYER_REMINDER_MINUTES,
+                DEFAULT_DRYER_REPEAT_MINUTES,
+                DEFAULT_DRYER_MAX_REMINDERS,
+            )
         else:
-            defaults = (DEFAULT_MOVE_REMINDER_MINUTES, DEFAULT_MOVE_REPEAT_MINUTES, DEFAULT_MOVE_MAX_REMINDERS)
+            defaults = (
+                DEFAULT_MOVE_REMINDER_MINUTES,
+                DEFAULT_MOVE_REPEAT_MINUTES,
+                DEFAULT_MOVE_MAX_REMINDERS,
+            )
         fields.update(
             {
                 vol.Optional(
@@ -416,13 +451,16 @@ def _behaviour_fields(
         fields.update(
             {
                 vol.Optional(
-                    CONF_FRIDGE_MAX_TEMP, default=current.get(CONF_FRIDGE_MAX_TEMP, fridge_max)
+                    CONF_FRIDGE_MAX_TEMP,
+                    default=current.get(CONF_FRIDGE_MAX_TEMP, fridge_max),
                 ): _number(-10, 70, 1, "°"),
                 vol.Optional(
-                    CONF_FREEZER_MAX_TEMP, default=current.get(CONF_FREEZER_MAX_TEMP, freezer_max)
+                    CONF_FREEZER_MAX_TEMP,
+                    default=current.get(CONF_FREEZER_MAX_TEMP, freezer_max),
                 ): _number(-40, 40, 1, "°"),
                 vol.Optional(
-                    CONF_WARM_MINUTES, default=current.get(CONF_WARM_MINUTES, DEFAULT_WARM_MINUTES)
+                    CONF_WARM_MINUTES,
+                    default=current.get(CONF_WARM_MINUTES, DEFAULT_WARM_MINUTES),
                 ): _number(5, 240, 5, "min"),
                 vol.Optional(
                     CONF_ICE_FULL_ALERT, default=current.get(CONF_ICE_FULL_ALERT, False)
@@ -439,7 +477,8 @@ def _behaviour_fields(
                     selector.EntitySelectorConfig(domain="button")
                 ),
                 vol.Optional(
-                    CONF_COMBINE_LAUNDRY, default=current.get(CONF_COMBINE_LAUNDRY, True)
+                    CONF_COMBINE_LAUNDRY,
+                    default=current.get(CONF_COMBINE_LAUNDRY, True),
                 ): selector.BooleanSelector(),
                 vol.Optional(CONF_LAUNDRY_TITLE): selector.TextSelector(),
             }
@@ -449,11 +488,15 @@ def _behaviour_fields(
             {
                 vol.Optional(
                     CONF_COOKTOP_ALERT_MINUTES,
-                    default=current.get(CONF_COOKTOP_ALERT_MINUTES, DEFAULT_COOKTOP_ALERT_MINUTES),
+                    default=current.get(
+                        CONF_COOKTOP_ALERT_MINUTES, DEFAULT_COOKTOP_ALERT_MINUTES
+                    ),
                 ): _number(1, 240, 1, "min"),
                 vol.Optional(
                     CONF_COOKTOP_REPEAT_MINUTES,
-                    default=current.get(CONF_COOKTOP_REPEAT_MINUTES, DEFAULT_COOKTOP_REPEAT_MINUTES),
+                    default=current.get(
+                        CONF_COOKTOP_REPEAT_MINUTES, DEFAULT_COOKTOP_REPEAT_MINUTES
+                    ),
                 ): _number(1, 120, 1, "min"),
             }
         )
@@ -469,7 +512,9 @@ def _behaviour_fields(
                 ),
                 vol.Optional(
                     CONF_LEAK_REPEAT_MINUTES,
-                    default=current.get(CONF_LEAK_REPEAT_MINUTES, DEFAULT_LEAK_REPEAT_MINUTES),
+                    default=current.get(
+                        CONF_LEAK_REPEAT_MINUTES, DEFAULT_LEAK_REPEAT_MINUTES
+                    ),
                 ): _number(1, 60, 1, "min"),
             }
         )
@@ -485,7 +530,11 @@ def _behaviour_fields(
         fields.update(_announce_fields())
     # Quiet hours: only when the appliance sends alerts that can wait (a plain
     # door's alerts are all critical or Live Activities)
-    if appliance_type != "door" or current.get(CONF_QUIET_START) or current.get(CONF_QUIET_END):
+    if (
+        appliance_type != "door"
+        or current.get(CONF_QUIET_START)
+        or current.get(CONF_QUIET_END)
+    ):
         fields.update(
             {
                 vol.Optional(CONF_QUIET_START): selector.TimeSelector(),
@@ -498,11 +547,12 @@ def _behaviour_fields(
 REDISCOVER = "rediscover"
 
 
-
 def _entity_fields(appliance_type: str) -> dict:
     """The appliance's sensors (Reconfigure)."""
     sensor = selector.EntitySelector(selector.EntitySelectorConfig(domain="sensor"))
-    binary = selector.EntitySelector(selector.EntitySelectorConfig(domain="binary_sensor"))
+    binary = selector.EntitySelector(
+        selector.EntitySelectorConfig(domain="binary_sensor")
+    )
     if appliance_type in DOOR_TYPES:
         fields: dict = {
             vol.Required(CONF_STATE_ENTITY): selector.EntitySelector(
@@ -540,7 +590,9 @@ def _entity_fields(appliance_type: str) -> dict:
                 ),
                 vol.Optional(CONF_TEMPERATURE_ENTITY): sensor,
                 vol.Optional(CONF_TARGET_TEMPERATURE_ENTITY): selector.EntitySelector(
-                    selector.EntitySelectorConfig(domain=["water_heater", "climate", "number", "sensor"])
+                    selector.EntitySelectorConfig(
+                        domain=["water_heater", "climate", "number", "sensor"]
+                    )
                 ),
                 vol.Optional(CONF_TIMER_ENTITY): sensor,
                 vol.Optional(CONF_PROBE_ENTITY): sensor,
@@ -561,16 +613,22 @@ class ApplianceLiveActivityConfigFlow(ConfigFlow, domain=DOMAIN):
     def __init__(self) -> None:
         self._data: dict[str, Any] = {}
 
-    async def async_step_user(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
+    async def async_step_user(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
         """Choose GE Home auto-setup or manual setup."""
         if async_has_ge_devices(self.hass):
-            return self.async_show_menu(step_id="user", menu_options=[SOURCE_GE_HOME, SOURCE_MANUAL])
+            return self.async_show_menu(
+                step_id="user", menu_options=[SOURCE_GE_HOME, SOURCE_MANUAL]
+            )
         return await self.async_step_manual()
 
     # ------------------------------------------------------------------
     # GE Home (SmartHQ)
     # ------------------------------------------------------------------
-    async def async_step_ge_home(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
+    async def async_step_ge_home(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
         """Pick a GE appliance; its entities are discovered automatically."""
         errors: dict[str, str] = {}
         if user_input is not None:
@@ -600,11 +658,17 @@ class ApplianceLiveActivityConfigFlow(ConfigFlow, domain=DOMAIN):
             {
                 vol.Required(CONF_SOURCE_DEVICE): selector.DeviceSelector(
                     selector.DeviceSelectorConfig(
-                        filter=[selector.DeviceFilterSelectorConfig(integration=GE_HOME_DOMAIN)]
+                        filter=[
+                            selector.DeviceFilterSelectorConfig(
+                                integration=GE_HOME_DOMAIN
+                            )
+                        ]
                     )
                 ),
                 vol.Optional(CONF_NAME): selector.TextSelector(),
-                vol.Optional(CONF_APPLIANCE_TYPE, default=AUTO): _type_selector(include_auto=True),
+                vol.Optional(CONF_APPLIANCE_TYPE, default=AUTO): _type_selector(
+                    include_auto=True
+                ),
             }
         )
         return self.async_show_form(
@@ -633,7 +697,9 @@ class ApplianceLiveActivityConfigFlow(ConfigFlow, domain=DOMAIN):
             return self.async_abort(reason="already_configured")
         schema = vol.Schema(
             {
-                vol.Required(CONF_OVEN_CAVITY, default=options[0]["value"]): selector.SelectSelector(
+                vol.Required(
+                    CONF_OVEN_CAVITY, default=options[0]["value"]
+                ): selector.SelectSelector(
                     selector.SelectSelectorConfig(options=options)
                 )
             }
@@ -648,19 +714,26 @@ class ApplianceLiveActivityConfigFlow(ConfigFlow, domain=DOMAIN):
         await self.async_set_unique_id(unique)
         self._abort_if_unique_id_configured()
         name = self._data.get(CONF_NAME) or (
-            device_name(self.hass, device_id) or APPLIANCE_REGISTRY[appliance_type].display_name
+            device_name(self.hass, device_id)
+            or APPLIANCE_REGISTRY[appliance_type].display_name
         )
         if cavity and not self._data.get(CONF_NAME):
             name = f"{name} {cavity.title()}"
         self._data.update(
-            {CONF_NAME: name, **found.as_config(), CONF_GE_DISCOVERY: GE_DISCOVERY_VERSION}
+            {
+                CONF_NAME: name,
+                **found.as_config(),
+                CONF_GE_DISCOVERY: GE_DISCOVERY_VERSION,
+            }
         )
         return await self.async_step_notify()
 
     # ------------------------------------------------------------------
     # Manual (any brand)
     # ------------------------------------------------------------------
-    async def async_step_manual(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
+    async def async_step_manual(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
         """Pick appliance type and name."""
         if user_input is not None:
             self._data = {CONF_SOURCE: SOURCE_MANUAL, **user_input}
@@ -674,14 +747,18 @@ class ApplianceLiveActivityConfigFlow(ConfigFlow, domain=DOMAIN):
         )
         return self.async_show_form(step_id=SOURCE_MANUAL, data_schema=schema)
 
-    async def async_step_entities(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
+    async def async_step_entities(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
         """Pick the appliance's entities."""
         if user_input is not None:
             self._data.update(user_input)
             return await self.async_step_notify()
 
         sensor = selector.EntitySelector(selector.EntitySelectorConfig(domain="sensor"))
-        binary = selector.EntitySelector(selector.EntitySelectorConfig(domain="binary_sensor"))
+        binary = selector.EntitySelector(
+            selector.EntitySelectorConfig(domain="binary_sensor")
+        )
         schema = vol.Schema(
             {
                 vol.Required(CONF_STATE_ENTITY): selector.EntitySelector(
@@ -699,12 +776,18 @@ class ApplianceLiveActivityConfigFlow(ConfigFlow, domain=DOMAIN):
             schema = schema.extend(
                 {
                     vol.Optional(CONF_COOKTOP_ENTITIES): selector.EntitySelector(
-                        selector.EntitySelectorConfig(domain="binary_sensor", multiple=True)
+                        selector.EntitySelectorConfig(
+                            domain="binary_sensor", multiple=True
+                        )
                     ),
                     vol.Optional(CONF_TEMPERATURE_ENTITY): selector.EntitySelector(
-                        selector.EntitySelectorConfig(domain="sensor", device_class="temperature")
+                        selector.EntitySelectorConfig(
+                            domain="sensor", device_class="temperature"
+                        )
                     ),
-                    vol.Optional(CONF_TARGET_TEMPERATURE_ENTITY): selector.EntitySelector(
+                    vol.Optional(
+                        CONF_TARGET_TEMPERATURE_ENTITY
+                    ): selector.EntitySelector(
                         selector.EntitySelectorConfig(
                             domain=["water_heater", "climate", "number", "sensor"]
                         )
@@ -723,7 +806,9 @@ class ApplianceLiveActivityConfigFlow(ConfigFlow, domain=DOMAIN):
     # ------------------------------------------------------------------
     # Notifications (shared)
     # ------------------------------------------------------------------
-    async def async_step_notify(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
+    async def async_step_notify(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
         """Pick phones and notification options."""
         definition = APPLIANCE_REGISTRY[self._data[CONF_APPLIANCE_TYPE]]
         default_tag = _make_tag(self._data[CONF_APPLIANCE_TYPE], self._data[CONF_NAME])
@@ -747,8 +832,12 @@ class ApplianceLiveActivityConfigFlow(ConfigFlow, domain=DOMAIN):
                     _temperature_defaults(self.hass),
                 ),
                 vol.Optional(CONF_ACTIVITY_TITLE): selector.TextSelector(),
-                vol.Optional(CONF_ICON, default=definition.icon): selector.IconSelector(),
-                vol.Optional(CONF_ICON_COLOR, default=hex_to_rgb(definition.color)): selector.ColorRGBSelector(),
+                vol.Optional(
+                    CONF_ICON, default=definition.icon
+                ): selector.IconSelector(),
+                vol.Optional(
+                    CONF_ICON_COLOR, default=hex_to_rgb(definition.color)
+                ): selector.ColorRGBSelector(),
             }
         )
         return self.async_show_form(
@@ -764,7 +853,9 @@ class ApplianceLiveActivityConfigFlow(ConfigFlow, domain=DOMAIN):
     ) -> ConfigFlowResult:
         entry = self._get_reconfigure_entry()
         appliance_type = entry.data[CONF_APPLIANCE_TYPE]
-        is_ge = entry.data.get(CONF_SOURCE) == SOURCE_GE_HOME and entry.data.get(CONF_SOURCE_DEVICE)
+        is_ge = entry.data.get(CONF_SOURCE) == SOURCE_GE_HOME and entry.data.get(
+            CONF_SOURCE_DEVICE
+        )
         fields = _entity_fields(appliance_type)
 
         if user_input is not None:
@@ -774,7 +865,9 @@ class ApplianceLiveActivityConfigFlow(ConfigFlow, domain=DOMAIN):
                 data[name] = user_input.get(name) or None
             if is_ge and user_input.get(REDISCOVER):
                 found = async_discover(
-                    self.hass, entry.data[CONF_SOURCE_DEVICE], entry.data.get(CONF_OVEN_CAVITY)
+                    self.hass,
+                    entry.data[CONF_SOURCE_DEVICE],
+                    entry.data.get(CONF_OVEN_CAVITY),
                 )
                 data.update(found.as_config())
                 data[CONF_GE_DISCOVERY] = GE_DISCOVERY_VERSION
@@ -782,12 +875,15 @@ class ApplianceLiveActivityConfigFlow(ConfigFlow, domain=DOMAIN):
 
         schema_fields: dict = {}
         if is_ge:
-            schema_fields[vol.Optional(REDISCOVER, default=False)] = selector.BooleanSelector()
+            schema_fields[vol.Optional(REDISCOVER, default=False)] = (
+                selector.BooleanSelector()
+            )
         schema_fields.update(fields)
         return self.async_show_form(
             step_id="reconfigure",
             data_schema=self.add_suggested_values_to_schema(
-                vol.Schema(schema_fields), {k: v for k, v in entry.data.items() if v is not None}
+                vol.Schema(schema_fields),
+                {k: v for k, v in entry.data.items() if v is not None},
             ),
             description_placeholders={"name": entry.title},
         )
@@ -801,7 +897,9 @@ class ApplianceLiveActivityConfigFlow(ConfigFlow, domain=DOMAIN):
 class ApplianceLiveActivityOptionsFlow(OptionsFlowWithReload):
     """Change phones, alerts and appearance after setup (reloads on save)."""
 
-    async def async_step_init(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
+    async def async_step_init(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
         if user_input is not None:
             user_input = _flatten(user_input)
             # A cleared picker is simply missing from user_input; store None so
@@ -814,7 +912,9 @@ class ApplianceLiveActivityOptionsFlow(OptionsFlowWithReload):
         definition = APPLIANCE_REGISTRY[current[CONF_APPLIANCE_TYPE]]
         schema = _sectioned(
             {
-                vol.Required(CONF_DEVICES, default=current.get(CONF_DEVICES, [])): _phones_selector(),
+                vol.Required(
+                    CONF_DEVICES, default=current.get(CONF_DEVICES, [])
+                ): _phones_selector(),
                 **_behaviour_fields(
                     current[CONF_APPLIANCE_TYPE],
                     current,
@@ -826,7 +926,10 @@ class ApplianceLiveActivityOptionsFlow(OptionsFlowWithReload):
                     CONF_ICON, default=current.get(CONF_ICON) or definition.icon
                 ): selector.IconSelector(),
                 vol.Optional(
-                    CONF_ICON_COLOR, default=_current_rgb(current.get(CONF_ICON_COLOR), definition.color)
+                    CONF_ICON_COLOR,
+                    default=_current_rgb(
+                        current.get(CONF_ICON_COLOR), definition.color
+                    ),
                 ): selector.ColorRGBSelector(),
             }
         )
@@ -838,7 +941,9 @@ class ApplianceLiveActivityOptionsFlow(OptionsFlowWithReload):
                     {
                         **current,
                         # Older entries stored a hex string; the color picker needs RGB
-                        CONF_ICON_COLOR: _current_rgb(current.get(CONF_ICON_COLOR), definition.color),
+                        CONF_ICON_COLOR: _current_rgb(
+                            current.get(CONF_ICON_COLOR), definition.color
+                        ),
                     }
                 ),
             ),

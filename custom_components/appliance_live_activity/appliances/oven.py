@@ -9,6 +9,7 @@ the displayed message.
 only counts as "finished" when a cook timer was running and had (nearly)
 run out -- the coordinator handles that with FINISHED_THRESHOLD_MINUTES.
 """
+
 from ..appliance import ApplianceDefinition, register
 
 register(
@@ -17,7 +18,16 @@ register(
         display_name="Oven",
         icon="mdi:stove",
         color="#F44336",
-        active_states=["Run", "Running", "Bake", "Baking", "Preheat", "Preheating", "Broil", "Convection Bake"],
+        active_states=[
+            "Run",
+            "Running",
+            "Bake",
+            "Baking",
+            "Preheat",
+            "Preheating",
+            "Broil",
+            "Convection Bake",
+        ],
         pause_states=["Pause"],
         complete_states=["Finished", "Complete", "Done"],
         running_message="Cooking",
