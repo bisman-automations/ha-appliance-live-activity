@@ -5,20 +5,30 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.11.1] - 2026-10-26
+## [1.12.0] - 2026-10-28
 
 ### Changed
 
-- The changelog no longer keeps an Unreleased section, and the agent notes follow the updated shared release rules.
+- **Requires Home Assistant 2026.8 or newer.** Linked devices, one config entry per device, are how an appliance and its Live Activity stay connected. Home Assistant 2026.7 is no longer supported.
+- **Entity names follow the device.** Status, Time Left, Probe Target, the cycle or door event and Update Live Activity are named for what they are, and Home Assistant adds the device name. A new linked appliance is `sensor.kitchen_dishwasher_live_activity_status` instead of the doubled `sensor.kitchen_dishwasher_live_activity_kitchen_dishwasher_status`. An appliance that is not linked to another device keeps `sensor.kitchen_oven_status`. Entity IDs you already have are not changed, because the unique IDs did not change; rename one in **Settings → Entities** if you want the new form.
+- One-time repairs of an existing appliance (GE sensors learned since it was set up, a dishwasher filter that was stored as a supply, and options Configure used to wipe) run once when Home Assistant migrates the entry, instead of on every start.
 - The README follows the same layout as the other bisman-automations integrations: a button that opens it in HACS, a button that starts setup, and troubleshooting steps for debug logs and diagnostics.
 - Each release now includes `appliance_live_activity.zip` for installing without HACS.
+- The changelog no longer keeps an Unreleased section.
 
 ### Fixed
 
-- **Entity IDs no longer repeat the appliance name**: on Home Assistant 2026.7 and newer, an appliance linked to its GE or other brand's device got IDs like `sensor.kitchen_dishwasher_live_activity_kitchen_dishwasher_status`. New entities are named `sensor.kitchen_dishwasher_status` again. Existing entity IDs are not changed, so automations keep working; rename them in **Settings → Entities** if you like.
-- **Ready for Home Assistant 2027.8**: finding the integration's own device no longer uses a device registry call that Home Assistant 2026.10 deprecated and 2027.8 removes.
 - **Delayed start**: when the delay countdown reached 0 a moment before the washer started, the Live Activity briefly showed "Scheduled" without a start time.
-- Reloading or removing an appliance cancels the pending removal of "resolved" notifications instead of leaving it running.
+- Reloading or removing an appliance cancels the pending removal of a "resolved" notification, and that timer is tied to the config entry so it cannot keep running after the appliance is gone.
+- If setting up an appliance's entities fails part way, its listeners and timers are cancelled instead of being left behind.
+
+### Security
+
+- **Diagnostics redact personal data.** Downloaded diagnostics no longer include phone names, whether someone is home, notification services named after a phone, picture URLs (they carry an access token), or the phones and custom titles stored on the appliance. Appliance sensor ids and what the appliance is doing are still included, so a bug report stays useful.
+
+### Removed
+
+- Support for Home Assistant 2026.7.
 
 ## [1.11.0] - 2026-10-24
 
@@ -468,7 +478,7 @@ Initial release.
 - Status and Progress sensors per appliance for dashboards.
 - `appliance_live_activity.update` service for forcing a manual refresh.
 
-[1.11.1]: https://github.com/bisman-automations/ha-appliance-live-activity/compare/v1.11.0...v1.11.1
+[1.12.0]: https://github.com/bisman-automations/ha-appliance-live-activity/compare/v1.11.0...v1.12.0
 [1.11.0]: https://github.com/bisman-automations/ha-appliance-live-activity/compare/v1.10.1...v1.11.0
 [1.10.1]: https://github.com/bisman-automations/ha-appliance-live-activity/compare/v1.10.0...v1.10.1
 [1.10.0]: https://github.com/bisman-automations/ha-appliance-live-activity/compare/v1.9.5...v1.10.0

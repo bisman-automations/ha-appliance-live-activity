@@ -16,8 +16,9 @@ from typing import TYPE_CHECKING, Any
 
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import device_registry as dr, entity_registry as er
-from homeassistant.helpers.event import async_call_later
 from homeassistant.util import slugify
+
+from .helpers import async_track_later
 
 if TYPE_CHECKING:
     from .coordinator import ApplianceCoordinator
@@ -783,7 +784,13 @@ async def async_resolve(
     def _later(_now) -> None:
         coordinator.pending_clears.discard(cancel)
         if still_resolved is None or still_resolved():
-            hass.async_create_task(async_clear_tag(hass, coordinator, tag, devices))
+            coordinator.async_run(
+                async_clear_tag(hass, coordinator, tag, devices),
+                "clear resolved notification",
+            )
 
-    cancel = async_call_later(hass, RESOLVED_CLEAR_SECONDS, _later)
+    # async_track_later also registers the cancel with entry.async_on_unload,
+    # so the two-minute removal cannot outlive the config entry. pending_clears
+    # is the early cancel (the problem came back, or async_unload ran).
+    cancel = async_track_later(hass, coordinator.entry, RESOLVED_CLEAR_SECONDS, _later)
     coordinator.pending_clears.add(cancel)

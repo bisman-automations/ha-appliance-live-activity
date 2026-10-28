@@ -104,7 +104,7 @@ class _Base:
 
     @callback
     def _handle_change(self, _event=None) -> None:
-        self.hass.async_create_task(self.async_evaluate())
+        self.coordinator.async_run(self.async_evaluate(), "evaluate maintenance")
 
     async def async_evaluate(self) -> None:
         raise NotImplementedError

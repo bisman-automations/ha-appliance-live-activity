@@ -17,20 +17,28 @@ from .const import (
     CONF_SOURCE,
     CONF_SOURCE_DEVICE,
     CONF_SUPPLY_ENTITIES,
+    CONFIG_MINOR_VERSION,
     DOMAIN,
     DOOR_TYPES,
     PLATFORMS,
     SOURCE_GE_HOME,
 )
-from .coordinator import ApplianceCoordinator
+from .coordinator import ApplianceConfigEntry, ApplianceCoordinator
 from .door import DoorCoordinator
-from .services import async_setup_services, async_unload_services
+from .services import async_setup_services
 
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 
 
 async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
-    hass.data.setdefault(DOMAIN, {})
+    """Register services once, for the lifetime of Home Assistant.
+
+    Doing this when the first config entry loads (and removing them when the
+    last one unloads) races two entries setting up together and drops the
+    service while an entry is still loaded. The service handler no-ops when
+    the requested appliance is not set up.
+    """
+    await async_setup_services(hass)
     return True
 
 
@@ -105,11 +113,44 @@ def _async_restore_wiped(hass: HomeAssistant, entry: ConfigEntry) -> None:
     )
 
 
-async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-    hass.data.setdefault(DOMAIN, {})
-    _async_backfill_ge(hass, entry)
-    _async_move_filter_out_of_supplies(hass, entry)
-    _async_restore_wiped(hass, entry)
+async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+    """Upgrade stored config once per minor version.
+
+    The GE backfill, the filter-field move and the wiped-options restore used
+    to run on every start. They are idempotent, but they also rewrote the
+    config entry during setup. Home Assistant's minor version runs each step
+    a single time, before the entry is set up, and a later repair is a new
+    step rather than more work on the startup path.
+
+    ``GE_DISCOVERY_VERSION`` still records how far discovery got. Bumping it
+    is not enough on its own: add a minor step below that calls
+    ``_async_backfill_ge`` again.
+    """
+    if entry.version > 1:
+        return False
+
+    if entry.minor_version < 2:
+        _async_backfill_ge(hass, entry)
+        _async_move_filter_out_of_supplies(hass, entry)
+        _async_restore_wiped(hass, entry)
+        hass.config_entries.async_update_entry(entry, minor_version=2)
+
+    if entry.minor_version != CONFIG_MINOR_VERSION:
+        # A step above should have landed on the current minor. If it did
+        # not, refuse to start rather than silently skip a migration.
+        return False
+    return True
+
+
+async def async_setup_entry(hass: HomeAssistant, entry: ApplianceConfigEntry) -> bool:
+    """Create the coordinator, link the device, and forward platforms.
+
+    The coordinator is stored on ``entry.runtime_data``. If forwarding a
+    platform raises, the platforms that did load are unloaded and the
+    coordinator's listeners and timers are cancelled before the error
+    propagates. Home Assistant does not call ``async_unload_entry`` when
+    setup raises, so leaving them running would leak a timer.
+    """
     cfg = {**entry.data, **entry.options}
     coordinator_cls = (
         DoorCoordinator
@@ -117,31 +158,33 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         else ApplianceCoordinator
     )
     coordinator = coordinator_cls(hass, entry)
-    await coordinator.async_setup()
-    hass.data[DOMAIN][entry.entry_id] = coordinator
+    # Assigned before async_setup so a partner appliance can see this one
+    # while startup listeners run. Cleared again if setup does not finish;
+    # Home Assistant only drops runtime_data after a successful unload.
+    entry.runtime_data = coordinator
+    try:
+        await coordinator.async_setup()
+        from .device import async_link_device  # noqa: PLC0415
 
-    from .device import async_link_device  # noqa: PLC0415
-
-    async_link_device(hass, coordinator, entry)
-    await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
-
-    if len(hass.data[DOMAIN]) == 1:
-        await async_setup_services(hass)
-
+        async_link_device(hass, coordinator, entry)
+        await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+    except Exception:
+        await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+        await coordinator.async_unload()
+        object.__delattr__(entry, "runtime_data")
+        raise
     return True
 
 
-async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+async def async_unload_entry(hass: HomeAssistant, entry: ApplianceConfigEntry) -> bool:
+    """Unload platforms and cancel the coordinator's listeners and timers."""
     unloaded = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
     if unloaded:
-        coordinator: ApplianceCoordinator = hass.data[DOMAIN].pop(entry.entry_id)
-        await coordinator.async_unload()
-        if not hass.data[DOMAIN]:
-            await async_unload_services(hass)
+        await entry.runtime_data.async_unload()
     return unloaded
 
 
-async def async_remove_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
+async def async_remove_entry(hass: HomeAssistant, entry: ApplianceConfigEntry) -> None:
     """Appliance deleted: remove its Repairs issues."""
     from .health import async_remove_issues  # noqa: PLC0415
 

@@ -26,7 +26,6 @@ from homeassistant.const import ATTR_UNIT_OF_MEASUREMENT, STATE_ON
 from homeassistant.core import CALLBACK_TYPE, Event, HomeAssistant, callback
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.event import (
-    async_call_later,
     async_track_state_change_event,
     async_track_time_interval,
 )
@@ -132,6 +131,8 @@ from .const import (
     STORAGE_VERSION,
 )
 from .helpers import (
+    async_entry_background_task,
+    async_track_later,
     classify_state,
     color_to_hex,
     in_quiet_hours,
@@ -157,6 +158,23 @@ _LOGGER = logging.getLogger(__name__)
 ACTIVE = (STATUS_RUNNING, STATUS_PAUSED)
 # Seconds "Off" / "Stopped" shows before the Live Activity is ended
 STOPPED_DISPLAY_SECONDS = 60
+
+
+def iter_coordinators(hass: HomeAssistant) -> list[ApplianceCoordinator]:
+    """Coordinators stored on each entry's ``runtime_data``.
+
+    Includes an entry that is still in ``async_setup_entry`` (its runtime
+    data is already assigned, its state is not LOADED yet) and skips entries
+    that have not been set up. Replaces ``hass.data[DOMAIN]``.
+    """
+    found: list[ApplianceCoordinator] = []
+    for entry in hass.config_entries.async_entries(DOMAIN):
+        if not hasattr(entry, "runtime_data"):
+            continue
+        runtime = entry.runtime_data
+        if isinstance(runtime, ApplianceCoordinator):
+            found.append(runtime)
+    return found
 
 
 class ApplianceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
@@ -469,16 +487,21 @@ class ApplianceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             "progress": 0,
         }
 
+    def async_run(self, target, name: str):
+        """Run ``target`` in the background; cancelled when this entry unloads.
+
+        Event handlers used to call ``hass.async_create_task``. That task
+        outlives the config entry. The name shows up in the logs when a task
+        is still running at unload.
+        """
+        return async_entry_background_task(self.hass, self.entry, target, name)
+
     # ------------------------------------------------------------------
     # Shared washer + dryer Live Activity
     # ------------------------------------------------------------------
     def partner(self) -> ApplianceCoordinator | None:
         """The washer <-> dryer this appliance shares its Live Activity with."""
-        coordinators = [
-            c
-            for c in self.hass.data.get(DOMAIN, {}).values()
-            if isinstance(c, ApplianceCoordinator) and c is not self
-        ]
+        coordinators = [c for c in iter_coordinators(self.hass) if c is not self]
         if self.combine_laundry:
             return next(
                 (
@@ -602,10 +625,8 @@ class ApplianceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         return next(
             (
                 c
-                for c in self.hass.data.get(DOMAIN, {}).values()
-                if isinstance(c, ApplianceCoordinator)
-                and c.appliance_type == "washer"
-                and c.dryer_entity == self.state_entity
+                for c in iter_coordinators(self.hass)
+                if c.appliance_type == "washer" and c.dryer_entity == self.state_entity
             ),
             None,
         )
@@ -757,7 +778,7 @@ class ApplianceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     @callback
     def _handle_quiet_tick(self, _now=None) -> None:
         if self._deferred and not self.quiet_now():
-            self.hass.async_create_task(self._async_flush_deferred())
+            self.async_run(self._async_flush_deferred(), "flush deferred alerts")
 
     async def _async_flush_deferred(self) -> None:
         pending, self._deferred = self._deferred, {}
@@ -911,15 +932,17 @@ class ApplianceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             # "move the laundry" reminders. A shared laundry activity stays
             # up until the dryer takes it over (or the dismiss delay).
             if self._dismiss_at is not None and not self.combine_laundry:
-                self.hass.async_create_task(self._async_dismiss())
+                self.async_run(self._async_dismiss(), "dismiss finished activity")
             if self._move_since is not None:
-                self.hass.async_create_task(self._async_cancel_move("door opened"))
+                self.async_run(
+                    self._async_cancel_move("door opened"), "cancel laundry reminder"
+                )
             return
-        self.hass.async_create_task(self.async_evaluate(send=True))
+        self.async_run(self.async_evaluate(send=True), "evaluate appliance")
 
     @callback
     def _handle_tick(self, _now=None) -> None:
-        self.hass.async_create_task(self.async_evaluate(send=True))
+        self.async_run(self.async_evaluate(send=True), "evaluate appliance")
 
     @callback
     def _handle_action(self, event: Event) -> None:
@@ -930,7 +953,7 @@ class ApplianceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         handler = self._action_handlers().get(action)
         if handler is not None:
             _LOGGER.debug("%s: notification action %s", self.name, action)
-            self.hass.async_create_task(handler())
+            self.async_run(handler(), "notification action")
 
     def _action_handlers(self) -> dict[str, Any]:
         if self.appliance_type == "dryer":
@@ -1596,9 +1619,11 @@ class ApplianceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         @callback
         def _fire(_now) -> None:
             self._dismiss_unsub = None
-            self.hass.async_create_task(self._async_dismiss())
+            self.async_run(self._async_dismiss(), "dismiss finished activity")
 
-        self._dismiss_unsub = async_call_later(self.hass, delay_seconds, _fire)
+        self._dismiss_unsub = async_track_later(
+            self.hass, self.entry, delay_seconds, _fire
+        )
 
     def _cancel_dismiss(self) -> None:
         if self._dismiss_unsub is not None:
@@ -1620,9 +1645,11 @@ class ApplianceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 and self._delay_sent is None
                 and self._dismiss_at is None
             ):
-                self.hass.async_create_task(self._async_end_activity())
+                self.async_run(self._async_end_activity(), "end stopped activity")
 
-        self._stop_unsub = async_call_later(self.hass, STOPPED_DISPLAY_SECONDS, _fire)
+        self._stop_unsub = async_track_later(
+            self.hass, self.entry, STOPPED_DISPLAY_SECONDS, _fire
+        )
 
     async def _async_dismiss(self) -> None:
         self._cancel_dismiss()
@@ -1662,3 +1689,8 @@ class ApplianceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
     async def _async_save(self) -> None:
         await self._store.async_save(self._data_to_save())
+
+
+# A config entry whose runtime_data is this integration's coordinator.
+# DoorCoordinator is a subclass, so a refrigerator entry fits this too.
+type ApplianceConfigEntry = ConfigEntry[ApplianceCoordinator]

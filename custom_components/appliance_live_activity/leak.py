@@ -112,7 +112,7 @@ class LeakMonitor:
 
     @callback
     def _handle_change(self, _event=None) -> None:
-        self.hass.async_create_task(self.async_evaluate())
+        self.coordinator.async_run(self.async_evaluate(), "evaluate leak")
 
     @callback
     def _handle_action(self, event: Event) -> None:
@@ -120,8 +120,9 @@ class LeakMonitor:
             return
         _LOGGER.info("%s: leak alerts silenced until dry", self.coordinator.name)
         self._silenced = True
-        self.hass.async_create_task(
-            async_clear_tag(self.hass, self.coordinator, self.tag, self.devices)
+        self.coordinator.async_run(
+            async_clear_tag(self.hass, self.coordinator, self.tag, self.devices),
+            "clear leak alert",
         )
 
     async def async_evaluate(self) -> None:

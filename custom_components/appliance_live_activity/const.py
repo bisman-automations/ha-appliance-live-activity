@@ -7,6 +7,13 @@ from homeassistant.const import Platform
 DOMAIN = "appliance_live_activity"
 STORAGE_VERSION = 1
 
+# Config-entry minor version. Home Assistant runs ``async_migrate_entry``
+# once when a stored entry is older than the flow's ``MINOR_VERSION``.
+# 2: GE entity backfill, dishwasher filter moved out of supplies, and
+# options that Configure used to wipe. A future one-time repair adds the
+# next minor here and a matching step in ``async_migrate_entry``.
+CONFIG_MINOR_VERSION = 2
+
 PLATFORMS: list[Platform] = [
     Platform.SENSOR,
     Platform.NUMBER,

@@ -244,7 +244,7 @@ async def test_new_wash_while_last_load_dries(
     # Load 1 is dry and unloaded; load 2 finishes washing
     await _finish(hass, "dryer")
     await _finish(hass, "washer")
-    dryer_coordinator = hass.data[DOMAIN][dryer.entry_id]
+    dryer_coordinator = dryer.runtime_data
     await dryer_coordinator._async_dismiss()  # dryer door opened
     assert cleared() == ["laundry_room_washer"]
 

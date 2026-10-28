@@ -11,8 +11,9 @@ that sends iOS Live Activities and alerts (via the Home Assistant Companion app,
 first, plus any other brand or a plain door/contact sensor set up manually.
 
 - Repo: `bisman-automations/ha-appliance-live-activity` (owner `@donavanbecker`).
-- Minimum Home Assistant: `hacs.json` → `homeassistant` (currently 2026.7.0).
+- Minimum Home Assistant: `hacs.json` → `homeassistant` (currently 2026.8.0).
   Code must keep working from that version through the current dev release.
+  Do not add a `homeassistant` key to `manifest.json`; hassfest rejects it.
 
 ## Ground rules
 
@@ -25,9 +26,11 @@ first, plus any other brand or a plain door/contact sensor set up manually.
 - Don't change entity unique IDs or entity IDs; dashboards and automations
   depend on them. Moving entities between devices must keep IDs.
 - Existing config entries must keep working: when stored data changes shape,
-  migrate or backfill it in `async_setup_entry` (see `_async_backfill_ge`,
-  `_async_restore_wiped`, and `GE_DISCOVERY_VERSION`, which is defined in both
-  `__init__.py` and `config_flow.py`).
+  migrate it once in `async_migrate_entry` and bump `CONFIG_MINOR_VERSION`
+  (and the flow's `MINOR_VERSION`). `GE_DISCOVERY_VERSION` is defined in both
+  `__init__.py` and `config_flow.py`; a new discovery version needs a new
+  minor step that calls `_async_backfill_ge`, or existing entries will not
+  pick the new entities up.
 
 ## Release notes for this repo
 
@@ -53,27 +56,35 @@ first, plus any other brand or a plain door/contact sensor set up manually.
 
 ## Home Assistant conventions to follow
 
-- **Devices (HA 2026.8+ registry v3)**: a device belongs to exactly one config
-  entry. Each appliance gets its own device (`own_device_info`) that repeats
-  the appliance device's identifiers and connections, so both pages show each
-  other under **Linked devices**. Don't co-own another integration's device,
-  don't put our entities on it (`entity.device_entry`), and don't use
-  `via_device` for this. Gate behavior that differs on older HA with
-  `LINKED_DEVICES_SUPPORTED`. Avoid `DeviceEntry.config_entries` and
-  `primary_config_entry` on new HA; use `config_entry_id`.
-- **Finding our device**: use `own_device(hass, entry)` (`device.py`).
-  `device_registry.async_get_device` is deprecated from 2026.10 (stops
-  working in 2027.8); `own_device` uses `async_get_device_by_identifier` when
-  it exists and falls back on older HA. Tests use it too.
-- **Entity IDs**: our entities don't use `has_entity_name`, and their names
-  start with the appliance name. Since HA 2026.7 such entities get their
-  device's name in front of the ID unless the name already starts with it,
-  and our linked device is "<appliance> Live Activity". `attach_to_appliance`
-  therefore suggests `<platform>.<slug of the entity name>`; pass every new
-  entity's platform and name to it.
-- **Timers**: cancel every `async_call_later` when the entry unloads (see
-  `pending_clears` for the "resolved" notification clears). The test harness
-  fails a test that leaves a timer behind.
+- **Devices (registry v3, required since the 2026.8 minimum)**: a device
+  belongs to exactly one config entry (`config_entry_id`). Each appliance
+  gets its own device (`own_device_info`) that repeats the appliance
+  device's identifiers and connections, so both pages show each other under
+  **Linked devices**. Don't co-own another integration's device, don't put
+  our entities on it (`entity.device_entry`), and don't use `via_device`.
+  Don't read `DeviceEntry.config_entries` or `primary_config_entry`, and
+  don't pass `remove_config_entry_id`; remove a device with
+  `async_remove_device`.
+- **Finding our device**: use `own_device(hass, entry)` (`device.py`). It
+  calls `async_get_device_by_identifier` with our config entry. Identifiers
+  are shared with the appliance, so `async_get_device` is ambiguous; 2026.10
+  reports that call and raises `RuntimeError` when the caller isn't tied to
+  an integration, and 2027.8 removes it. Devices that share one identifier
+  are listed with `async_get_devices`.
+- **Entity IDs**: platforms set `_attr_has_entity_name = True` and a
+  `translation_key` (strings in `strings.json`, `translations/en.json` and
+  `icons.json`). Do not set a `name` that already includes the appliance
+  name: on current Home Assistant that name is prefixed with the device
+  name ("… Live Activity") and the entity ID doubles. The unique id stays
+  `<entry_id>_<key>` so an entity ID already in the registry is kept.
+  `attach_to_appliance` only sets the device info.
+- **Timers**: every `async_call_later` goes through `async_track_later`,
+  which registers the cancel callback with `entry.async_on_unload`.
+  Background work uses `entry.async_create_background_task` (`async_run` on
+  the coordinator), not `hass.async_create_task`. The test harness fails a
+  test that leaves a timer behind.
+- **Coordinators** live on `entry.runtime_data`. Don't put them in
+  `hass.data[DOMAIN]`. Services are registered once in `async_setup`.
 - **Config entry reloads**: Configure uses `OptionsFlowWithReload`;
   Reconfigure uses `async_update_reload_and_abort`. Don't add an
   `add_update_listener` reload: HA warns about combining an update
@@ -112,9 +123,8 @@ Run the shared checks at the end of this file.
   real-world bug first. Use `MockConfigEntry`, `async_mock_service(hass,
   "notify", ...)`, and `freezer` + `async_fire_time_changed` for timers.
 - The PyPI test harness lags behind HA releases. When a change depends on
-  newer HA behavior, read that version's source, cover the old-HA path in
-  tests, and test new-HA-only logic directly (e.g. monkeypatch
-  `LINKED_DEVICES_SUPPORTED`).
+  newer HA behavior, read that version's source and cover it with a test.
+  The oldest supported release is the `requirements_test_min.txt` venv.
 
 <!-- BEGIN bisman-automations shared rules -->
 <!-- This block is the same in every bisman-automations repo. Edit it in

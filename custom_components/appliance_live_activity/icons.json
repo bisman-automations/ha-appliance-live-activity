@@ -1,0 +1,39 @@
+{
+  "entity": {
+    "sensor": {
+      "progress": {
+        "default": "mdi:progress-clock"
+      },
+      "time_left": {
+        "default": "mdi:timer-sand"
+      },
+      "finishes_at": {
+        "default": "mdi:clock-end"
+      },
+      "cycles_week": {
+        "default": "mdi:counter"
+      },
+      "average_cycle": {
+        "default": "mdi:timer-outline"
+      }
+    },
+    "number": {
+      "probe_target": {
+        "default": "mdi:thermometer-probe"
+      }
+    },
+    "event": {
+      "cycle": {
+        "default": "mdi:bell-ring-outline"
+      },
+      "door": {
+        "default": "mdi:door"
+      }
+    },
+    "button": {
+      "update_live_activity": {
+        "default": "mdi:send"
+      }
+    }
+  }
+}

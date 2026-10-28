@@ -90,6 +90,7 @@ from .const import (
     CONF_TUMBLE_ENTITY,
     CONF_VENT_ENTITY,
     CONF_WARM_MINUTES,
+    CONFIG_MINOR_VERSION,
     DEFAULT_COOKTOP_ALERT_MINUTES,
     DEFAULT_COOKTOP_REPEAT_MINUTES,
     DEFAULT_CRITICAL_AFTER_MINUTES,
@@ -606,9 +607,15 @@ def _entity_fields(appliance_type: str) -> dict:
 
 
 class ApplianceLiveActivityConfigFlow(ConfigFlow, domain=DOMAIN):
-    """Config flow for Appliance Live Activity."""
+    """Config flow for Appliance Live Activity.
+
+    ``MINOR_VERSION`` matches ``async_migrate_entry``. New entries are
+    created at the current minor version, so the one-time repairs are not
+    run against a config that was just written.
+    """
 
     VERSION = 1
+    MINOR_VERSION = CONFIG_MINOR_VERSION
 
     def __init__(self) -> None:
         self._data: dict[str, Any] = {}

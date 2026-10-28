@@ -102,7 +102,8 @@ async def _action(hass, action):
 
 
 def _status(hass, name):
-    return hass.states.get(f"sensor.{name}_status")
+    """Our Status sensor. A linked appliance's device is "{name} Live Activity"."""
+    return hass.states.get(f"sensor.{name}_live_activity_status")
 
 
 # ---------------------------------------------------------------- discovery

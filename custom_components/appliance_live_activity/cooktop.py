@@ -105,14 +105,15 @@ class CooktopMonitor:
 
     @callback
     def _handle_change(self, _event=None) -> None:
-        self.hass.async_create_task(self.async_evaluate())
+        self.coordinator.async_run(self.async_evaluate(), "evaluate cooktop")
 
     @callback
     def _handle_action(self, event: Event) -> None:
         if event.data.get("action") == self.ack_action and self._on_since is not None:
             self._acknowledged = True
-            self.hass.async_create_task(
-                async_clear_tag(self.hass, self.coordinator, self.tag)
+            self.coordinator.async_run(
+                async_clear_tag(self.hass, self.coordinator, self.tag),
+                "clear cooktop alert",
             )
 
     async def async_evaluate(self) -> None:

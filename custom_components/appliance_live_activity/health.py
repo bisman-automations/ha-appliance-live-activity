@@ -20,9 +20,10 @@ from homeassistant.helpers import (
     entity_registry as er,
     issue_registry as ir,
 )
-from homeassistant.helpers.event import async_call_later, async_track_time_interval
+from homeassistant.helpers.event import async_track_time_interval
 
 from .const import DOMAIN, HEALTH_CHECK_MINUTES, HEALTH_FIRST_CHECK_SECONDS
+from .helpers import async_track_later
 from .notify import notify_services_for_device
 
 if TYPE_CHECKING:
@@ -45,9 +46,16 @@ def async_setup_health(hass: HomeAssistant, coordinator: ApplianceCoordinator) -
     def _run(_now=None) -> None:
         async_check_health(hass, coordinator)
 
+    # The first check is a one-shot timer. async_track_later cancels it with
+    # the config entry; the interval is cancelled from the coordinator's
+    # unsubscribe list (async_unload).
+    interval = async_track_time_interval(
+        hass, _run, timedelta(minutes=HEALTH_CHECK_MINUTES)
+    )
+    coordinator.entry.async_on_unload(interval)
     return [
-        async_call_later(hass, HEALTH_FIRST_CHECK_SECONDS, _run),
-        async_track_time_interval(hass, _run, timedelta(minutes=HEALTH_CHECK_MINUTES)),
+        async_track_later(hass, coordinator.entry, HEALTH_FIRST_CHECK_SECONDS, _run),
+        interval,
     ]
 
 

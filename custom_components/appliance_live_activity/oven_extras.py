@@ -79,7 +79,7 @@ class _Monitor:
 
     @callback
     def _handle_change(self, _event=None) -> None:
-        self.hass.async_create_task(self.async_evaluate())
+        self.coordinator.async_run(self.async_evaluate(), "evaluate oven extra")
 
     async def async_evaluate(self) -> None:  # pragma: no cover - overridden
         raise NotImplementedError

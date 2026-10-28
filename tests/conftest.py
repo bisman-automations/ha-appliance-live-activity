@@ -36,6 +36,29 @@ def suggested_values(result) -> dict:
 
 
 @pytest.fixture(autouse=True)
+def _wait_for_background_tasks(request, monkeypatch):
+    """Wait for config-entry background tasks inside ``async_block_till_done``.
+
+    State changes schedule ``entry.async_create_background_task``. Home
+    Assistant's ``async_block_till_done`` does not wait for those by default
+    (they are cancelled on unload instead of blocking startup). These tests
+    assert on that work, so the wait includes it. Long-lived background tasks
+    are not started by this integration.
+    """
+    if "hass" not in request.fixturenames:
+        yield
+        return
+    hass = request.getfixturevalue("hass")
+    original = hass.async_block_till_done
+
+    async def _wait(wait_background_tasks: bool = True):
+        await original(wait_background_tasks=wait_background_tasks)
+
+    monkeypatch.setattr(hass, "async_block_till_done", _wait)
+    yield
+
+
+@pytest.fixture(autouse=True)
 def _sectioned_forms(monkeypatch):
     original = data_entry_flow.FlowManager.async_configure
 

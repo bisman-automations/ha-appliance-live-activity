@@ -5,14 +5,19 @@ Activity") holding its sensors, event and Probe Target. When the appliance
 also has a device of its own -- the GE device picked at setup, or for other
 brands the device the state sensor belongs to (an LG washer, a door's
 contact sensor) -- our device repeats that device's identifiers and
-connections. Home Assistant 2026.8+ gives every device a single owning
-integration and lists devices that share an identifier or connection under
-**Linked devices** ("These devices share hardware with this device and are
-managed by other integrations"), the same way UniFi Network's client device
-shows up on a Rain Bird controller. So each page links to the other.
+connections. Home Assistant 2026.8 gives every device a single owning
+config entry (``config_entry_id``) and lists devices that share an
+identifier or connection under **Linked devices** ("These devices share
+hardware with this device and are managed by other integrations"), the same
+way UniFi Network's client device shows up on a Rain Bird controller. So
+each page links to the other.
 
-Before 2026.8 devices with shared identifiers were merged into one, so
-there our device keeps only its own identifier.
+The minimum supported release is 2026.8, so there is no fallback that
+co-owns the appliance device (``config_entries`` / ``remove_config_entry_id``)
+or that looks a device up with ``async_get_device``. Identifiers are shared
+on purpose and are no longer unique across config entries; that lookup is
+ambiguous and Home Assistant 2026.10 reports it (it raises when the caller
+cannot be tied to an integration, and it is removed in 2027.8).
 """
 
 from __future__ import annotations
@@ -22,13 +27,8 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import device_registry as dr, entity_registry as er
 from homeassistant.helpers.device_registry import DeviceEntryType, DeviceInfo
 from homeassistant.helpers.entity import Entity
-from homeassistant.util import slugify
 
 from .const import DOMAIN
-
-# Device registry v3 (Home Assistant 2026.8): one config entry per device,
-# shared identifiers/connections across integrations become "Linked devices"
-LINKED_DEVICES_SUPPORTED = getattr(dr, "STORAGE_VERSION_MAJOR", 1) >= 3
 
 
 def appliance_device_id(hass: HomeAssistant, coordinator) -> str | None:
@@ -67,52 +67,64 @@ def own_device_info(coordinator, entry: ConfigEntry) -> DeviceInfo:
     if target is None:
         return info
     appliance = dr.async_get(coordinator.hass).async_get(target)
-    # Distinct from the appliance's own device in the Linked devices list
+    if appliance is None:
+        return info
+    # Distinct from the appliance's own device in the Linked devices list.
     info["name"] = f"{coordinator.name} Live Activity"
-    if LINKED_DEVICES_SUPPORTED:
-        info["identifiers"] = {(DOMAIN, entry.entry_id)} | {
-            i for i in appliance.identifiers if i[0] != DOMAIN
-        }
-        if appliance.connections:
-            info["connections"] = set(appliance.connections)
+    # Share the appliance's hardware keys, but never our own domain: that
+    # identifier already names this device, and copying it back would make
+    # the two devices indistinguishable.
+    info["identifiers"] = {(DOMAIN, entry.entry_id)} | {
+        identifier for identifier in appliance.identifiers if identifier[0] != DOMAIN
+    }
+    if appliance.connections:
+        info["connections"] = set(appliance.connections)
     return info
 
 
 def own_device(hass: HomeAssistant, entry: ConfigEntry) -> dr.DeviceEntry | None:
     """This integration's device for the appliance, if it has been created.
 
-    Looked up by our own identifier within our own config entry. Home
-    Assistant 2026.10 deprecated ``async_get_device`` (identifiers and
-    connections are no longer unique across config entries; it stops working
-    in 2027.8) in favour of ``async_get_device_by_identifier``, which takes the
-    owning entry. Older releases only have ``async_get_device``, where our
-    identifier is unique anyway.
+    Looked up by our own identifier *and* our config entry.
+    ``async_get_device`` searches by identifier alone. Once this device
+    repeats the appliance's identifiers, that search matches both devices.
+    Home Assistant 2026.10 reports the call and, when it cannot see which
+    integration made it, raises ``RuntimeError``. ``async_get_device_by_identifier``
+    takes the owning entry, so the match is the device this entry created.
     """
-    dev_reg = dr.async_get(hass)
-    identifier = (DOMAIN, entry.entry_id)
-    if hasattr(dev_reg, "async_get_device_by_identifier"):
-        return dev_reg.async_get_device_by_identifier(identifier, entry.entry_id)
-    return dev_reg.async_get_device(identifiers={identifier})
+    return dr.async_get(hass).async_get_device_by_identifier(
+        (DOMAIN, entry.entry_id), entry.entry_id
+    )
 
 
-def attach_to_appliance(
-    entity: Entity, coordinator, entry: ConfigEntry, platform: str, name: str
-) -> None:
+def devices_sharing_identifier(
+    hass: HomeAssistant, identifier: tuple[str, str]
+) -> list[dr.DeviceEntry]:
+    """Every device that carries ``identifier``, across config entries.
+
+    Used where a single identifier is intentionally shared (our device and
+    the appliance's). ``async_get_devices`` returns all of them;
+    ``async_get_device`` would have to guess.
+    """
+    return dr.async_get(hass).async_get_devices(identifiers={identifier})
+
+
+def attach_to_appliance(entity: Entity, coordinator, entry: ConfigEntry) -> None:
     """Put an entity on this integration's device for the appliance.
 
-    Also suggests its entity ID from its own name ("Laundry Room Washer
-    Status" -> ``sensor.laundry_room_washer_status``), as every release has
-    created it. Since Home Assistant 2026.7 an entity without
-    ``has_entity_name`` gets its device's name put in front of its ID unless
-    its name already starts with it, and our device is named "... Live
-    Activity" when it is linked to the appliance's own device, which gave
-    ``sensor.laundry_room_washer_live_activity_laundry_room_washer_status``.
-    The suggestion only applies when the entity is first registered: IDs
-    already in the entity registry, including ones the user renamed, are
-    kept, and Home Assistant adds a suffix if the ID is taken.
+    The entity's name is its translation (``has_entity_name``), so Home
+    Assistant builds the entity ID from the device name plus that name.
+    A linked device is "<appliance> Live Activity", which gives
+    ``sensor.kitchen_dishwasher_live_activity_status`` -- one device prefix,
+    not the doubled
+    ``sensor.kitchen_dishwasher_live_activity_kitchen_dishwasher_status``
+    that a full name ("Kitchen Dishwasher Status") produced on 2026.7+.
+
+    The entity ID is chosen only when the entity is first registered.
+    ``unique_id`` is unchanged, so an ID already in the registry, including
+    one the user renamed, is kept.
     """
     entity._attr_device_info = own_device_info(coordinator, entry)
-    entity.entity_id = f"{platform}.{slugify(name)}"
 
 
 @callback
@@ -123,13 +135,6 @@ def async_link_device(hass: HomeAssistant, coordinator, entry: ConfigEntry) -> N
     dev_reg = dr.async_get(hass)
     ent_reg = er.async_get(hass)
     target = appliance_device_id(hass, coordinator)
-
-    # Before 2026.8, versions before 1.9.4 co-owned the GE device: let go of it
-    # first, or registering our device would find and reuse it
-    if target is not None and not LINKED_DEVICES_SUPPORTED:
-        device = dev_reg.async_get(target)
-        if device is not None and entry.entry_id in device.config_entries:
-            dev_reg.async_update_device(target, remove_config_entry_id=entry.entry_id)
 
     ours = dev_reg.async_get_or_create(
         config_entry_id=entry.entry_id, **own_device_info(coordinator, entry)

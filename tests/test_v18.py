@@ -16,6 +16,7 @@ from custom_components.appliance_live_activity.diagnostics import (
     async_get_config_entry_diagnostics,
 )
 from homeassistant import config_entries
+from homeassistant.components.diagnostics import REDACTED
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import (
     device_registry as dr,
@@ -228,7 +229,7 @@ async def test_cycle_events_and_history(hass: HomeAssistant, env, freezer):
     async_mock_service(hass, "notify", "mobile_app_my_phone")
     washer = await _ge_device(hass, ge, "washer", "Laundry Room Washer", WASHER)
     await _setup(hass, washer.id, {"devices": [me.id]})
-    event_entity = "event.laundry_room_washer_cycle"
+    event_entity = "event.laundry_room_washer_live_activity_cycle"
     state = hass.states.get(event_entity)
     assert state is not None
     assert "finished" in state.attributes["event_types"]
@@ -267,8 +268,16 @@ async def test_cycle_events_and_history(hass: HomeAssistant, env, freezer):
     assert finished.attributes["cycle"] == "Normal"
 
     await _cycle(hass, freezer, minutes=55)
-    assert hass.states.get("sensor.laundry_room_washer_cycles_this_week").state == "2"
-    assert hass.states.get("sensor.laundry_room_washer_average_cycle").state == "50"
+    assert (
+        hass.states.get(
+            "sensor.laundry_room_washer_live_activity_cycles_this_week"
+        ).state
+        == "2"
+    )
+    assert (
+        hass.states.get("sensor.laundry_room_washer_live_activity_average_cycle").state
+        == "50"
+    )
 
     # Cancelled: stopped with lots of time left
     _set(hass, "binary_sensor.laundry_room_washer_end_of_cycle", "off")
@@ -283,12 +292,25 @@ async def test_cycle_events_and_history(hass: HomeAssistant, env, freezer):
     _set(hass, "sensor.laundry_room_washer_state", "Off")
     await hass.async_block_till_done()
     assert events[-2:] == ["started", "cancelled"]
-    assert hass.states.get("sensor.laundry_room_washer_cycles_this_week").state == "2"
+    assert (
+        hass.states.get(
+            "sensor.laundry_room_washer_live_activity_cycles_this_week"
+        ).state
+        == "2"
+    )
 
     # A week later the count drops
     await _tick(hass, freezer, timedelta(days=8))
-    assert hass.states.get("sensor.laundry_room_washer_cycles_this_week").state == "0"
-    assert hass.states.get("sensor.laundry_room_washer_average_cycle").state == "50"
+    assert (
+        hass.states.get(
+            "sensor.laundry_room_washer_live_activity_cycles_this_week"
+        ).state
+        == "0"
+    )
+    assert (
+        hass.states.get("sensor.laundry_room_washer_live_activity_average_cycle").state
+        == "50"
+    )
 
 
 async def test_door_events(hass: HomeAssistant, env, freezer):
@@ -309,7 +331,7 @@ async def test_door_events(hass: HomeAssistant, env, freezer):
         },
     )
     await _setup(hass, fridge.id, {"devices": [me.id]})
-    entity = "event.kitchen_refrigerator_door"
+    entity = "event.kitchen_refrigerator_live_activity_door"
     assert hass.states.get(entity).attributes["event_types"] == [
         "door_left_open",
         "door_closed",
@@ -383,9 +405,9 @@ async def test_diagnostics(hass: HomeAssistant, env, freezer):
     diag = await async_get_config_entry_diagnostics(hass, entry)
     assert diag["appliance_type"] == "washer"
     assert diag["phones"][me.id] == {
-        "name": "My Phone",
-        "notify_services": ["mobile_app_my_phone"],
-        "home": True,
+        "name": REDACTED,
+        "notify_services": REDACTED,
+        "home": REDACTED,
     }
     assert diag["entities"]["sensor.laundry_room_washer_state"]["state"] == "Finished"
     assert diag["internal"]["history"] and diag["data"]["status"] == "complete"

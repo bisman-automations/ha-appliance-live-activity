@@ -403,6 +403,46 @@
       }
     }
   },
+  "entity": {
+    "sensor": {
+      "status": {
+        "name": "Status"
+      },
+      "progress": {
+        "name": "Progress"
+      },
+      "time_left": {
+        "name": "Time Left"
+      },
+      "finishes_at": {
+        "name": "Finishes At"
+      },
+      "cycles_week": {
+        "name": "Cycles This Week"
+      },
+      "average_cycle": {
+        "name": "Average Cycle"
+      }
+    },
+    "number": {
+      "probe_target": {
+        "name": "Probe Target"
+      }
+    },
+    "event": {
+      "cycle": {
+        "name": "Cycle"
+      },
+      "door": {
+        "name": "Door"
+      }
+    },
+    "button": {
+      "update_live_activity": {
+        "name": "Update Live Activity"
+      }
+    }
+  },
   "services": {
     "update": {
       "name": "Update Live Activity",

@@ -1,10 +1,20 @@
-"""Small shared helpers (pure functions, easy to unit test)."""
+"""Small shared helpers.
+
+The state-classification functions are pure and unit tested. The two
+schedulers at the bottom tie one-shot timers and background work to a
+config entry so a reload cannot leave them running.
+"""
 
 from __future__ import annotations
 
-from collections.abc import Iterable
-from datetime import time
+from collections.abc import Callable, Coroutine, Iterable
+from datetime import time, timedelta
 import re
+from typing import Any
+
+from homeassistant.config_entries import ConfigEntry
+from homeassistant.core import CALLBACK_TYPE, HomeAssistant
+from homeassistant.helpers.event import async_call_later
 
 from .const import (
     STATUS_COMPLETE,
@@ -150,3 +160,45 @@ def in_quiet_hours(now: time, start: str | None, end: str | None) -> bool:
     if begin < finish:
         return begin <= now < finish
     return now >= begin or now < finish
+
+
+def async_track_later(
+    hass: HomeAssistant,
+    entry: ConfigEntry,
+    delay: float | timedelta,
+    action: Callable[..., Any],
+) -> CALLBACK_TYPE:
+    """Schedule ``action`` and cancel it when ``entry`` unloads.
+
+    ``async_call_later`` on its own survives a reload: the test harness then
+    fails the run ("Lingering timer"), and a real restart can call into a
+    coordinator that has already been torn down. ``entry.async_on_unload``
+    is invoked by Home Assistant itself after ``async_unload_entry``, so the
+    timer is cancelled even if the caller also keeps its own handle.
+
+    The returned cancel callback is safe to call twice (once early, again
+    from the unload hook).
+    """
+    cancel = async_call_later(hass, delay, action)
+    entry.async_on_unload(cancel)
+    return cancel
+
+
+def async_entry_background_task(
+    hass: HomeAssistant,
+    entry: ConfigEntry,
+    target: Coroutine[Any, Any, Any],
+    name: str,
+) -> Any:
+    """Run ``target`` as a background task of ``entry``.
+
+    A bare ``hass.async_create_task`` is not cancelled when the appliance is
+    removed, so a state change that arrives during unload keeps running
+    against a dead coordinator. ``ConfigEntry.async_create_background_task``
+    is cancelled as the entry unloads.
+
+    ``async_block_till_done`` does not wait for background tasks. The test
+    suite opts in (see ``tests/conftest.py``) because these tasks are the
+    short event handlers the tests assert on.
+    """
+    return entry.async_create_background_task(hass, target, name)

@@ -25,7 +25,6 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import ATTR_FRIENDLY_NAME, STATE_ON, STATE_OPEN
 from homeassistant.core import CALLBACK_TYPE, Event, HomeAssistant, callback
 from homeassistant.helpers.event import (
-    async_call_later,
     async_track_state_change_event,
     async_track_time_interval,
 )
@@ -57,6 +56,7 @@ from .const import (
     STATUS_RUNNING,
 )
 from .coordinator import ApplianceCoordinator
+from .helpers import async_track_later
 from .notify import (
     async_clear_tag,
     async_resolve,
@@ -141,7 +141,7 @@ class DoorCoordinator(ApplianceCoordinator):
 
     @callback
     def _handle_door_event(self, _event: Event) -> None:
-        self.hass.async_create_task(self.async_evaluate(send=True))
+        self.async_run(self.async_evaluate(send=True), "evaluate door")
 
     # ------------------------------------------------------------------
     # Snooze button on the critical alert
@@ -392,12 +392,13 @@ class DoorCoordinator(ApplianceCoordinator):
         @callback
         def _fire(_now) -> None:
             self._closed_clear_unsub = None
-            self.hass.async_create_task(
-                async_clear_tag(self.hass, self, self.notification_tag)
+            self.async_run(
+                async_clear_tag(self.hass, self, self.notification_tag),
+                "clear closed door activity",
             )
 
-        self._closed_clear_unsub = async_call_later(
-            self.hass, CLOSED_DISPLAY_SECONDS, _fire
+        self._closed_clear_unsub = async_track_later(
+            self.hass, self.entry, CLOSED_DISPLAY_SECONDS, _fire
         )
 
     def _cancel_closed_clear(self) -> None:

@@ -40,8 +40,9 @@ def _ge_dishwasher(hass: HomeAssistant) -> MockConfigEntry:
 async def test_linked_entity_ids_are_not_doubled(
     hass: HomeAssistant, enable_custom_integrations
 ):
-    """Our device is "Kitchen Dishwasher Live Activity" when linked. Since
-    Home Assistant 2026.7 that name was put in front of every new entity ID
+    """A linked device is named "Kitchen Dishwasher Live Activity". The entity
+    name is only "Status", so the id is prefixed once
+    (sensor.kitchen_dishwasher_live_activity_status) and not twice
     (sensor.kitchen_dishwasher_live_activity_kitchen_dishwasher_status)."""
     entry = _ge_dishwasher(hass)
     assert await hass.config_entries.async_setup(entry.entry_id)
@@ -52,14 +53,19 @@ async def test_linked_entity_ids_are_not_doubled(
         e.entity_id
         for e in er.async_entries_for_config_entry(er.async_get(hass), entry.entry_id)
     }
+    # Device name once ("... Live Activity"), then the entity's own name.
+    # Not "..._live_activity_kitchen_dishwasher_status".
     assert {
-        "sensor.kitchen_dishwasher_status",
-        "sensor.kitchen_dishwasher_progress",
-        "sensor.kitchen_dishwasher_time_left",
-        "event.kitchen_dishwasher_cycle",
-        "button.kitchen_dishwasher_update_live_activity",
+        "sensor.kitchen_dishwasher_live_activity_status",
+        "sensor.kitchen_dishwasher_live_activity_progress",
+        "sensor.kitchen_dishwasher_live_activity_time_left",
+        "event.kitchen_dishwasher_live_activity_cycle",
+        "button.kitchen_dishwasher_live_activity_update_live_activity",
     } <= ids
     assert not any("live_activity_kitchen" in entity_id for entity_id in ids)
+    status = hass.states.get("sensor.kitchen_dishwasher_live_activity_status")
+    assert status is not None
+    assert status.name == "Kitchen Dishwasher Live Activity Status"
 
 
 async def test_existing_entity_ids_are_kept(
@@ -91,7 +97,7 @@ async def test_unload_cancels_pending_notification_clears(
     entry = _ge_dishwasher(hass)
     assert await hass.config_entries.async_setup(entry.entry_id)
     await hass.async_block_till_done()
-    coordinator = hass.data[DOMAIN][entry.entry_id]
+    coordinator = entry.runtime_data
 
     await async_resolve(
         hass, coordinator, tag="kitchen_dishwasher_door", title="t", message="m"
