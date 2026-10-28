@@ -1,17 +1,17 @@
 """Sensor entities so appliance status/progress can be used on dashboards.
 
-Names come from translations (``has_entity_name``). Home Assistant prefixes
-them with the device name, which is what keeps a linked appliance from
-getting a doubled entity ID. The unique id is still
+Names come from translations (``has_entity_name``), so the UI shows the
+device name plus "Status" or "Time Left". The suggested entity id is the
+short form (``sensor.kitchen_dishwasher_status``). The unique id is still
 ``<entry_id>_<key>`` -- the same value every previous release stored -- so
-an entity ID already in the registry is left alone.
+an entity id already in the registry is left alone.
 """
 
 from __future__ import annotations
 
 from homeassistant.components.sensor import SensorDeviceClass, SensorEntity
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import UnitOfTime
+from homeassistant.const import Platform, UnitOfTime
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
@@ -44,9 +44,10 @@ class _ApplianceSensor(CoordinatorEntity, SensorEntity):
     """A sensor named by ``translation_key``, on this integration's device.
 
     ``_attr_has_entity_name`` means the translated name is only the entity
-    ("Time Left"), and the device name supplies the appliance. Do not set
-    ``_attr_name``: a hardcoded name that already contains the appliance
-    name is what Home Assistant then prefixes again.
+    ("Time Left"), and the device name supplies what you see. Do not set
+    ``_attr_name``: a name that already contains the appliance name is what
+    gets the device name prefixed onto the entity id as well.
+    ``attach_to_appliance`` suggests the short id instead.
     """
 
     _attr_has_entity_name = True
@@ -58,7 +59,7 @@ class _ApplianceSensor(CoordinatorEntity, SensorEntity):
         # Stable across the naming change. A new unique id would register a
         # second entity and leave the old one orphaned.
         self._attr_unique_id = f"{entry.entry_id}_{key}"
-        attach_to_appliance(self, coordinator, entry)
+        attach_to_appliance(self, coordinator, entry, Platform.SENSOR, key)
 
 
 class ApplianceStatusSensor(_ApplianceSensor):

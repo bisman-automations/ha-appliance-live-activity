@@ -7,6 +7,7 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry
 from custom_components.appliance_live_activity import GE_DISCOVERY_VERSION
 from custom_components.appliance_live_activity.const import CONFIG_MINOR_VERSION, DOMAIN
 from custom_components.appliance_live_activity.device import (
+    SUGGESTED_ENTITY_NAMES,
     devices_sharing_identifier,
     own_device,
 )
@@ -17,6 +18,23 @@ from custom_components.appliance_live_activity.diagnostics import (
 from homeassistant.components.diagnostics import REDACTED
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry as dr, entity_registry as er
+
+
+def test_suggested_entity_names_match_translations():
+    """The slug source and strings.json name the entity the same way."""
+    import json
+    from pathlib import Path
+
+    strings = json.loads(
+        (
+            Path(__file__).resolve().parents[1]
+            / "custom_components"
+            / "appliance_live_activity"
+            / "strings.json"
+        ).read_text()
+    )
+    for (platform, key), name in SUGGESTED_ENTITY_NAMES.items():
+        assert strings["entity"][platform][key]["name"] == name, (platform, key)
 
 
 def _phone(hass: HomeAssistant):
@@ -74,8 +92,9 @@ async def test_existing_entity_ids_survive_has_entity_name(
 ):
     """Unique ids are unchanged, so entity ids already in the registry stay.
 
-    A linked appliance's *new* entities take the device name once. They must
-    not repeat the appliance name after ``live_activity``.
+    A new entity on a linked appliance uses the short id
+    (``sensor.kitchen_dishwasher_progress``). A doubled id stored by an
+    earlier install is not renamed.
     """
     ge = MockConfigEntry(domain="ge_home")
     ge.add_to_hass(hass)
@@ -109,6 +128,12 @@ async def test_existing_entity_ids_survive_has_entity_name(
             f"{entry.entry_id}_update_live_activity",
             "button.dishwasher_refresh",
         ),
+        # The doubled id Home Assistant 2026.7–2026.10 created. Left as stored.
+        (
+            "sensor",
+            f"{entry.entry_id}_time_left",
+            "sensor.kitchen_dishwasher_live_activity_kitchen_dishwasher_time_left",
+        ),
     }
     for domain, unique_id, entity_id in preexisting:
         registry.async_get_or_create(
@@ -126,13 +151,15 @@ async def test_existing_entity_ids_survive_has_entity_name(
         assert registry.async_get_entity_id(domain, DOMAIN, unique_id) == entity_id
         assert hass.states.get(entity_id) is not None
 
-    # Progress was not in the registry. It is created from the device name
-    # plus the translated name, a single prefix.
+    # Progress was not in the registry. The suggestion is the short id.
     progress = registry.async_get_entity_id(
         "sensor", DOMAIN, f"{entry.entry_id}_progress"
     )
-    assert progress == "sensor.kitchen_dishwasher_live_activity_progress"
-    assert "live_activity_kitchen" not in progress
+    assert progress == "sensor.kitchen_dishwasher_progress"
+    assert hass.states.get("sensor.kitchen_dishwasher_time_left") is None
+    assert hass.states.get(
+        "sensor.kitchen_dishwasher_live_activity_kitchen_dishwasher_time_left"
+    )
 
     status = registry.async_get("sensor.dishwasher_now")
     assert status is not None

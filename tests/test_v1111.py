@@ -40,10 +40,11 @@ def _ge_dishwasher(hass: HomeAssistant) -> MockConfigEntry:
 async def test_linked_entity_ids_are_not_doubled(
     hass: HomeAssistant, enable_custom_integrations
 ):
-    """A linked device is named "Kitchen Dishwasher Live Activity". The entity
-    name is only "Status", so the id is prefixed once
-    (sensor.kitchen_dishwasher_live_activity_status) and not twice
-    (sensor.kitchen_dishwasher_live_activity_kitchen_dishwasher_status)."""
+    """A linked device is named "Kitchen Dishwasher Live Activity", but a new
+    entity id is the appliance name plus the entity
+    (sensor.kitchen_dishwasher_status), not the device name and not the
+    doubled sensor.kitchen_dishwasher_live_activity_kitchen_dishwasher_status.
+    The name shown in the UI still includes the device name."""
     entry = _ge_dishwasher(hass)
     assert await hass.config_entries.async_setup(entry.entry_id)
     await hass.async_block_till_done()
@@ -53,17 +54,17 @@ async def test_linked_entity_ids_are_not_doubled(
         e.entity_id
         for e in er.async_entries_for_config_entry(er.async_get(hass), entry.entry_id)
     }
-    # Device name once ("... Live Activity"), then the entity's own name.
-    # Not "..._live_activity_kitchen_dishwasher_status".
     assert {
-        "sensor.kitchen_dishwasher_live_activity_status",
-        "sensor.kitchen_dishwasher_live_activity_progress",
-        "sensor.kitchen_dishwasher_live_activity_time_left",
-        "event.kitchen_dishwasher_live_activity_cycle",
-        "button.kitchen_dishwasher_live_activity_update_live_activity",
+        "sensor.kitchen_dishwasher_status",
+        "sensor.kitchen_dishwasher_progress",
+        "sensor.kitchen_dishwasher_time_left",
+        "event.kitchen_dishwasher_cycle",
+        "button.kitchen_dishwasher_update_live_activity",
     } <= ids
+    # "update_live_activity" is the button's own name. The device name
+    # "… Live Activity" must not be added in front of the appliance name.
     assert not any("live_activity_kitchen" in entity_id for entity_id in ids)
-    status = hass.states.get("sensor.kitchen_dishwasher_live_activity_status")
+    status = hass.states.get("sensor.kitchen_dishwasher_status")
     assert status is not None
     assert status.name == "Kitchen Dishwasher Live Activity Status"
 

@@ -27,8 +27,27 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import device_registry as dr, entity_registry as er
 from homeassistant.helpers.device_registry import DeviceEntryType, DeviceInfo
 from homeassistant.helpers.entity import Entity
+from homeassistant.util import slugify
 
 from .const import DOMAIN
+
+# English names used only to suggest an entity id. The name Home Assistant
+# shows still comes from the translation of the same key (strings.json).
+# These strings have to match those translations: tests/test_v1120.py checks.
+# They are fixed here because the id is chosen in ``__init__``, before
+# translations are available on the entity.
+SUGGESTED_ENTITY_NAMES: dict[tuple[str, str], str] = {
+    ("sensor", "status"): "Status",
+    ("sensor", "progress"): "Progress",
+    ("sensor", "time_left"): "Time Left",
+    ("sensor", "finishes_at"): "Finishes At",
+    ("sensor", "cycles_week"): "Cycles This Week",
+    ("sensor", "average_cycle"): "Average Cycle",
+    ("number", "probe_target"): "Probe Target",
+    ("event", "cycle"): "Cycle",
+    ("event", "door"): "Door",
+    ("button", "update_live_activity"): "Update Live Activity",
+}
 
 
 def appliance_device_id(hass: HomeAssistant, coordinator) -> str | None:
@@ -109,22 +128,36 @@ def devices_sharing_identifier(
     return dr.async_get(hass).async_get_devices(identifiers={identifier})
 
 
-def attach_to_appliance(entity: Entity, coordinator, entry: ConfigEntry) -> None:
-    """Put an entity on this integration's device for the appliance.
+def attach_to_appliance(
+    entity: Entity,
+    coordinator,
+    entry: ConfigEntry,
+    platform: str,
+    translation_key: str,
+) -> None:
+    """Put an entity on this integration's device and suggest its entity id.
 
-    The entity's name is its translation (``has_entity_name``), so Home
-    Assistant builds the entity ID from the device name plus that name.
-    A linked device is "<appliance> Live Activity", which gives
-    ``sensor.kitchen_dishwasher_live_activity_status`` -- one device prefix,
-    not the doubled
-    ``sensor.kitchen_dishwasher_live_activity_kitchen_dishwasher_status``
-    that a full name ("Kitchen Dishwasher Status") produced on 2026.7+.
+    The displayed name is the translation (``has_entity_name``): Home
+    Assistant shows "<device> Status". A linked device is named
+    "<appliance> Live Activity", and with no suggestion that device name
+    becomes the entity id
+    (``sensor.kitchen_dishwasher_live_activity_status``) or, when the
+    entity's own name also contains the appliance name, the doubled
+    ``sensor.kitchen_dishwasher_live_activity_kitchen_dishwasher_status``.
 
-    The entity ID is chosen only when the entity is first registered.
-    ``unique_id`` is unchanged, so an ID already in the registry, including
-    one the user renamed, is kept.
+    Setting ``entity_id`` before the entity is added is Home Assistant's
+    suggested object id. A suggestion is not prefixed with the device name,
+    so a new entity is ``sensor.kitchen_dishwasher_status`` -- the appliance
+    name plus the entity's own name ("Status", "Time Left", …).
+
+    The suggestion is used only when the unique id is not already in the
+    registry. An entity id that is already stored, including one the user
+    renamed and including a doubled id from an earlier install, is kept.
+    The unique id itself does not change.
     """
     entity._attr_device_info = own_device_info(coordinator, entry)
+    own_name = SUGGESTED_ENTITY_NAMES[(platform, translation_key)]
+    entity.entity_id = f"{platform}.{slugify(f'{coordinator.name} {own_name}')}"
 
 
 @callback

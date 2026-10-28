@@ -262,6 +262,8 @@ Home Assistant app (the GE appliance's own page for GE setups).
 
 ### Dashboards and services
 
+The name you see is the device name plus the entity: **Kitchen Dishwasher Live Activity Status**. A new entity id uses the appliance name only, for example `sensor.kitchen_dishwasher_status` and `sensor.kitchen_dishwasher_time_left`. An entity id that is already in Home Assistant is left as it is, including one you renamed.
+
 - **Status** and **Progress** sensors per appliance, plus **Time Left** and
   **Finishes At** for washers, dryers, dishwashers and ovens (status attributes include
   phase, cycle, remaining minutes, door open minutes and cooktop on-time).

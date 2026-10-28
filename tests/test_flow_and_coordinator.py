@@ -115,13 +115,8 @@ async def test_ge_flow_and_lifecycle(hass: HomeAssistant, setup_devices):
     await hass.async_block_till_done()
     assert calls, "running update expected"
     data = calls[-1].data["data"]
-    assert (
-        hass.states.get("sensor.laundry_room_washer_live_activity_time_left").state
-        == "60"
-    )
-    assert hass.states.get(
-        "sensor.laundry_room_washer_live_activity_finishes_at"
-    ).state not in (
+    assert hass.states.get("sensor.laundry_room_washer_time_left").state == "60"
+    assert hass.states.get("sensor.laundry_room_washer_finishes_at").state not in (
         "unknown",
         "unavailable",
     )
@@ -135,9 +130,7 @@ async def test_ge_flow_and_lifecycle(hass: HomeAssistant, setup_devices):
     button_entity = er.async_get(hass).async_get_entity_id(
         "button", DOMAIN, f"{entry.entry_id}_update_live_activity"
     )
-    assert (
-        button_entity == "button.laundry_room_washer_live_activity_update_live_activity"
-    )
+    assert button_entity == "button.laundry_room_washer_update_live_activity"
     sent = len(calls)
     await hass.services.async_call(
         "button", "press", {"entity_id": button_entity}, blocking=True
@@ -175,10 +168,7 @@ async def test_ge_flow_and_lifecycle(hass: HomeAssistant, setup_devices):
     sent = len(calls)
 
     # Paused / resumed above; time left still tracked
-    assert (
-        hass.states.get("sensor.laundry_room_washer_live_activity_time_left").state
-        == "44"
-    )
+    assert hass.states.get("sensor.laundry_room_washer_time_left").state == "44"
 
     # Finish: end-of-cycle on -> Done + finished alert, once
     _set(hass, "time_remaining", "0")
@@ -193,14 +183,8 @@ async def test_ge_flow_and_lifecycle(hass: HomeAssistant, setup_devices):
     assert any(c.data.get("title", "").startswith("✅") for c in new)
     sent = len(calls)
 
-    assert (
-        hass.states.get("sensor.laundry_room_washer_live_activity_time_left").state
-        == "0"
-    )
-    assert (
-        hass.states.get("sensor.laundry_room_washer_live_activity_finishes_at").state
-        == "unknown"
-    )
+    assert hass.states.get("sensor.laundry_room_washer_time_left").state == "0"
+    assert hass.states.get("sensor.laundry_room_washer_finishes_at").state == "unknown"
 
     # Staying finished does not re-send every minute
     async_fire_time_changed(hass, dt_util.utcnow() + timedelta(minutes=3))

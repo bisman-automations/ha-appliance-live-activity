@@ -73,11 +73,15 @@ first, plus any other brand or a plain door/contact sensor set up manually.
   are listed with `async_get_devices`.
 - **Entity IDs**: platforms set `_attr_has_entity_name = True` and a
   `translation_key` (strings in `strings.json`, `translations/en.json` and
-  `icons.json`). Do not set a `name` that already includes the appliance
-  name: on current Home Assistant that name is prefixed with the device
-  name ("… Live Activity") and the entity ID doubles. The unique id stays
-  `<entry_id>_<key>` so an entity ID already in the registry is kept.
-  `attach_to_appliance` only sets the device info.
+  `icons.json`). Do not set `_attr_name`: a name that already includes the
+  appliance name is prefixed with the device name ("… Live Activity") and
+  the entity id doubles. `attach_to_appliance` suggests
+  `<platform>.<slug of appliance name + entity name>`
+  (`sensor.kitchen_dishwasher_status`). That suggestion applies only when
+  the unique id is new. The unique id stays `<entry_id>_<key>` (the event
+  entity's unique id is `<entry_id>_event`), so an entity id already in the
+  registry is kept. The English names used for the slug are
+  `SUGGESTED_ENTITY_NAMES` and must match the translations.
 - **Timers**: every `async_call_later` goes through `async_track_later`,
   which registers the cancel callback with `entry.async_on_unload`.
   Background work uses `entry.async_create_background_task` (`async_run` on

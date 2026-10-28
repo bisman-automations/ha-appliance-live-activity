@@ -167,7 +167,7 @@ async def test_other_brand_linked(hass: HomeAssistant, enable_custom_integration
     await hass.async_block_till_done()
     own = own_device(hass, entry)
     assert own is not None and own.name == "LG Washer Live Activity"
-    status = er.async_get(hass).async_get("sensor.lg_washer_live_activity_status")
+    status = er.async_get(hass).async_get("sensor.lg_washer_status")
     assert status is not None and status.device_id == own.id
     assert _owner(dev_reg.async_get(washer.id)) == lg.entry_id
     coordinator = entry.runtime_data

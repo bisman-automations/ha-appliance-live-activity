@@ -15,6 +15,7 @@ from typing import Any
 
 from homeassistant.components.event import EventEntity
 from homeassistant.config_entries import ConfigEntry
+from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
@@ -43,7 +44,9 @@ class ApplianceEvent(EventEntity):
         self._attr_unique_id = f"{entry.entry_id}_event"
         self._attr_translation_key = "door" if door else "cycle"
         self._attr_event_types = list(DOOR_EVENTS if door else CYCLE_EVENTS)
-        attach_to_appliance(self, coordinator, entry)
+        attach_to_appliance(
+            self, coordinator, entry, Platform.EVENT, self._attr_translation_key
+        )
 
     async def async_added_to_hass(self) -> None:
         """Subscribe to the coordinator's cycle/door events."""

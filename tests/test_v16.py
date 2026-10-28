@@ -224,7 +224,7 @@ async def test_kitchen_timer(hass: HomeAssistant, phone, freezer):
         await hass.async_block_till_done()
     assert len(_live(calls, "kitchen_oven_timer")) == 1
     assert (
-        hass.states.get("sensor.kitchen_oven_live_activity_status").attributes[
+        hass.states.get("sensor.kitchen_oven_status").attributes[
             "kitchen_timer_minutes"
         ]
         == 1
@@ -258,7 +258,7 @@ def _probe(hass, temp):
 
 async def test_probe(hass: HomeAssistant, phone, freezer):
     calls = await _oven(hass, phone)
-    number = "number.kitchen_oven_live_activity_probe_target"
+    number = "number.kitchen_oven_probe_target"
     assert hass.states.get(number) is not None
 
     # No target yet: shows the temperature, every 5 degrees
@@ -294,7 +294,7 @@ async def test_probe(hass: HomeAssistant, phone, freezer):
     _probe(hass, 150)
     await hass.async_block_till_done()
     assert len(_titled(calls, "🍖")) == 1
-    attrs = hass.states.get("sensor.kitchen_oven_live_activity_status").attributes
+    attrs = hass.states.get("sensor.kitchen_oven_status").attributes
     assert attrs["probe_temperature"] == 150 and attrs["probe_target"] == 145
 
     # Unplugged
@@ -477,9 +477,7 @@ async def test_blocked_vent(hass: HomeAssistant, phone, freezer):
     await _tick(hass, freezer, timedelta(minutes=2, seconds=5))
     assert "laundry_room_dryer_vent" in _cleared(calls)
     assert (
-        hass.states.get("sensor.laundry_room_dryer_live_activity_status").attributes[
-            "vent_blocked"
-        ]
+        hass.states.get("sensor.laundry_room_dryer_status").attributes["vent_blocked"]
         is False
     )
 
