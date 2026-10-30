@@ -5,6 +5,12 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.12.2] - 2026-10-30
+
+### Fixed
+
+- **Keeps working on Home Assistant 2026.11.** The Live Activity device for an appliance that is linked to its own device is now set up in a way that still works when Home Assistant 2026.11 changes how device details are passed. Nothing changes for you on earlier versions.
+
 ## [1.12.1] - 2026-10-30
 
 ### Changed
@@ -484,6 +490,7 @@ Initial release.
 - Status and Progress sensors per appliance for dashboards.
 - `appliance_live_activity.update` service for forcing a manual refresh.
 
+[1.12.2]: https://github.com/bisman-automations/ha-appliance-live-activity/compare/v1.12.1...v1.12.2
 [1.12.1]: https://github.com/bisman-automations/ha-appliance-live-activity/compare/v1.12.0...v1.12.1
 [1.12.0]: https://github.com/bisman-automations/ha-appliance-live-activity/compare/v1.11.0...v1.12.0
 [1.11.0]: https://github.com/bisman-automations/ha-appliance-live-activity/compare/v1.10.1...v1.11.0

@@ -22,6 +22,8 @@ cannot be tied to an integration, and it is removed in 2027.8).
 
 from __future__ import annotations
 
+from typing import Any
+
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import device_registry as dr, entity_registry as er
@@ -73,32 +75,42 @@ def _is_ours(device) -> bool:
     return any(i[0] == DOMAIN for i in device.identifiers)
 
 
-def own_device_info(coordinator, entry: ConfigEntry) -> DeviceInfo:
-    """Our device, sharing the appliance device's hardware keys when linked."""
-    info = DeviceInfo(
-        identifiers={(DOMAIN, entry.entry_id)},
-        name=coordinator.name,
-        manufacturer="Appliance Live Activity",
-        model=coordinator.definition.display_name,
-        entry_type=DeviceEntryType.SERVICE,
-    )
+def own_device_fields(coordinator, entry: ConfigEntry) -> dict[str, Any]:
+    """Our device, sharing the appliance device's hardware keys when linked.
+
+    Plain keyword arguments, for the device registry and for ``DeviceInfo``.
+    ``DeviceInfo`` is a dataclass from Home Assistant 2026.11, so it can't be
+    changed or unpacked like a dictionary.
+    """
+    fields: dict[str, Any] = {
+        "identifiers": {(DOMAIN, entry.entry_id)},
+        "name": coordinator.name,
+        "manufacturer": "Appliance Live Activity",
+        "model": coordinator.definition.display_name,
+        "entry_type": DeviceEntryType.SERVICE,
+    }
     target = appliance_device_id(coordinator.hass, coordinator)
     if target is None:
-        return info
+        return fields
     appliance = dr.async_get(coordinator.hass).async_get(target)
     if appliance is None:
-        return info
+        return fields
     # Distinct from the appliance's own device in the Linked devices list.
-    info["name"] = f"{coordinator.name} Live Activity"
+    fields["name"] = f"{coordinator.name} Live Activity"
     # Share the appliance's hardware keys, but never our own domain: that
     # identifier already names this device, and copying it back would make
     # the two devices indistinguishable.
-    info["identifiers"] = {(DOMAIN, entry.entry_id)} | {
+    fields["identifiers"] = {(DOMAIN, entry.entry_id)} | {
         identifier for identifier in appliance.identifiers if identifier[0] != DOMAIN
     }
     if appliance.connections:
-        info["connections"] = set(appliance.connections)
-    return info
+        fields["connections"] = set(appliance.connections)
+    return fields
+
+
+def own_device_info(coordinator, entry: ConfigEntry) -> DeviceInfo:
+    """Our device's details for an entity."""
+    return DeviceInfo(**own_device_fields(coordinator, entry))
 
 
 def own_device(hass: HomeAssistant, entry: ConfigEntry) -> dr.DeviceEntry | None:
@@ -170,7 +182,7 @@ def async_link_device(hass: HomeAssistant, coordinator, entry: ConfigEntry) -> N
     target = appliance_device_id(hass, coordinator)
 
     ours = dev_reg.async_get_or_create(
-        config_entry_id=entry.entry_id, **own_device_info(coordinator, entry)
+        config_entry_id=entry.entry_id, **own_device_fields(coordinator, entry)
     )
     for entity in er.async_entries_for_config_entry(ent_reg, entry.entry_id):
         if entity.device_id != ours.id:
