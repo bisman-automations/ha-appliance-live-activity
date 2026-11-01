@@ -16,6 +16,7 @@ CONFIG_MINOR_VERSION = 2
 
 PLATFORMS: list[Platform] = [
     Platform.SENSOR,
+    Platform.SWITCH,
     Platform.NUMBER,
     Platform.EVENT,
     Platform.BUTTON,
@@ -146,6 +147,18 @@ STATUS_RUNNING = "running"
 STATUS_PAUSED = "paused"
 STATUS_COMPLETE = "complete"
 STATUS_DELAYED = "delayed"
+# Every status, for the Status sensor's enum options (Matter Hub finds an
+# appliance's state sensor by "running" and "paused" in them).
+STATUSES = (
+    STATUS_IDLE,
+    STATUS_DELAYED,
+    STATUS_RUNNING,
+    STATUS_PAUSED,
+    STATUS_COMPLETE,
+)
+# Appliances Matter has a type for (Dishwasher, Laundry Washer and Laundry
+# Dryer); they get a Power switch for Home Assistant Matter Hub to map.
+MATTER_APPLIANCE_TYPES = ("dishwasher", "washer", "dryer")
 
 # Behaviour tuning
 DEFAULT_DISMISS_MINUTES = 30

@@ -406,7 +406,14 @@
   "entity": {
     "sensor": {
       "status": {
-        "name": "Status"
+        "name": "Status",
+        "state": {
+          "idle": "Idle",
+          "delayed": "Delayed start",
+          "running": "Running",
+          "paused": "Paused",
+          "complete": "Complete"
+        }
       },
       "progress": {
         "name": "Progress"
@@ -441,6 +448,11 @@
       "update_live_activity": {
         "name": "Update Live Activity"
       }
+    },
+    "switch": {
+      "power": {
+        "name": "Power"
+      }
     }
   },
   "services": {
@@ -463,6 +475,11 @@
     "missing_entities": {
       "title": "{appliance}: sensors are missing",
       "description": "{appliance} uses sensors that no longer exist: {entities}. Pick the right ones with {appliance} → ⋮ → Reconfigure."
+    }
+  },
+  "exceptions": {
+    "no_remote_control": {
+      "message": "{name} can't be started or stopped from Home Assistant. Use the buttons on the appliance."
     }
   }
 }

@@ -34,6 +34,11 @@
       "update_live_activity": {
         "default": "mdi:send"
       }
+    },
+    "switch": {
+      "power": {
+        "default": "mdi:power"
+      }
     }
   }
 }

@@ -5,6 +5,16 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.13.0] - 2026-11-01
+
+### Added
+
+- **Matter, through Home Assistant Matter Hub.** Washers, dryers and dishwashers now have a **Power** switch, on while a cycle is running, paused or waiting to start. Map it in Matter Hub as a Dishwasher, Laundry Washer or Laundry Dryer. Matter apps such as Google Home or SmartThings then show the appliance and whether it's running, paused or stopped, and when a cycle finishes. GE appliances can't be started or stopped remotely, so turning the switch on or off is refused with a message.
+
+### Changed
+
+- **Status** for washers, dryers, dishwashers and ovens is now a list of fixed states: Idle, Delayed start, Running, Paused and Complete. They show translated in the UI, and Matter Hub can read them. The stored values are the same as before (`idle`, `running`, …), so automations that check them keep working.
+
 ## [1.12.2] - 2026-10-30
 
 ### Fixed
@@ -490,6 +500,7 @@ Initial release.
 - Status and Progress sensors per appliance for dashboards.
 - `appliance_live_activity.update` service for forcing a manual refresh.
 
+[1.13.0]: https://github.com/bisman-automations/ha-appliance-live-activity/compare/v1.12.2...v1.13.0
 [1.12.2]: https://github.com/bisman-automations/ha-appliance-live-activity/compare/v1.12.1...v1.12.2
 [1.12.1]: https://github.com/bisman-automations/ha-appliance-live-activity/compare/v1.12.0...v1.12.1
 [1.12.0]: https://github.com/bisman-automations/ha-appliance-live-activity/compare/v1.11.0...v1.12.0

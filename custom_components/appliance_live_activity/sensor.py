@@ -16,7 +16,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import DOOR_TYPES
+from .const import DOOR_TYPES, STATUS_IDLE, STATUSES
 from .device import attach_to_appliance
 
 
@@ -73,11 +73,22 @@ class ApplianceStatusSensor(_ApplianceSensor):
         """Status sensor for ``entry``."""
         super().__init__(coordinator, entry, "status")
         self._attr_icon = coordinator.icon
+        # Appliances with a cycle report one of a fixed set of statuses, so
+        # the sensor is an enum: translated states, and Home Assistant Matter
+        # Hub picks it up as the appliance's operational state.
+        self._enum = coordinator.appliance_type not in DOOR_TYPES
+        if self._enum:
+            self._attr_device_class = SensorDeviceClass.ENUM
+            self._attr_options = list(STATUSES)
 
     @property
     def native_value(self):
         """The coordinator's status string."""
-        return self.coordinator.data.get("status")
+        status = self.coordinator.data.get("status")
+        if self._enum and status not in STATUSES:
+            # An enum must be one of its options, or the entity breaks.
+            return STATUS_IDLE
+        return status
 
     @property
     def extra_state_attributes(self) -> dict:

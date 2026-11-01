@@ -109,9 +109,10 @@ async def test_unavailable_blip_ignored(
 
 
 async def test_switch_light(hass: HomeAssistant, enable_custom_integrations):
+    await _setup(hass, light="switch.oven_light", light_state="off")
+    # After setup: loading the switch platform registers the real actions.
     on = async_mock_service(hass, "switch", "turn_on")
     off = async_mock_service(hass, "switch", "turn_off")
-    await _setup(hass, light="switch.oven_light", light_state="off")
     await _oven(hass, "Bake")
     assert len(on) == 1 and on[0].data["entity_id"] == "switch.oven_light"
     hass.states.async_set("switch.oven_light", "on")

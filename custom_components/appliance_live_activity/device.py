@@ -40,6 +40,7 @@ from .const import DOMAIN
 # translations are available on the entity.
 SUGGESTED_ENTITY_NAMES: dict[tuple[str, str], str] = {
     ("sensor", "status"): "Status",
+    ("switch", "power"): "Power",
     ("sensor", "progress"): "Progress",
     ("sensor", "time_left"): "Time Left",
     ("sensor", "finishes_at"): "Finishes At",

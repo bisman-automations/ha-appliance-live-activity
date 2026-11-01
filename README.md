@@ -286,6 +286,15 @@ The name you see is the device name plus the entity: **Kitchen Dishwasher Live A
   activity if it was dismissed from the notification center.
 - `appliance_live_activity.update` re-sends an appliance's Live Activity.
 
+### Matter (Home Assistant Matter Hub)
+
+Washers, dryers and dishwashers can be shared over Matter with [Home Assistant Matter Hub](https://riddix.github.io/home-assistant-matter-hub/supported-device-types#dishwashers-washers-and-dryers-entity-mapping-override). They then show up in Google Home, SmartThings and other Matter apps as a Dishwasher, Laundry Washer or Laundry Dryer, with their running state.
+
+- Each has a **Power** switch, which is on while a cycle is running, paused or waiting for a delayed start. GE appliances can't be started or stopped from Home Assistant, so turning it on or off from Home Assistant or a Matter app does nothing and shows an error.
+- The **Status** sensor's states are *idle*, *delayed*, *running*, *paused* and *complete*. Ovens use the same sensor; doors and fridges keep theirs as it was.
+
+In Matter Hub, add the **Power** switch (for example `switch.kitchen_dishwasher_power`) to a bridge, and set its device type in the Entity Mapping to Dishwasher, Laundry Washer or Laundry Dryer. Matter Hub finds the **Status** sensor on the same device by itself and reports Running, Paused or Stopped, and when a cycle has finished. A delayed start counts as stopped until the cycle starts.
+
 ## Adding an appliance type
 
 Appliance types are plugins in
