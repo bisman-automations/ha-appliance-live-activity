@@ -5,6 +5,19 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.14.0] - 2026-11-01
+
+### Added
+
+- **Appliances dashboard** in the sidebar. Every appliance gets a card with:
+  - its picture or icon, and its state (Running, Paused, Delayed start, Done, Idle, or Open and Closed for doors);
+  - what it's doing, with a progress bar, time left and when it'll be done;
+  - anything that needs you: leaks, a blocked vent, the cooktop left on, low supplies, filters, a fridge or freezer too warm;
+  - fridge and freezer temperatures, this week's cycles, the usual cycle length, and the last 10 cycles.
+
+  Running appliances come first, then ones that need attention. You can search, filter and sort, and update an appliance's Live Activity from its card.
+- **Appliance pictures.** Admins can add a picture of each appliance on the dashboard, from the phone's camera or photos, and change or remove it later.
+
 ## [1.13.0] - 2026-11-01
 
 ### Added
@@ -500,6 +513,7 @@ Initial release.
 - Status and Progress sensors per appliance for dashboards.
 - `appliance_live_activity.update` service for forcing a manual refresh.
 
+[1.14.0]: https://github.com/bisman-automations/ha-appliance-live-activity/compare/v1.13.0...v1.14.0
 [1.13.0]: https://github.com/bisman-automations/ha-appliance-live-activity/compare/v1.12.2...v1.13.0
 [1.12.2]: https://github.com/bisman-automations/ha-appliance-live-activity/compare/v1.12.1...v1.12.2
 [1.12.1]: https://github.com/bisman-automations/ha-appliance-live-activity/compare/v1.12.0...v1.12.1

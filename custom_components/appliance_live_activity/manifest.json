@@ -1,13 +1,25 @@
 {
   "domain": "appliance_live_activity",
   "name": "Appliance Live Activity",
-  "after_dependencies": ["mobile_app", "tts"],
-  "codeowners": ["@donavanbecker"],
+  "after_dependencies": [
+    "frontend",
+    "http",
+    "image_upload",
+    "mobile_app",
+    "panel_custom",
+    "tts"
+  ],
+  "codeowners": [
+    "@donavanbecker"
+  ],
   "config_flow": true,
+  "dependencies": [
+    "websocket_api"
+  ],
   "documentation": "https://github.com/bisman-automations/ha-appliance-live-activity",
   "integration_type": "service",
   "iot_class": "calculated",
   "issue_tracker": "https://github.com/bisman-automations/ha-appliance-live-activity/issues",
   "requirements": [],
-  "version": "1.13.0"
+  "version": "1.14.0"
 }

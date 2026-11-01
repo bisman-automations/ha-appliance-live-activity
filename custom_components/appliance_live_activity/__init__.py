@@ -39,6 +39,9 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     the requested appliance is not set up.
     """
     await async_setup_services(hass)
+    from .panel import async_setup_panel_backend  # noqa: PLC0415
+
+    await async_setup_panel_backend(hass)
     return True
 
 
@@ -168,6 +171,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ApplianceConfigEntry) ->
 
         async_link_device(hass, coordinator, entry)
         await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+        from .panel import async_register_panel  # noqa: PLC0415
+
+        await async_register_panel(hass, await _version(hass))
     except Exception:
         await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
         await coordinator.async_unload()
@@ -181,7 +187,16 @@ async def async_unload_entry(hass: HomeAssistant, entry: ApplianceConfigEntry) -
     unloaded = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
     if unloaded:
         await entry.runtime_data.async_unload()
+        from .panel import async_unregister_panel_if_unused  # noqa: PLC0415
+
+        async_unregister_panel_if_unused(hass, entry.entry_id)
     return unloaded
+
+
+async def _version(hass: HomeAssistant) -> str | None:
+    from homeassistant.loader import async_get_integration  # noqa: PLC0415
+
+    return (await async_get_integration(hass, DOMAIN)).version
 
 
 async def async_remove_entry(hass: HomeAssistant, entry: ApplianceConfigEntry) -> None:

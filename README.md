@@ -286,6 +286,20 @@ The name you see is the device name plus the entity: **Kitchen Dishwasher Live A
   activity if it was dismissed from the notification center.
 - `appliance_live_activity.update` re-sends an appliance's Live Activity.
 
+### Appliances dashboard
+
+**Appliances** in the sidebar shows every appliance on one page, with a card for each:
+
+- a picture of the appliance, or its icon in its color, with its state on top (Running, Paused, Delayed start, Done or Idle; Open or Closed for doors and fridges);
+- what it's doing now (the cycle phase, when a delayed start begins, when the last load finished, or how long a door has been open), with a progress bar, time left and when it'll be done while it runs;
+- anything that needs you: a water leak, a blocked dryer vent, the cooktop left on, low rinse aid or detergent, a filter to clean or replace, a fridge or freezer too warm, plus the meat probe and kitchen timer;
+- fridge and freezer temperatures, cycles this week, the usual cycle length and the last cycle;
+- **Recent cycles** (the last 10, when each finished and how long it ran), and **Update Live Activity**.
+
+Appliances that are running come first, then ones that need attention (a finished load, an open door, an alert), then the most recently used. With two or more appliances you can search, show only some (running now, needs attention, not running) and sort by name or type instead; the choice is remembered on each device. Tap an appliance's name to open its device page.
+
+Admins can **Add picture** to each appliance from their phone's camera or photos, or change or remove it. Pictures use Home Assistant's own image upload, the same as person pictures (part of `default_config`). Everyone can see the dashboard; only admins can change pictures.
+
 ### Matter (Home Assistant Matter Hub)
 
 Washers, dryers and dishwashers can be shared over Matter with [Home Assistant Matter Hub](https://riddix.github.io/home-assistant-matter-hub/supported-device-types#dishwashers-washers-and-dryers-entity-mapping-override). They then show up in Google Home, SmartThings and other Matter apps as a Dishwasher, Laundry Washer or Laundry Dryer, with their running state.
