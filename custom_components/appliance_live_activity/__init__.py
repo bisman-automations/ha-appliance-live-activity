@@ -39,9 +39,10 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     the requested appliance is not set up.
     """
     await async_setup_services(hass)
-    from .panel import async_setup_panel_backend  # noqa: PLC0415
+    from .panel import async_setup_panel_backend, async_register_panel  # noqa: PLC0415
 
     await async_setup_panel_backend(hass)
+    await async_register_panel(hass, await _version(hass))   # ← add this
     return True
 
 
@@ -171,9 +172,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ApplianceConfigEntry) ->
 
         async_link_device(hass, coordinator, entry)
         await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
-        from .panel import async_register_panel  # noqa: PLC0415
-
-        await async_register_panel(hass, await _version(hass))
     except Exception:
         await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
         await coordinator.async_unload()
