@@ -4,13 +4,14 @@
 rejects a second registration (``ValueError: Overwriting panel appliances
 owned by custom``), so only the first appliance loaded. 1.14.1 registered it
 once at startup but removed it with the last appliance and never put it
-back. These tests set several entries up together — the way Home Assistant
-does — and then reload, unload and add them again.
+back. These tests load several entries, then reload, unload and add them
+again. Each entry is set up on its own: Home Assistant also sets up every
+entry of a domain when the integration first loads, and a second setup
+while one is still in progress raises OperationNotAllowed.
 """
 
 from __future__ import annotations
 
-import asyncio
 from contextlib import contextmanager
 from pathlib import Path
 from unittest.mock import AsyncMock, patch
@@ -20,6 +21,7 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry
 from custom_components.appliance_live_activity import panel
 from custom_components.appliance_live_activity.const import DOMAIN
 from custom_components.appliance_live_activity.coordinator import ApplianceCoordinator
+from homeassistant.config_entries import ConfigEntryState
 from homeassistant.core import HomeAssistant
 from homeassistant.setup import async_setup_component
 
@@ -236,17 +238,37 @@ def _appliance(hass: HomeAssistant, name: str, index: int) -> MockConfigEntry:
     return entry
 
 
-async def _setup_together(
+async def _setup_entry(hass: HomeAssistant, entry: MockConfigEntry) -> bool:
+    """Set up one entry, after any setup already running has finished.
+
+    Loading the integration sets up every entry of this domain. Calling
+    ``async_setup`` again while that entry is ``SETUP_IN_PROGRESS`` raises
+    ``OperationNotAllowed``, so an entry Home Assistant already started is
+    left to finish and its resulting state is what we report.
+    """
+    if entry.state is ConfigEntryState.SETUP_IN_PROGRESS:
+        await hass.async_block_till_done()
+    if entry.state is ConfigEntryState.NOT_LOADED:
+        result = await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
+        return result
+    return entry.state is ConfigEntryState.LOADED
+
+
+async def _setup_entries(
     hass: HomeAssistant, names: tuple[str, ...] = APPLIANCES
 ) -> list[MockConfigEntry]:
-    """Add every appliance, then set them all up concurrently."""
+    """Add every appliance, then set each one up on its own."""
     entries = [_appliance(hass, name, index) for index, name in enumerate(names)]
-    results = await asyncio.gather(
-        *(hass.config_entries.async_setup(entry.entry_id) for entry in entries)
-    )
-    await hass.async_block_till_done()
+    # One after another. Awaiting them together races Home Assistant, which
+    # is already setting the same entries up while the integration loads.
+    results = []
+    for entry in entries:
+        results.append(await _setup_entry(hass, entry))
     assert results == [True] * len(entries)
-    assert [entry.state.value for entry in entries] == ["loaded"] * len(entries)
+    assert [entry.state is ConfigEntryState.LOADED for entry in entries] == [
+        True
+    ] * len(entries)
     return entries
 
 
@@ -299,7 +321,7 @@ async def test_six_entries_set_up_together(
     await _enable_frontend(hass)
     calls = _PanelCalls()
     with _patched_frontend(calls):
-        await _setup_together(hass)
+        await _setup_entries(hass)
         _panel_is_up(hass, calls)
         # Calling registration again (a retried setup) must not raise or
         # register the static path or the commands a second time.
@@ -315,7 +337,7 @@ async def test_reload_one_entry_keeps_the_panel_and_every_appliance(
     await _enable_frontend(hass)
     calls = _PanelCalls()
     with _patched_frontend(calls):
-        entries = await _setup_together(hass)
+        entries = await _setup_entries(hass)
         assert await hass.config_entries.async_reload(entries[0].entry_id)
         await hass.async_block_till_done()
         _panel_is_up(hass, calls)
@@ -328,7 +350,7 @@ async def test_unload_all_but_one_lists_the_remaining_appliance(
     await _enable_frontend(hass)
     calls = _PanelCalls()
     with _patched_frontend(calls):
-        entries = await _setup_together(hass)
+        entries = await _setup_entries(hass)
         for entry in entries[1:]:
             assert await hass.config_entries.async_unload(entry.entry_id)
         await hass.async_block_till_done()
@@ -349,17 +371,16 @@ async def test_unload_all_and_readd(
     await _enable_frontend(hass)
     calls = _PanelCalls()
     with _patched_frontend(calls):
-        entries = await _setup_together(hass)
+        entries = await _setup_entries(hass)
         for entry in entries:
             assert await hass.config_entries.async_unload(entry.entry_id)
         await hass.async_block_till_done()
         _panel_is_up(hass, calls)
         assert await _listed_names(hass, hass_ws_client) == []
 
-        again = await asyncio.gather(
-            *(hass.config_entries.async_setup(entry.entry_id) for entry in entries)
-        )
-        await hass.async_block_till_done()
+        again = []
+        for entry in entries:
+            again.append(await _setup_entry(hass, entry))
         assert again == [True] * len(entries)
         extra = _appliance(hass, "Laundry Dishwasher", len(entries))
         assert await hass.config_entries.async_setup(extra.entry_id)
@@ -387,10 +408,9 @@ async def test_failed_setup_does_not_block_the_others(
 
     monkeypatch.setattr(ApplianceCoordinator, "async_setup", _fail_one)
     with _patched_frontend(calls):
-        results = await asyncio.gather(
-            *(hass.config_entries.async_setup(entry.entry_id) for entry in entries)
-        )
-        await hass.async_block_till_done()
+        results = []
+        for entry in entries:
+            results.append(await _setup_entry(hass, entry))
         assert results == [True, True, False, True, True, True]
         assert failed.state.value == "setup_error"
         assert not hasattr(failed, "runtime_data")
@@ -407,7 +427,7 @@ async def test_panel_already_registered_does_not_fail_setup(
     await _enable_frontend(hass)
     calls = _PanelCalls(already_registered=True)
     with _patched_frontend(calls):
-        await _setup_together(hass)
+        await _setup_entries(hass)
         assert calls.register_calls == 1
         assert calls.static_calls == 1
         assert hass.data[panel.DATA_PANEL] is True
@@ -417,7 +437,7 @@ async def test_panel_already_registered_does_not_fail_setup(
 async def test_one_bad_summary_does_not_hide_the_others(
     hass: HomeAssistant, enable_custom_integrations, hass_ws_client, monkeypatch
 ):
-    entries = await _setup_together(hass, APPLIANCES[:2])
+    entries = await _setup_entries(hass, APPLIANCES[:2])
     real = panel.appliance_summary
 
     def _boom(hass, entry):
