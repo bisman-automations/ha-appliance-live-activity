@@ -5,6 +5,12 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.14.2] - 2026-11-04
+
+### Fixed
+
+- **Every appliance loads, and the Appliances page stays.** 1.14.0 registered the sidebar page once for each appliance, so Home Assistant rejected every appliance after the first and only one of them loaded. 1.14.1 registered the page at startup, then removed it when the last appliance was reloaded or removed and did not put it back. The page is now registered once for the whole time Home Assistant is running. Adding, reloading or removing an appliance no longer drops the page or stops the others from loading, and the page lists every appliance that is set up.
+
 ## [1.14.1] - 2026-11-02
 
 ### Fixed
@@ -519,6 +525,7 @@ Initial release.
 - Status and Progress sensors per appliance for dashboards.
 - `appliance_live_activity.update` service for forcing a manual refresh.
 
+[1.14.2]: https://github.com/bisman-automations/ha-appliance-live-activity/compare/v1.14.1...v1.14.2
 [1.14.1]: https://github.com/bisman-automations/ha-appliance-live-activity/compare/v1.14.0...v1.14.1
 [1.14.0]: https://github.com/bisman-automations/ha-appliance-live-activity/compare/v1.13.0...v1.14.0
 [1.13.0]: https://github.com/bisman-automations/ha-appliance-live-activity/compare/v1.12.2...v1.13.0

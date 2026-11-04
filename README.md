@@ -288,7 +288,7 @@ The name you see is the device name plus the entity: **Kitchen Dishwasher Live A
 
 ### Appliances dashboard
 
-**Appliances** in the sidebar shows every appliance on one page, with a card for each:
+**Appliances** in the sidebar lists every appliance you have set up, on one page. The page is added once, when the integration loads, and it stays while you add, reload or remove appliances. Each appliance has a card with:
 
 - a picture of the appliance, or its icon in its color, with its state on top (Running, Paused, Delayed start, Done or Idle; Open or Closed for doors and fridges);
 - what it's doing now (the cycle phase, when a delayed start begins, when the last load finished, or how long a door has been open), with a progress bar, time left and when it'll be done while it runs;

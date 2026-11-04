@@ -51,7 +51,7 @@ first, plus any other brand or a plain door/contact sensor set up manually.
 | `door.py`, `cooktop.py`, `leak.py`, `maintenance.py`, `oven_extras.py`, `oven_light.py` | Feature monitors |
 | `sensor.py`, `number.py`, `event.py`, `button.py` | Entities |
 | `health.py` | Repairs issues; `diagnostics.py` (redact personal data) |
-| `panel.py` + `frontend/appliance-live-activity-panel.js` | The Appliances sidebar dashboard: registered with the first loaded appliance (only when the frontend is loaded), removed with the last. Websocket `appliance_live_activity/appliances` (everyone) and `appliance_live_activity/image` (admins). Pictures are Home Assistant `image_upload` ids kept in the `appliance_live_activity.images` Store. The panel is plain JS with no build step; live values come from `hass.states`. |
+| `panel.py` + `frontend/appliance-live-activity-panel.js` | The Appliances sidebar dashboard. Registered once from `async_setup` (only when the frontend is loaded) and left in place for the whole run, including after the last appliance unloads, so a reload cannot remove the page or register it twice. Websocket `appliance_live_activity/appliances` lists every loaded appliance (everyone) and `appliance_live_activity/image` changes pictures (admins). Pictures are Home Assistant `image_upload` ids kept in the `appliance_live_activity.images` Store. The panel is plain JS with no build step; live values come from `hass.states`. |
 | `strings.json` + `translations/en.json` | Must stay **identical**; edit both |
 | `brand/` | Icons shown by HACS / HA |
 
@@ -89,7 +89,9 @@ first, plus any other brand or a plain door/contact sensor set up manually.
   the coordinator), not `hass.async_create_task`. The test harness fails a
   test that leaves a timer behind.
 - **Coordinators** live on `entry.runtime_data`. Don't put them in
-  `hass.data[DOMAIN]`. Services are registered once in `async_setup`.
+  `hass.data[DOMAIN]`. Services and the Appliances sidebar panel (its static
+  path and websocket commands) are registered once in `async_setup` and are
+  not removed when an entry unloads.
 - **Config entry reloads**: Configure uses `OptionsFlowWithReload`;
   Reconfigure uses `async_update_reload_and_abort`. Don't add an
   `add_update_listener` reload: HA warns about combining an update

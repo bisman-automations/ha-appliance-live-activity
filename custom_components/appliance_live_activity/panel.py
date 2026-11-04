@@ -1,10 +1,18 @@
 """The Appliances sidebar dashboard.
 
-Registers one "Appliances" panel while at least one appliance is set up,
-serves its JavaScript, and answers its websocket requests. The panel reads
-live states (Status, Time Left, …) from the frontend's own connection; the
-backend adds what states don't carry: which entities belong to which
-appliance, recent cycles, maintenance alerts and each appliance's picture.
+Registered once from ``async_setup`` for the whole Home Assistant run — not
+once per config entry, and not removed when the last appliance unloads.
+Home Assistant raises ``ValueError: Overwriting panel appliances owned by
+custom`` if the same panel is registered again, which used to abort setup of
+every appliance after the first. Removing it with the last entry (1.14.1)
+then left the page missing after a reload, because nothing registered it a
+second time.
+
+The panel reads live states (Status, Time Left, …) from the frontend's own
+connection. This module adds what states don't carry: which entities belong
+to which appliance, recent cycles, maintenance alerts and each appliance's
+picture. The websocket command lists every appliance that is set up, not the
+entry that happened to register the page.
 
 Pictures are uploaded with Home Assistant's own image upload (the same one
 person pictures use); only the uploaded image's id is stored here.
@@ -35,8 +43,15 @@ PANEL_TITLE = "Appliances"
 PANEL_ICON = "mdi:washing-machine"
 STATIC_URL = f"/{DOMAIN}_static"
 FRONTEND_DIR = Path(__file__).parent / "frontend"
+# True once this run has claimed the sidebar panel. Set before the await so
+# a second caller cannot register it too.
 DATA_PANEL = f"{DOMAIN}_panel"
+# True once the panel's JavaScript path is registered. Independent of
+# DATA_PANEL so a failed panel registration can be retried without
+# registering the same static path twice.
 DATA_STATIC = f"{DOMAIN}_static"
+# True once the websocket commands are registered for this run.
+DATA_API = f"{DOMAIN}_panel_api"
 DATA_IMAGES = f"{DOMAIN}_images"
 IMAGES_STORE = f"{DOMAIN}.images"
 RECENT_CYCLES = 10
@@ -80,21 +95,72 @@ class ImageStore:
 
 
 async def async_setup_panel_backend(hass: HomeAssistant) -> None:
-    """Load the pictures and register the websocket commands (once)."""
-    images = ImageStore(hass)
-    await images.async_load()
+    """Load the pictures and register the websocket commands, once per run.
+
+    ``websocket_api.async_register_command`` raises if the same command is
+    registered again, so a second call (a retried ``async_setup``) must not
+    reach it. The claim is synchronous, before the storage load, so two
+    callers cannot both pass the check.
+    """
+    if hass.data.get(DATA_API):
+        return
+    hass.data[DATA_API] = True
+    try:
+        images = ImageStore(hass)
+        await images.async_load()
+    except Exception:
+        # Leave the commands unregistered and let a retry start over.
+        hass.data[DATA_API] = False
+        raise
     hass.data[DATA_IMAGES] = images
     websocket_api.async_register_command(hass, websocket_appliances)
     websocket_api.async_register_command(hass, websocket_set_image)
 
 
+def _panel_already_registered(err: BaseException) -> bool:
+    """Home Assistant's error when this panel is already in the sidebar."""
+    return isinstance(err, ValueError) and "Overwriting panel" in str(err)
+
+
 async def async_register_panel(hass: HomeAssistant, version: str | None) -> None:
-    """Show the panel in the sidebar (no-op if it's already there)."""
+    """Show the Appliances panel in the sidebar, once per Home Assistant run.
+
+    Called from ``async_setup``. The panel stays for the whole run, including
+    after the last appliance is removed, and shows an empty state then. It is
+    not registered from ``async_setup_entry``: doing that once per appliance
+    raises, and only the first appliance loads.
+
+    No-op when this run already registered it. No-op without a frontend
+    (tests, or a headless setup); the flag is left unset so a later call can
+    still register. An "already registered" error from Home Assistant is the
+    outcome we want and is not raised — a failed or repeated setup must not
+    take the integration down or hide the other appliances.
+    """
     if hass.data.get(DATA_PANEL):
         return
     if "frontend" not in hass.config.components or hass.http is None:
-        # Not running with a frontend (tests, or a headless setup).
+        _LOGGER.debug("Frontend not loaded; skipping the Appliances panel")
         return
+
+    # Claim before the first await. Check and set are synchronous, so a
+    # second task cannot pass the check above while this one is waiting.
+    hass.data[DATA_PANEL] = True
+    try:
+        await _async_register_panel_and_static(hass, version)
+    except Exception as err:
+        if _panel_already_registered(err):
+            _LOGGER.debug("Appliances panel is already registered: %s", err)
+            return
+        # Static path may already be recorded. Clearing only the panel claim
+        # lets a retry register the panel without registering the path twice.
+        hass.data[DATA_PANEL] = False
+        raise
+
+
+async def _async_register_panel_and_static(
+    hass: HomeAssistant, version: str | None
+) -> None:
+    """Register the script path, then the sidebar panel."""
     from homeassistant.components import panel_custom  # noqa: PLC0415
     from homeassistant.components.http import StaticPathConfig  # noqa: PLC0415
 
@@ -114,25 +180,6 @@ async def async_register_panel(hass: HomeAssistant, version: str | None) -> None
         require_admin=False,
         config={},
     )
-    hass.data[DATA_PANEL] = True
-
-
-@callback
-def async_unregister_panel_if_unused(
-    hass: HomeAssistant, leaving_entry_id: str
-) -> None:
-    """Remove the panel once no appliance is set up any more."""
-    if not hass.data.get(DATA_PANEL):
-        return
-    if any(
-        entry.entry_id != leaving_entry_id and entry.state is ConfigEntryState.LOADED
-        for entry in hass.config_entries.async_entries(DOMAIN)
-    ):
-        return
-    from homeassistant.components import frontend  # noqa: PLC0415
-
-    frontend.async_remove_panel(hass, PANEL_URL_PATH, warn_if_unknown=False)
-    hass.data[DATA_PANEL] = False
 
 
 def image_url(image_id: str | None) -> str | None:
@@ -225,12 +272,26 @@ def appliance_summary(hass: HomeAssistant, entry) -> dict[str, Any]:
     }
 
 
-def _loaded(hass: HomeAssistant) -> list:
-    return [
-        entry
-        for entry in hass.config_entries.async_entries(DOMAIN)
-        if entry.state is ConfigEntryState.LOADED
-    ]
+def dashboard_appliances(hass: HomeAssistant) -> list[dict[str, Any]]:
+    """Every appliance that is set up, for the dashboard.
+
+    The sidebar page is registered once for the whole run, so this is every
+    loaded config entry — whichever entry was set up first does not own the
+    list. An entry that failed setup has no coordinator and is left out. One
+    appliance whose summary raises is skipped so the others still show.
+    """
+    summaries: list[dict[str, Any]] = []
+    for entry in hass.config_entries.async_entries(DOMAIN):
+        if entry.state is not ConfigEntryState.LOADED:
+            continue
+        try:
+            summaries.append(appliance_summary(hass, entry))
+        except Exception:
+            _LOGGER.exception(
+                "Couldn't describe %s for the Appliances dashboard",
+                getattr(entry, "title", None) or entry.entry_id,
+            )
+    return summaries
 
 
 @websocket_api.websocket_command({vol.Required("type"): f"{DOMAIN}/appliances"})
@@ -238,11 +299,11 @@ def _loaded(hass: HomeAssistant) -> list:
 def websocket_appliances(
     hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict
 ) -> None:
-    """Every appliance, for the dashboard."""
+    """Every set-up appliance, for the dashboard."""
     connection.send_result(
         msg["id"],
         {
-            "appliances": [appliance_summary(hass, entry) for entry in _loaded(hass)],
+            "appliances": dashboard_appliances(hass),
             "is_admin": connection.user.is_admin if connection.user else False,
         },
     )

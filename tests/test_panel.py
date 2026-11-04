@@ -1,7 +1,17 @@
-"""The Appliances dashboard: its websocket commands and the sidebar panel."""
+"""The Appliances dashboard: its websocket commands and the sidebar panel.
+
+1.14.0 registered the sidebar panel from every config entry. Home Assistant
+rejects a second registration (``ValueError: Overwriting panel appliances
+owned by custom``), so only the first appliance loaded. 1.14.1 registered it
+once at startup but removed it with the last appliance and never put it
+back. These tests set several entries up together — the way Home Assistant
+does — and then reload, unload and add them again.
+"""
 
 from __future__ import annotations
 
+import asyncio
+from contextlib import contextmanager
 from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
@@ -9,6 +19,7 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.appliance_live_activity import panel
 from custom_components.appliance_live_activity.const import DOMAIN
+from custom_components.appliance_live_activity.coordinator import ApplianceCoordinator
 from homeassistant.core import HomeAssistant
 from homeassistant.setup import async_setup_component
 
@@ -140,39 +151,282 @@ async def test_maintenance_alerts(hass: HomeAssistant, enable_custom_integration
     assert summary["alerts"] == ["Rinse aid: low", "Filter needs cleaning"]
 
 
-async def test_panel_registered_and_removed(
-    hass: HomeAssistant, enable_custom_integrations
-):
-    """With a frontend, the panel appears with the first appliance and goes with the last."""
-    assert await async_setup_component(hass, "http", {})
-    hass.config.components.add("frontend")
-    static = AsyncMock()
+# Six appliances, the report that only the first one loaded.
+APPLIANCES = (
+    "Kitchen Dishwasher",
+    "Pantry Dishwasher",
+    "Bar Dishwasher",
+    "Guest Dishwasher",
+    "Basement Dishwasher",
+    "Cottage Dishwasher",
+)
+
+
+class _PanelCalls:
+    """Stand-in for Home Assistant's panel registration.
+
+    A second registration raises the same ValueError Home Assistant raises.
+    A second static path raises too. The real frontend is not running in
+    these tests; this is the behaviour that aborted setup.
+    """
+
+    def __init__(self, *, already_registered: bool = False) -> None:
+        self.register_calls = 0
+        self.static_calls = 0
+        self.remove_calls = 0
+        self.kwargs: dict = {}
+        self.static_paths = None
+        self.already_registered = already_registered
+
+    async def register(self, hass, **kwargs):
+        self.register_calls += 1
+        self.kwargs = kwargs
+        if self.already_registered or self.register_calls > 1:
+            raise ValueError("Overwriting panel appliances owned by custom")
+
+    async def static(self, paths):
+        self.static_calls += 1
+        self.static_paths = paths
+        if self.static_calls > 1:
+            raise RuntimeError("static path registered twice")
+
+    def remove(self, hass, url_path, *, warn_if_unknown=False):
+        self.remove_calls += 1
+
+
+@contextmanager
+def _patched_frontend(calls: _PanelCalls):
     with (
         patch(
             "homeassistant.components.http.HomeAssistantHTTP.async_register_static_paths",
-            static,
+            calls.static,
         ),
         patch(
-            "homeassistant.components.panel_custom.async_register_panel", AsyncMock()
-        ) as register,
-        patch("homeassistant.components.frontend.async_remove_panel") as remove,
+            "homeassistant.components.panel_custom.async_register_panel",
+            calls.register,
+        ),
+        patch(
+            "homeassistant.components.frontend.async_remove_panel",
+            calls.remove,
+        ),
     ):
+        yield calls
+
+
+async def _enable_frontend(hass: HomeAssistant) -> None:
+    assert await async_setup_component(hass, "http", {})
+    hass.config.components.add("frontend")
+
+
+def _appliance(hass: HomeAssistant, name: str, index: int) -> MockConfigEntry:
+    state = f"sensor.dishwasher_{index}_operating_mode"
+    hass.states.async_set(state, "Off")
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        data={
+            "source": "manual",
+            "appliance_type": "dishwasher",
+            "name": name,
+            "state_entity": state,
+            "notification_tag": f"dishwasher_{index}",
+            "devices": [],
+        },
+    )
+    entry.add_to_hass(hass)
+    return entry
+
+
+async def _setup_together(
+    hass: HomeAssistant, names: tuple[str, ...] = APPLIANCES
+) -> list[MockConfigEntry]:
+    """Add every appliance, then set them all up concurrently."""
+    entries = [_appliance(hass, name, index) for index, name in enumerate(names)]
+    results = await asyncio.gather(
+        *(hass.config_entries.async_setup(entry.entry_id) for entry in entries)
+    )
+    await hass.async_block_till_done()
+    assert results == [True] * len(entries)
+    assert [entry.state.value for entry in entries] == ["loaded"] * len(entries)
+    return entries
+
+
+async def _listed_names(hass: HomeAssistant, hass_ws_client) -> list[str]:
+    client = await hass_ws_client(hass)
+    res = await _ws(client, type=f"{DOMAIN}/appliances")
+    assert res["success"]
+    return [item["name"] for item in res["result"]["appliances"]]
+
+
+def _panel_is_up(hass: HomeAssistant, calls: _PanelCalls) -> None:
+    """The page, its script and its commands were registered once and kept."""
+    assert calls.register_calls == 1
+    assert calls.static_calls == 1
+    assert calls.remove_calls == 0
+    assert hass.data[panel.DATA_PANEL] is True
+    assert hass.data[panel.DATA_STATIC] is True
+    assert hass.data[panel.DATA_API] is True
+
+
+async def test_panel_registered_for_the_whole_run(
+    hass: HomeAssistant, enable_custom_integrations
+):
+    """With a frontend, the panel is registered once and stays after unload."""
+    await _enable_frontend(hass)
+    calls = _PanelCalls()
+    with _patched_frontend(calls):
         entry = await _setup(hass)
-        register.assert_awaited_once()
-        kwargs = register.await_args.kwargs
-        assert kwargs["frontend_url_path"] == "appliances"
-        assert kwargs["webcomponent_name"] == "appliance-live-activity-panel"
-        assert kwargs["require_admin"] is False
-        assert kwargs["module_url"].startswith(
+        assert calls.kwargs["frontend_url_path"] == "appliances"
+        assert calls.kwargs["webcomponent_name"] == "appliance-live-activity-panel"
+        assert calls.kwargs["require_admin"] is False
+        assert calls.kwargs["module_url"].startswith(
             "/appliance_live_activity_static/appliance-live-activity-panel.js?v="
         )
-        (config,) = static.await_args.args[0]
+        (config,) = calls.static_paths
         assert Path(config.path) == panel.FRONTEND_DIR
+        _panel_is_up(hass, calls)
 
         assert await hass.config_entries.async_unload(entry.entry_id)
         await hass.async_block_till_done()
-        remove.assert_called_once()
-        assert remove.call_args.args[1] == "appliances"
+        # Unloading the only appliance must not remove the page. Putting it
+        # back would be a second registration, which Home Assistant rejects.
+        _panel_is_up(hass, calls)
+
+
+async def test_six_entries_set_up_together(
+    hass: HomeAssistant, enable_custom_integrations, hass_ws_client
+):
+    """Every appliance loads, and the dashboard lists all of them."""
+    await _enable_frontend(hass)
+    calls = _PanelCalls()
+    with _patched_frontend(calls):
+        await _setup_together(hass)
+        _panel_is_up(hass, calls)
+        # Calling registration again (a retried setup) must not raise or
+        # register the static path or the commands a second time.
+        await panel.async_register_panel(hass, "1.14.2")
+        await panel.async_setup_panel_backend(hass)
+        _panel_is_up(hass, calls)
+        assert sorted(await _listed_names(hass, hass_ws_client)) == sorted(APPLIANCES)
+
+
+async def test_reload_one_entry_keeps_the_panel_and_every_appliance(
+    hass: HomeAssistant, enable_custom_integrations, hass_ws_client
+):
+    await _enable_frontend(hass)
+    calls = _PanelCalls()
+    with _patched_frontend(calls):
+        entries = await _setup_together(hass)
+        assert await hass.config_entries.async_reload(entries[0].entry_id)
+        await hass.async_block_till_done()
+        _panel_is_up(hass, calls)
+        assert sorted(await _listed_names(hass, hass_ws_client)) == sorted(APPLIANCES)
+
+
+async def test_unload_all_but_one_lists_the_remaining_appliance(
+    hass: HomeAssistant, enable_custom_integrations, hass_ws_client
+):
+    await _enable_frontend(hass)
+    calls = _PanelCalls()
+    with _patched_frontend(calls):
+        entries = await _setup_together(hass)
+        for entry in entries[1:]:
+            assert await hass.config_entries.async_unload(entry.entry_id)
+        await hass.async_block_till_done()
+        _panel_is_up(hass, calls)
+        assert await _listed_names(hass, hass_ws_client) == ["Kitchen Dishwasher"]
+
+        # 1.14.1 removed the page here: this was the last loaded appliance,
+        # and the reload did not register it again.
+        assert await hass.config_entries.async_reload(entries[0].entry_id)
+        await hass.async_block_till_done()
+        _panel_is_up(hass, calls)
+        assert await _listed_names(hass, hass_ws_client) == ["Kitchen Dishwasher"]
+
+
+async def test_unload_all_and_readd(
+    hass: HomeAssistant, enable_custom_integrations, hass_ws_client
+):
+    await _enable_frontend(hass)
+    calls = _PanelCalls()
+    with _patched_frontend(calls):
+        entries = await _setup_together(hass)
+        for entry in entries:
+            assert await hass.config_entries.async_unload(entry.entry_id)
+        await hass.async_block_till_done()
+        _panel_is_up(hass, calls)
+        assert await _listed_names(hass, hass_ws_client) == []
+
+        again = await asyncio.gather(
+            *(hass.config_entries.async_setup(entry.entry_id) for entry in entries)
+        )
+        await hass.async_block_till_done()
+        assert again == [True] * len(entries)
+        extra = _appliance(hass, "Laundry Dishwasher", len(entries))
+        assert await hass.config_entries.async_setup(extra.entry_id)
+        await hass.async_block_till_done()
+        _panel_is_up(hass, calls)
+        assert sorted(await _listed_names(hass, hass_ws_client)) == sorted(
+            (*APPLIANCES, "Laundry Dishwasher")
+        )
+
+
+async def test_failed_setup_does_not_block_the_others(
+    hass: HomeAssistant, enable_custom_integrations, hass_ws_client, monkeypatch
+):
+    """One appliance failing setup must not raise, drop the page, or hide the rest."""
+    await _enable_frontend(hass)
+    calls = _PanelCalls()
+    entries = [_appliance(hass, name, index) for index, name in enumerate(APPLIANCES)]
+    failed = entries[2]
+    original = ApplianceCoordinator.async_setup
+
+    async def _fail_one(self):
+        if self.entry.entry_id == failed.entry_id:
+            raise RuntimeError("setup failed")
+        await original(self)
+
+    monkeypatch.setattr(ApplianceCoordinator, "async_setup", _fail_one)
+    with _patched_frontend(calls):
+        results = await asyncio.gather(
+            *(hass.config_entries.async_setup(entry.entry_id) for entry in entries)
+        )
+        await hass.async_block_till_done()
+        assert results == [True, True, False, True, True, True]
+        assert failed.state.value == "setup_error"
+        assert not hasattr(failed, "runtime_data")
+        _panel_is_up(hass, calls)
+        assert sorted(await _listed_names(hass, hass_ws_client)) == sorted(
+            name for name in APPLIANCES if name != "Bar Dishwasher"
+        )
+
+
+async def test_panel_already_registered_does_not_fail_setup(
+    hass: HomeAssistant, enable_custom_integrations, hass_ws_client
+):
+    """Home Assistant already owning the panel is not a setup failure."""
+    await _enable_frontend(hass)
+    calls = _PanelCalls(already_registered=True)
+    with _patched_frontend(calls):
+        await _setup_together(hass)
+        assert calls.register_calls == 1
+        assert calls.static_calls == 1
+        assert hass.data[panel.DATA_PANEL] is True
+        assert sorted(await _listed_names(hass, hass_ws_client)) == sorted(APPLIANCES)
+
+
+async def test_one_bad_summary_does_not_hide_the_others(
+    hass: HomeAssistant, enable_custom_integrations, hass_ws_client, monkeypatch
+):
+    entries = await _setup_together(hass, APPLIANCES[:2])
+    real = panel.appliance_summary
+
+    def _boom(hass, entry):
+        if entry.entry_id == entries[0].entry_id:
+            raise RuntimeError("summary failed")
+        return real(hass, entry)
+
+    monkeypatch.setattr(panel, "appliance_summary", _boom)
+    assert await _listed_names(hass, hass_ws_client) == ["Pantry Dishwasher"]
 
 
 async def test_no_panel_without_frontend(

@@ -25,24 +25,30 @@ from .const import (
 )
 from .coordinator import ApplianceConfigEntry, ApplianceCoordinator
 from .door import DoorCoordinator
+from .panel import async_register_panel, async_setup_panel_backend
 from .services import async_setup_services
 
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 
 
 async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
-    """Register services once, for the lifetime of Home Assistant.
+    """Register services and the Appliances dashboard once per Home Assistant run.
 
-    Doing this when the first config entry loads (and removing them when the
-    last one unloads) races two entries setting up together and drops the
-    service while an entry is still loaded. The service handler no-ops when
-    the requested appliance is not set up.
+    Doing either when the first config entry loads (and removing them when
+    the last one unloads) races two entries setting up together. Home
+    Assistant also refuses a second registration of the same sidebar panel
+    (``ValueError: Overwriting panel appliances owned by custom``), which
+    stopped every appliance after the first from loading in 1.14.0. 1.14.1
+    moved registration here but still removed the panel with the last
+    appliance, and a reload of that appliance never put the page back.
+
+    The service handler no-ops when the requested appliance is not set up.
+    The dashboard asks for whatever is loaded at that moment, so it lists
+    every appliance, and the page stays for the whole run.
     """
     await async_setup_services(hass)
-    from .panel import async_setup_panel_backend, async_register_panel  # noqa: PLC0415
-
     await async_setup_panel_backend(hass)
-    await async_register_panel(hass, await _version(hass))   # ← add this
+    await async_register_panel(hass, await _version(hass))
     return True
 
 
@@ -181,13 +187,15 @@ async def async_setup_entry(hass: HomeAssistant, entry: ApplianceConfigEntry) ->
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ApplianceConfigEntry) -> bool:
-    """Unload platforms and cancel the coordinator's listeners and timers."""
+    """Unload platforms and cancel the coordinator's listeners and timers.
+
+    The Appliances panel is not removed here. It was registered once in
+    ``async_setup`` and stays for the whole run, including when this was the
+    last appliance, so a reload cannot drop the page or register it again.
+    """
     unloaded = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
     if unloaded:
         await entry.runtime_data.async_unload()
-        from .panel import async_unregister_panel_if_unused  # noqa: PLC0415
-
-        async_unregister_panel_if_unused(hass, entry.entry_id)
     return unloaded
 
 
