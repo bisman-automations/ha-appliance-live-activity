@@ -19,6 +19,9 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from .const import DOOR_TYPES, STATUS_IDLE, STATUSES
 from .device import attach_to_appliance
 
+# Coordinator or push updates; nothing polls on its own.
+PARALLEL_UPDATES = 0
+
 
 async def async_setup_entry(
     hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback

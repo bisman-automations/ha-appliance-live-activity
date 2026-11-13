@@ -5,6 +5,12 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.14.4] - 2026-11-13
+
+### Changed
+
+- **Smoother updates.** Each kind of entity now tells Home Assistant how many updates it can take at once, as Home Assistant recommends. Nothing changes in how anything looks or works.
+
 ## [1.14.3] - 2026-11-10
 
 ### Changed
@@ -532,6 +538,7 @@ Initial release.
 - Status and Progress sensors per appliance for dashboards.
 - `appliance_live_activity.update` service for forcing a manual refresh.
 
+[1.14.4]: https://github.com/bisman-automations/ha-appliance-live-activity/compare/v1.14.3...v1.14.4
 [1.14.3]: https://github.com/bisman-automations/ha-appliance-live-activity/compare/v1.14.2...v1.14.3
 [1.14.2]: https://github.com/bisman-automations/ha-appliance-live-activity/compare/v1.14.1...v1.14.2
 [1.14.1]: https://github.com/bisman-automations/ha-appliance-live-activity/compare/v1.14.0...v1.14.1

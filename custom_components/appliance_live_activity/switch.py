@@ -28,6 +28,9 @@ from .const import (
 )
 from .device import attach_to_appliance
 
+# Coordinator or push updates; nothing polls on its own.
+PARALLEL_UPDATES = 0
+
 ON_STATUSES = (STATUS_RUNNING, STATUS_PAUSED, STATUS_DELAYED)
 
 
