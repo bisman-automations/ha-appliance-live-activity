@@ -483,7 +483,7 @@
         "step": {
           "confirm": {
             "title": "Remove the old Appliance Live Activity folder",
-            "description": "Appliance Live Activity is now Appliance Mgmt. Your appliances, settings and history move across on the next start, but only once the old `{folder}` folder is gone: while it's there, both would run and you'd get every alert twice.\n\nSelect **Submit** to delete that folder, then restart Home Assistant. If you installed Appliance Live Activity with HACS, you can remove it there instead."
+            "description": "Appliance Live Activity is now Appliance Mgmt. Your appliances, settings and history move across on the next start, but only once the old `{folder}` folder is gone: while it's there, both would run and you'd get every alert twice.\n\nSelect **Submit** to delete that folder, then restart Home Assistant."
           }
         }
       }

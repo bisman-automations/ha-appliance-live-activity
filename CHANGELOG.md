@@ -5,6 +5,22 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.1] - 2026-11-13
+
+### Fixed
+
+- **Upgrading from Appliance Live Activity, step by step.** The Marketplace won't update across the rename, and it won't remove Appliance Live Activity while your appliances are set up. Don't press **Delete and uninstall** when it offers it: that deletes your appliances. Instead, put Appliance Mgmt in place by hand once and restart, as the README's **Upgrading from Appliance Live Activity** section shows; everything then moves across by itself. From a terminal with access to your configuration folder (for example the Terminal & SSH add-on):
+
+  ```sh
+  cd /config/custom_components
+  mkdir appliance_mgmt
+  curl -L -o /tmp/appliance_mgmt.zip https://github.com/bisman-automations/ha-appliance-mgmt/releases/latest/download/appliance_mgmt.zip
+  unzip /tmp/appliance_mgmt.zip -d appliance_mgmt
+  rm -r appliance_live_activity
+  ```
+
+  Then restart Home Assistant. In the Marketplace, **Remove** Appliance Live Activity and **Download** Appliance Mgmt, so it offers you updates from now on.
+
 ## [2.0.0] - 2026-11-13
 
 ### Changed
@@ -550,6 +566,7 @@ Initial release.
 - Status and Progress sensors per appliance for dashboards.
 - `appliance_live_activity.update` service for forcing a manual refresh.
 
+[2.0.1]: https://github.com/bisman-automations/ha-appliance-mgmt/compare/v2.0.0...v2.0.1
 [2.0.0]: https://github.com/bisman-automations/ha-appliance-mgmt/compare/v1.14.4...v2.0.0
 [1.14.4]: https://github.com/bisman-automations/ha-appliance-mgmt/compare/v1.14.3...v1.14.4
 [1.14.3]: https://github.com/bisman-automations/ha-appliance-mgmt/compare/v1.14.2...v1.14.3

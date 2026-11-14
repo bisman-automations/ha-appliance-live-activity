@@ -70,15 +70,39 @@ Download `appliance_mgmt.zip` from the [latest release](https://github.com/bisma
 ### Upgrading from Appliance Live Activity
 
 Appliance Live Activity was renamed Appliance Mgmt in 2.0.0. Your appliances,
-settings, entities, history and pictures move across by themselves:
+settings, entities, history and pictures move across by themselves, but the
+Marketplace (HACS) can't make the switch for you: it won't update across the
+rename, and it won't remove Appliance Live Activity while appliances are set
+up with it. So the switch is done by hand, once.
 
-1. Install **Appliance Mgmt** (above). If the Marketplace or HACS updated
-   Appliance Live Activity to 2.0.0 for you, it's already installed.
-2. Remove **Appliance Live Activity** from the Marketplace or HACS. If you
-   can't, Home Assistant shows a repair, **Remove the old Appliance Live
-   Activity folder**; select **Submit** and it deletes the folder for you.
-3. Restart Home Assistant. Each appliance now shows under **Appliance Mgmt**
-   with the same entities.
+> **Don't press Delete and uninstall** if the Marketplace offers it. It
+> deletes your appliances, and then there's nothing left to move.
+
+1. Open a terminal with access to your configuration folder (for example the
+   Terminal & SSH add-on) and run:
+
+   ```sh
+   cd /config/custom_components
+   mkdir appliance_mgmt
+   curl -L -o /tmp/appliance_mgmt.zip https://github.com/bisman-automations/ha-appliance-mgmt/releases/latest/download/appliance_mgmt.zip
+   unzip /tmp/appliance_mgmt.zip -d appliance_mgmt
+   rm -r appliance_live_activity
+   ```
+
+   No terminal? Do the same with a file editor add-on or a network share:
+   unzip the latest `appliance_mgmt.zip` from the
+   [releases](https://github.com/bisman-automations/ha-appliance-mgmt/releases)
+   into a new `custom_components/appliance_mgmt` folder, and delete
+   `custom_components/appliance_live_activity`.
+2. Restart Home Assistant. Each appliance now shows under **Appliance Mgmt**
+   with the same entities, and the Appliance Live Activity entries are gone.
+3. In the Marketplace, **Remove** Appliance Live Activity (nothing is set up
+   with it any more), then **Download** Appliance Mgmt, so it offers you
+   updates from now on.
+
+If the old folder is still there after a restart, nothing moves and Home
+Assistant shows the repair **Remove the old Appliance Live Activity folder**.
+Select **Submit** to delete it, then restart.
 
 Automations that call the **Appliance Live Activity: Update** action need the
 new one, **Appliance Mgmt: Update** (`appliance_mgmt.update`). Everything that
