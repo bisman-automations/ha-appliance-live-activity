@@ -86,7 +86,7 @@ def own_device_fields(coordinator, entry: ConfigEntry) -> dict[str, Any]:
     fields: dict[str, Any] = {
         "identifiers": {(DOMAIN, entry.entry_id)},
         "name": coordinator.name,
-        "manufacturer": "Appliance Live Activity",
+        "manufacturer": "Appliance Mgmt",
         "model": coordinator.definition.display_name,
         "entry_type": DeviceEntryType.SERVICE,
     }

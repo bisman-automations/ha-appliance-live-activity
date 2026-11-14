@@ -5,6 +5,18 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.0] - 2026-11-13
+
+### Changed
+
+- **Appliance Live Activity is now Appliance Mgmt.** It does more than Live Activities now (alerts, reminders, the Appliances page), so the name, the repository (`ha-appliance-mgmt`) and the integration (`appliance_mgmt`) changed. Search the Marketplace or HACS for **Appliance Mgmt**.
+- **Everything moves across by itself.** On the first start, each appliance is set up again under Appliance Mgmt with the same name, settings, phones and picture, and its entities move with it: the same entity IDs, so history, statistics, dashboards and automations that use them keep working. A name or area you gave the device comes along too. The old Appliance Live Activity entries are then removed.
+- **Remove the old folder first.** While the Appliance Live Activity folder is still installed, nothing moves (both would run and you'd get every alert twice). Remove Appliance Live Activity from the Marketplace or HACS, or use the repair **Remove the old Appliance Live Activity folder**, which deletes it for you, then restart.
+
+### Removed
+
+- **The `appliance_live_activity.update` action.** It's now `appliance_mgmt.update`. Automations and scripts that call the old action need the new name.
+
 ## [1.14.4] - 2026-11-13
 
 ### Changed
@@ -538,36 +550,37 @@ Initial release.
 - Status and Progress sensors per appliance for dashboards.
 - `appliance_live_activity.update` service for forcing a manual refresh.
 
-[1.14.4]: https://github.com/bisman-automations/ha-appliance-live-activity/compare/v1.14.3...v1.14.4
-[1.14.3]: https://github.com/bisman-automations/ha-appliance-live-activity/compare/v1.14.2...v1.14.3
-[1.14.2]: https://github.com/bisman-automations/ha-appliance-live-activity/compare/v1.14.1...v1.14.2
-[1.14.1]: https://github.com/bisman-automations/ha-appliance-live-activity/compare/v1.14.0...v1.14.1
-[1.14.0]: https://github.com/bisman-automations/ha-appliance-live-activity/compare/v1.13.0...v1.14.0
-[1.13.0]: https://github.com/bisman-automations/ha-appliance-live-activity/compare/v1.12.2...v1.13.0
-[1.12.2]: https://github.com/bisman-automations/ha-appliance-live-activity/compare/v1.12.1...v1.12.2
-[1.12.1]: https://github.com/bisman-automations/ha-appliance-live-activity/compare/v1.12.0...v1.12.1
-[1.12.0]: https://github.com/bisman-automations/ha-appliance-live-activity/compare/v1.11.0...v1.12.0
-[1.11.0]: https://github.com/bisman-automations/ha-appliance-live-activity/compare/v1.10.1...v1.11.0
-[1.10.1]: https://github.com/bisman-automations/ha-appliance-live-activity/compare/v1.10.0...v1.10.1
-[1.10.0]: https://github.com/bisman-automations/ha-appliance-live-activity/compare/v1.9.5...v1.10.0
-[1.9.5]: https://github.com/bisman-automations/ha-appliance-live-activity/compare/v1.9.4...v1.9.5
-[1.9.4]: https://github.com/bisman-automations/ha-appliance-live-activity/compare/v1.9.3...v1.9.4
-[1.9.3]: https://github.com/bisman-automations/ha-appliance-live-activity/compare/v1.9.2...v1.9.3
-[1.9.2]: https://github.com/bisman-automations/ha-appliance-live-activity/compare/v1.9.1...v1.9.2
-[1.9.1]: https://github.com/bisman-automations/ha-appliance-live-activity/compare/v1.9.0...v1.9.1
-[1.9.0]: https://github.com/bisman-automations/ha-appliance-live-activity/compare/v1.8.2...v1.9.0
-[1.8.2]: https://github.com/bisman-automations/ha-appliance-live-activity/compare/v1.8.1...v1.8.2
-[1.8.1]: https://github.com/bisman-automations/ha-appliance-live-activity/compare/v1.8.0...v1.8.1
-[1.8.0]: https://github.com/bisman-automations/ha-appliance-live-activity/compare/v1.7.0...v1.8.0
-[1.7.0]: https://github.com/bisman-automations/ha-appliance-live-activity/compare/v1.6.1...v1.7.0
-[1.6.1]: https://github.com/bisman-automations/ha-appliance-live-activity/compare/v1.6.0...v1.6.1
-[1.6.0]: https://github.com/bisman-automations/ha-appliance-live-activity/compare/v1.5.0...v1.6.0
-[1.5.0]: https://github.com/bisman-automations/ha-appliance-live-activity/compare/v1.4.0...v1.5.0
-[1.4.0]: https://github.com/bisman-automations/ha-appliance-live-activity/compare/v1.3.1...v1.4.0
-[1.3.1]: https://github.com/bisman-automations/ha-appliance-live-activity/compare/v1.3.0...v1.3.1
-[1.3.0]: https://github.com/bisman-automations/ha-appliance-live-activity/compare/v1.2.2...v1.3.0
-[1.2.2]: https://github.com/bisman-automations/ha-appliance-live-activity/compare/v1.2.1...v1.2.2
-[1.2.1]: https://github.com/bisman-automations/ha-appliance-live-activity/compare/v1.2.0...v1.2.1
-[1.2.0]: https://github.com/bisman-automations/ha-appliance-live-activity/compare/v1.1.0...v1.2.0
-[1.1.0]: https://github.com/bisman-automations/ha-appliance-live-activity/compare/v1.0.0...v1.1.0
-[1.0.0]: https://github.com/bisman-automations/ha-appliance-live-activity/releases/tag/v1.0.0
+[2.0.0]: https://github.com/bisman-automations/ha-appliance-mgmt/compare/v1.14.4...v2.0.0
+[1.14.4]: https://github.com/bisman-automations/ha-appliance-mgmt/compare/v1.14.3...v1.14.4
+[1.14.3]: https://github.com/bisman-automations/ha-appliance-mgmt/compare/v1.14.2...v1.14.3
+[1.14.2]: https://github.com/bisman-automations/ha-appliance-mgmt/compare/v1.14.1...v1.14.2
+[1.14.1]: https://github.com/bisman-automations/ha-appliance-mgmt/compare/v1.14.0...v1.14.1
+[1.14.0]: https://github.com/bisman-automations/ha-appliance-mgmt/compare/v1.13.0...v1.14.0
+[1.13.0]: https://github.com/bisman-automations/ha-appliance-mgmt/compare/v1.12.2...v1.13.0
+[1.12.2]: https://github.com/bisman-automations/ha-appliance-mgmt/compare/v1.12.1...v1.12.2
+[1.12.1]: https://github.com/bisman-automations/ha-appliance-mgmt/compare/v1.12.0...v1.12.1
+[1.12.0]: https://github.com/bisman-automations/ha-appliance-mgmt/compare/v1.11.0...v1.12.0
+[1.11.0]: https://github.com/bisman-automations/ha-appliance-mgmt/compare/v1.10.1...v1.11.0
+[1.10.1]: https://github.com/bisman-automations/ha-appliance-mgmt/compare/v1.10.0...v1.10.1
+[1.10.0]: https://github.com/bisman-automations/ha-appliance-mgmt/compare/v1.9.5...v1.10.0
+[1.9.5]: https://github.com/bisman-automations/ha-appliance-mgmt/compare/v1.9.4...v1.9.5
+[1.9.4]: https://github.com/bisman-automations/ha-appliance-mgmt/compare/v1.9.3...v1.9.4
+[1.9.3]: https://github.com/bisman-automations/ha-appliance-mgmt/compare/v1.9.2...v1.9.3
+[1.9.2]: https://github.com/bisman-automations/ha-appliance-mgmt/compare/v1.9.1...v1.9.2
+[1.9.1]: https://github.com/bisman-automations/ha-appliance-mgmt/compare/v1.9.0...v1.9.1
+[1.9.0]: https://github.com/bisman-automations/ha-appliance-mgmt/compare/v1.8.2...v1.9.0
+[1.8.2]: https://github.com/bisman-automations/ha-appliance-mgmt/compare/v1.8.1...v1.8.2
+[1.8.1]: https://github.com/bisman-automations/ha-appliance-mgmt/compare/v1.8.0...v1.8.1
+[1.8.0]: https://github.com/bisman-automations/ha-appliance-mgmt/compare/v1.7.0...v1.8.0
+[1.7.0]: https://github.com/bisman-automations/ha-appliance-mgmt/compare/v1.6.1...v1.7.0
+[1.6.1]: https://github.com/bisman-automations/ha-appliance-mgmt/compare/v1.6.0...v1.6.1
+[1.6.0]: https://github.com/bisman-automations/ha-appliance-mgmt/compare/v1.5.0...v1.6.0
+[1.5.0]: https://github.com/bisman-automations/ha-appliance-mgmt/compare/v1.4.0...v1.5.0
+[1.4.0]: https://github.com/bisman-automations/ha-appliance-mgmt/compare/v1.3.1...v1.4.0
+[1.3.1]: https://github.com/bisman-automations/ha-appliance-mgmt/compare/v1.3.0...v1.3.1
+[1.3.0]: https://github.com/bisman-automations/ha-appliance-mgmt/compare/v1.2.2...v1.3.0
+[1.2.2]: https://github.com/bisman-automations/ha-appliance-mgmt/compare/v1.2.1...v1.2.2
+[1.2.1]: https://github.com/bisman-automations/ha-appliance-mgmt/compare/v1.2.0...v1.2.1
+[1.2.0]: https://github.com/bisman-automations/ha-appliance-mgmt/compare/v1.1.0...v1.2.0
+[1.1.0]: https://github.com/bisman-automations/ha-appliance-mgmt/compare/v1.0.0...v1.1.0
+[1.0.0]: https://github.com/bisman-automations/ha-appliance-mgmt/releases/tag/v1.0.0

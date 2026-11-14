@@ -1,15 +1,15 @@
 <p align="center">
-  <img src="https://raw.githubusercontent.com/bisman-automations/ha-appliance-live-activity/main/custom_components/appliance_live_activity/brand/icon.png" alt="Appliance Live Activity icon" width="128">
+  <img src="https://raw.githubusercontent.com/bisman-automations/ha-appliance-mgmt/main/custom_components/appliance_mgmt/brand/icon.png" alt="Appliance Mgmt icon" width="128">
 </p>
 
-# Appliance Live Activity
+# Appliance Mgmt
 
 [![HACS Custom](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://hacs.xyz/)
 [![Home Assistant](https://img.shields.io/badge/Home%20Assistant-2026.8%2B-blue.svg)](https://www.home-assistant.io/)
-[![GitHub Release](https://img.shields.io/github/v/release/bisman-automations/ha-appliance-live-activity)](https://github.com/bisman-automations/ha-appliance-live-activity/releases)
-[![Test](https://github.com/bisman-automations/ha-appliance-live-activity/actions/workflows/test.yml/badge.svg)](https://github.com/bisman-automations/ha-appliance-live-activity/actions/workflows/test.yml)
-[![Validate](https://github.com/bisman-automations/ha-appliance-live-activity/actions/workflows/validate.yml/badge.svg)](https://github.com/bisman-automations/ha-appliance-live-activity/actions/workflows/validate.yml)
-[![License](https://img.shields.io/github/license/bisman-automations/ha-appliance-live-activity)](LICENSE)
+[![GitHub Release](https://img.shields.io/github/v/release/bisman-automations/ha-appliance-mgmt)](https://github.com/bisman-automations/ha-appliance-mgmt/releases)
+[![Test](https://github.com/bisman-automations/ha-appliance-mgmt/actions/workflows/test.yml/badge.svg)](https://github.com/bisman-automations/ha-appliance-mgmt/actions/workflows/test.yml)
+[![Validate](https://github.com/bisman-automations/ha-appliance-mgmt/actions/workflows/validate.yml/badge.svg)](https://github.com/bisman-automations/ha-appliance-mgmt/actions/workflows/validate.yml)
+[![License](https://img.shields.io/github/license/bisman-automations/ha-appliance-mgmt)](LICENSE)
 
 Live Activities (iOS) and Live Updates (Android) for your appliances in Home
 Assistant — plus critical alerts when something is left open or left on.
@@ -40,36 +40,53 @@ Requires **Home Assistant 2026.8 or newer**.
 
 ### Marketplace (Home Assistant 2026.11 and newer, recommended)
 
-[![Open your Home Assistant instance and open this repository in the Marketplace.](https://my.home-assistant.io/badges/marketplace_repository.svg)](https://my.home-assistant.io/redirect/marketplace_repository/?owner=bisman-automations&repository=ha-appliance-live-activity&category=integration)
+[![Open your Home Assistant instance and open this repository in the Marketplace.](https://my.home-assistant.io/badges/marketplace_repository.svg)](https://my.home-assistant.io/redirect/marketplace_repository/?owner=bisman-automations&repository=ha-appliance-mgmt&category=integration)
 
-1. Open the Marketplace and search for **Appliance Live Activity**, or select the button above to open this repository in the Marketplace.
-2. Download **Appliance Live Activity** and restart Home Assistant.
+1. Open the Marketplace and search for **Appliance Mgmt**, or select the button above to open this repository in the Marketplace.
+2. Download **Appliance Mgmt** and restart Home Assistant.
 
-New versions show up under **Settings > Updates**. Already installed Appliance Live Activity with
+New versions show up under **Settings > Updates**. Already installed Appliance Mgmt with
 HACS? There's nothing to do: Home Assistant moves it into the Marketplace the
 first time it starts on 2026.11.
 
 ### HACS (Home Assistant 2026.10 and older)
 
-[![Open your Home Assistant instance and open this repository in HACS.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=bisman-automations&repository=ha-appliance-live-activity&category=integration)
+[![Open your Home Assistant instance and open this repository in HACS.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=bisman-automations&repository=ha-appliance-mgmt&category=integration)
 
-1. Open HACS and search for **Appliance Live Activity**, or select the button above to open this repository in HACS.
-2. Download **Appliance Live Activity** and restart Home Assistant.
+1. Open HACS and search for **Appliance Mgmt**, or select the button above to open this repository in HACS.
+2. Download **Appliance Mgmt** and restart Home Assistant.
 
 ### Custom repository
 
-If **Appliance Live Activity** does not appear in search:
+If **Appliance Mgmt** does not appear in search:
 
-1. In HACS open the menu, choose **Custom repositories**, and add `https://github.com/bisman-automations/ha-appliance-live-activity` as an **Integration**.
-2. Download **Appliance Live Activity** and restart Home Assistant.
+1. In HACS open the menu, choose **Custom repositories**, and add `https://github.com/bisman-automations/ha-appliance-mgmt` as an **Integration**.
+2. Download **Appliance Mgmt** and restart Home Assistant.
 
 ### Manual
 
-Download `appliance_live_activity.zip` from the [latest release](https://github.com/bisman-automations/ha-appliance-live-activity/releases/latest), unzip it into `config/custom_components/appliance_live_activity/`, and restart Home Assistant.
+Download `appliance_mgmt.zip` from the [latest release](https://github.com/bisman-automations/ha-appliance-mgmt/releases/latest), unzip it into `config/custom_components/appliance_mgmt/`, and restart Home Assistant.
+
+### Upgrading from Appliance Live Activity
+
+Appliance Live Activity was renamed Appliance Mgmt in 2.0.0. Your appliances,
+settings, entities, history and pictures move across by themselves:
+
+1. Install **Appliance Mgmt** (above). If the Marketplace or HACS updated
+   Appliance Live Activity to 2.0.0 for you, it's already installed.
+2. Remove **Appliance Live Activity** from the Marketplace or HACS. If you
+   can't, Home Assistant shows a repair, **Remove the old Appliance Live
+   Activity folder**; select **Submit** and it deletes the folder for you.
+3. Restart Home Assistant. Each appliance now shows under **Appliance Mgmt**
+   with the same entities.
+
+Automations that call the **Appliance Live Activity: Update** action need the
+new one, **Appliance Mgmt: Update** (`appliance_mgmt.update`). Everything that
+uses the entities keeps working.
 
 ## Setup
 
-[![Open your Home Assistant instance and start setting up Appliance Live Activity.](https://my.home-assistant.io/badges/config_flow_start.svg)](https://my.home-assistant.io/redirect/config_flow_start/?domain=appliance_live_activity)
+[![Open your Home Assistant instance and start setting up Appliance Mgmt.](https://my.home-assistant.io/badges/config_flow_start.svg)](https://my.home-assistant.io/redirect/config_flow_start/?domain=appliance_mgmt)
 
 Add one entry per appliance.
 
@@ -293,7 +310,7 @@ The name you see is the device name plus the entity: **Kitchen Dishwasher Live A
 - **Probe Target** number for ovens with a meat probe.
 - **Update Live Activity** button on each appliance to re-send its current
   activity if it was dismissed from the notification center.
-- `appliance_live_activity.update` re-sends an appliance's Live Activity.
+- `appliance_mgmt.update` re-sends an appliance's Live Activity.
 
 ### Appliances dashboard
 
@@ -321,7 +338,7 @@ In Matter Hub, add the **Power** switch (for example `switch.kitchen_dishwasher_
 ## Adding an appliance type
 
 Appliance types are plugins in
-`custom_components/appliance_live_activity/appliances/`. Add a file with an
+`custom_components/appliance_mgmt/appliances/`. Add a file with an
 `ApplianceDefinition` (see `washer.py`) and one import line in
 `appliances/__init__.py`.
 
@@ -336,17 +353,17 @@ Appliance types are plugins in
 
 ### Diagnostics and debug logs
 
-When something goes wrong, download diagnostics from **Settings → Devices & services → Appliance Live Activity → ⋮ → Download diagnostics** and check the file before you share it.
+When something goes wrong, download diagnostics from **Settings → Devices & services → Appliance Mgmt → ⋮ → Download diagnostics** and check the file before you share it.
 
 For debug logs, use **Enable debug logging** on the integration page, or add this to `configuration.yaml` and restart:
 
 ```yaml
 logger:
   logs:
-    custom_components.appliance_live_activity: debug
+    custom_components.appliance_mgmt: debug
 ```
 
-Then open an [issue](https://github.com/bisman-automations/ha-appliance-live-activity/issues/new/choose) with the diagnostics, the log, and your Home Assistant and Appliance Live Activity versions.
+Then open an [issue](https://github.com/bisman-automations/ha-appliance-mgmt/issues/new/choose) with the diagnostics, the log, and your Home Assistant and Appliance Mgmt versions.
 
 ## Development
 

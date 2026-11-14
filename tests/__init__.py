@@ -1,1 +1,1 @@
-"""Tests for Appliance Live Activity."""
+"""Tests for Appliance Mgmt."""

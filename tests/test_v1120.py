@@ -4,14 +4,14 @@ from __future__ import annotations
 
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-from custom_components.appliance_live_activity import GE_DISCOVERY_VERSION
-from custom_components.appliance_live_activity.const import CONFIG_MINOR_VERSION, DOMAIN
-from custom_components.appliance_live_activity.device import (
+from custom_components.appliance_mgmt import GE_DISCOVERY_VERSION
+from custom_components.appliance_mgmt.const import CONFIG_MINOR_VERSION, DOMAIN
+from custom_components.appliance_mgmt.device import (
     SUGGESTED_ENTITY_NAMES,
     devices_sharing_identifier,
     own_device,
 )
-from custom_components.appliance_live_activity.diagnostics import (
+from custom_components.appliance_mgmt.diagnostics import (
     TO_REDACT,
     async_get_config_entry_diagnostics,
 )
@@ -29,7 +29,7 @@ def test_suggested_entity_names_match_translations():
         (
             Path(__file__).resolve().parents[1]
             / "custom_components"
-            / "appliance_live_activity"
+            / "appliance_mgmt"
             / "strings.json"
         ).read_text()
     )
@@ -349,7 +349,7 @@ async def test_resolved_notification_timer_is_unloaded_with_the_entry(
     hass: HomeAssistant, enable_custom_integrations
 ):
     """The two-minute clear is an entry unload callback, not a bare timer."""
-    from custom_components.appliance_live_activity.notify import async_resolve  # noqa: PLC0415
+    from custom_components.appliance_mgmt.notify import async_resolve  # noqa: PLC0415
 
     phone = _phone(hass)
     entry = _washer(hass, phone.id, minor_version=CONFIG_MINOR_VERSION)

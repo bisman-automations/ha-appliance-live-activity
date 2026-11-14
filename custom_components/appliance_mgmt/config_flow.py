@@ -606,8 +606,8 @@ def _entity_fields(appliance_type: str) -> dict:
     return fields
 
 
-class ApplianceLiveActivityConfigFlow(ConfigFlow, domain=DOMAIN):
-    """Config flow for Appliance Live Activity.
+class ApplianceMgmtConfigFlow(ConfigFlow, domain=DOMAIN):
+    """Config flow for Appliance Mgmt.
 
     ``MINOR_VERSION`` matches ``async_migrate_entry``. New entries are
     created at the current minor version, so the one-time repairs are not
@@ -619,6 +619,28 @@ class ApplianceLiveActivityConfigFlow(ConfigFlow, domain=DOMAIN):
 
     def __init__(self) -> None:
         self._data: dict[str, Any] = {}
+
+    async def async_step_import(self, import_data: dict[str, Any]) -> ConfigFlowResult:
+        """Re-create an Appliance Live Activity entry (see ``migrate.py``)."""
+        from .migrate import MIGRATED_FROM, import_entry  # noqa: PLC0415
+
+        old = import_entry(self.hass, import_data[MIGRATED_FROM])
+        if old is None:
+            return self.async_abort(reason="nothing_to_move")
+        for entry in self._async_current_entries(include_ignore=False):
+            if entry.data.get(MIGRATED_FROM) == old.entry_id:
+                return self.async_abort(reason="already_configured")
+        if old.unique_id:
+            await self.async_set_unique_id(old.unique_id)
+            self._abort_if_unique_id_configured()
+        # Keep the old entry's minor version, so async_migrate_entry runs
+        # any one-time steps it hadn't had yet.
+        self.MINOR_VERSION = min(old.minor_version, CONFIG_MINOR_VERSION)
+        return self.async_create_entry(
+            title=old.title,
+            data={**old.data, MIGRATED_FROM: old.entry_id},
+            options=dict(old.options),
+        )
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
@@ -898,10 +920,10 @@ class ApplianceLiveActivityConfigFlow(ConfigFlow, domain=DOMAIN):
     @staticmethod
     @callback
     def async_get_options_flow(config_entry: ConfigEntry) -> OptionsFlow:
-        return ApplianceLiveActivityOptionsFlow()
+        return ApplianceMgmtOptionsFlow()
 
 
-class ApplianceLiveActivityOptionsFlow(OptionsFlowWithReload):
+class ApplianceMgmtOptionsFlow(OptionsFlowWithReload):
     """Change phones, alerts and appearance after setup (reloads on save)."""
 
     async def async_step_init(

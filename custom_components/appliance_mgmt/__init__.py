@@ -1,4 +1,4 @@
-"""The Appliance Live Activity integration."""
+"""The Appliance Mgmt integration."""
 
 from __future__ import annotations
 
@@ -7,7 +7,10 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.typing import ConfigType
 
-from . import appliances  # noqa: F401  (import registers all appliance plugins)
+from . import (
+    appliances,  # noqa: F401  (import registers all appliance plugins)
+    migrate,
+)
 from .const import (
     CONF_APPLIANCE_TYPE,
     CONF_DELAY_ENTITY,
@@ -49,6 +52,7 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     await async_setup_services(hass)
     await async_setup_panel_backend(hass)
     await async_register_panel(hass, await _version(hass))
+    await migrate.async_start(hass)
     return True
 
 
@@ -173,10 +177,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: ApplianceConfigEntry) ->
     # Home Assistant only drops runtime_data after a successful unload.
     entry.runtime_data = coordinator
     try:
+        await migrate.async_before_setup(hass, entry)
         await coordinator.async_setup()
         from .device import async_link_device  # noqa: PLC0415
 
         async_link_device(hass, coordinator, entry)
+        await migrate.async_after_link(hass, entry)
         await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     except Exception:
         await hass.config_entries.async_unload_platforms(entry, PLATFORMS)

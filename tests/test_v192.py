@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-from custom_components.appliance_live_activity.const import DOMAIN
-from custom_components.appliance_live_activity.device import own_device
+from custom_components.appliance_mgmt.const import DOMAIN
+from custom_components.appliance_mgmt.device import own_device
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry as dr
 

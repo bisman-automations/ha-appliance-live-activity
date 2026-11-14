@@ -1,14 +1,14 @@
 """Unit tests for pure helpers and GE discovery."""
 
-from custom_components.appliance_live_activity.const import (
+from custom_components.appliance_mgmt.const import (
     DEFAULT_IDLE_STATES,
     STATUS_COMPLETE,
     STATUS_IDLE,
     STATUS_PAUSED,
     STATUS_RUNNING,
 )
-from custom_components.appliance_live_activity.ge import discover_from_entity_ids
-from custom_components.appliance_live_activity.helpers import (
+from custom_components.appliance_mgmt.ge import discover_from_entity_ids
+from custom_components.appliance_mgmt.helpers import (
     classify_state,
     color_to_hex,
     hex_to_rgb,

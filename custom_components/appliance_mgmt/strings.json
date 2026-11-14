@@ -257,13 +257,14 @@
     },
     "abort": {
       "already_configured": "This appliance is already configured.",
-      "reconfigure_successful": "The sensors were updated."
+      "reconfigure_successful": "The sensors were updated.",
+      "nothing_to_move": "There was nothing to move from Appliance Live Activity."
     }
   },
   "options": {
     "step": {
       "init": {
-        "title": "Appliance Live Activity options",
+        "title": "Appliance Mgmt options",
         "data": {
           "devices": "Phones",
           "finished_alert": "Also send a regular \"finished\" alert",
@@ -475,6 +476,17 @@
     "missing_entities": {
       "title": "{appliance}: sensors are missing",
       "description": "{appliance} uses sensors that no longer exist: {entities}. Pick the right ones with {appliance} → ⋮ → Reconfigure."
+    },
+    "old_folder": {
+      "title": "Remove the old Appliance Live Activity folder",
+      "fix_flow": {
+        "step": {
+          "confirm": {
+            "title": "Remove the old Appliance Live Activity folder",
+            "description": "Appliance Live Activity is now Appliance Mgmt. Your appliances, settings and history move across on the next start, but only once the old `{folder}` folder is gone: while it's there, both would run and you'd get every alert twice.\n\nSelect **Submit** to delete that folder, then restart Home Assistant. If you installed Appliance Live Activity with HACS, you can remove it there instead."
+          }
+        }
+      }
     }
   },
   "exceptions": {

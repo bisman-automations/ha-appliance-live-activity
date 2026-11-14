@@ -10,4 +10,4 @@ update:
       required: true
       selector:
         config_entry:
-          integration: appliance_live_activity
+          integration: appliance_mgmt

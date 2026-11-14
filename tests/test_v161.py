@@ -8,8 +8,8 @@ from pytest_homeassistant_custom_component.common import (
     async_mock_service,
 )
 
-from custom_components.appliance_live_activity.const import DOMAIN
-from custom_components.appliance_live_activity.ge import discover_from_entity_ids
+from custom_components.appliance_mgmt.const import DOMAIN
+from custom_components.appliance_mgmt.ge import discover_from_entity_ids
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry as dr, entity_registry as er
 from homeassistant.helpers.translation import async_get_translations
@@ -131,8 +131,8 @@ async def test_every_form_field_has_a_label(
     """Every option field name must have a translated label (no raw keys)."""
     import voluptuous as vol  # noqa: PLC0415
 
-    from custom_components.appliance_live_activity import config_flow  # noqa: PLC0415
-    from custom_components.appliance_live_activity.appliance import APPLIANCE_REGISTRY  # noqa: PLC0415
+    from custom_components.appliance_mgmt import config_flow  # noqa: PLC0415
+    from custom_components.appliance_mgmt.appliance import APPLIANCE_REGISTRY  # noqa: PLC0415
 
     options = await async_get_translations(hass, "en", "options", [DOMAIN])
     config = await async_get_translations(hass, "en", "config", [DOMAIN])

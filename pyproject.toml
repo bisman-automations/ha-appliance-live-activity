@@ -1,5 +1,5 @@
 # Tool settings only: this repo isn't a Python package, and the version lives
-# in custom_components/appliance_live_activity/manifest.json. The pytest, ruff and coverage
+# in custom_components/appliance_mgmt/manifest.json. The pytest, ruff and coverage
 # settings follow bisman-automations/.github templates/repo/pyproject.toml;
 # anything repo-specific is marked.
 
@@ -24,7 +24,7 @@ combine-as-imports = true
 split-on-trailing-comma = false
 
 [tool.coverage.run]
-source = ["custom_components/appliance_live_activity"]
+source = ["custom_components/appliance_mgmt"]
 
 [tool.coverage.report]
 show_missing = true

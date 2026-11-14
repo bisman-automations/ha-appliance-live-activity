@@ -6,8 +6,8 @@ from __future__ import annotations
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 import voluptuous as vol
 
-from custom_components.appliance_live_activity import config_flow
-from custom_components.appliance_live_activity.const import DOMAIN
+from custom_components.appliance_mgmt import config_flow
+from custom_components.appliance_mgmt.const import DOMAIN
 from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import section
 

@@ -11,11 +11,8 @@ from pytest_homeassistant_custom_component.common import (
     async_mock_service,
 )
 
-from custom_components.appliance_live_activity.const import (
-    DOMAIN,
-    EVENT_NOTIFICATION_ACTION,
-)
-from custom_components.appliance_live_activity.helpers import in_quiet_hours
+from custom_components.appliance_mgmt.const import DOMAIN, EVENT_NOTIFICATION_ACTION
+from custom_components.appliance_mgmt.helpers import in_quiet_hours
 from homeassistant import config_entries
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry as dr, entity_registry as er

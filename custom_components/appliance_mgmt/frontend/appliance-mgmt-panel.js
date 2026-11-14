@@ -1,15 +1,15 @@
 /*
- * Appliances sidebar dashboard for Appliance Live Activity.
+ * Appliances sidebar dashboard for Appliance Mgmt.
  *
  * One plain web component, no build step. The backend sends each appliance's
  * entities, recent cycles, maintenance alerts and picture
- * (appliance_live_activity/appliances); everything live (status, time left,
+ * (appliance_mgmt/appliances); everything live (status, time left,
  * progress) comes straight from hass.states. Pictures are uploaded with Home
  * Assistant's image upload (/api/image/upload), like person pictures.
  */
 
-const DOMAIN = "appliance_live_activity";
-const DASH_KEY = "appliance-live-activity-dashboard";
+const DOMAIN = "appliance_mgmt";
+const DASH_KEY = "appliance-live-activity-dashboard"; // kept from before 2.0.0 so saved layouts stay
 const OPEN_KEY = "appliance-live-activity-open";
 const REFRESH_MS = 60000;
 const ACTIVE = ["running", "paused", "delayed"];
@@ -316,7 +316,7 @@ class ApplianceLiveActivityPanel extends HTMLElement {
     if (this._appliances === null) {
       html = this._error ? "" : `<div class="empty">Loading your appliances…</div>`;
     } else if (!this._appliances.length) {
-      html = `<div class="empty"><h2>No appliances yet</h2><p>Add an appliance under Settings → Devices &amp; services → Appliance Live Activity.</p></div>`;
+      html = `<div class="empty"><h2>No appliances yet</h2><p>Add an appliance under Settings → Devices &amp; services → Appliance Mgmt.</p></div>`;
     } else {
       const shown = this._shown();
       html = shown.length
@@ -547,6 +547,6 @@ class ApplianceLiveActivityPanel extends HTMLElement {
   }
 }
 
-if (!customElements.get("appliance-live-activity-panel")) {
-  customElements.define("appliance-live-activity-panel", ApplianceLiveActivityPanel);
+if (!customElements.get("appliance-mgmt-panel")) {
+  customElements.define("appliance-mgmt-panel", ApplianceLiveActivityPanel);
 }

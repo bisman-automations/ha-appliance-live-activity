@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-from custom_components.appliance_live_activity.const import DOMAIN
+from custom_components.appliance_mgmt.const import DOMAIN
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import entity_registry as er

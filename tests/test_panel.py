@@ -18,9 +18,9 @@ from unittest.mock import AsyncMock, patch
 
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-from custom_components.appliance_live_activity import panel
-from custom_components.appliance_live_activity.const import DOMAIN
-from custom_components.appliance_live_activity.coordinator import ApplianceCoordinator
+from custom_components.appliance_mgmt import panel
+from custom_components.appliance_mgmt.const import DOMAIN
+from custom_components.appliance_mgmt.coordinator import ApplianceCoordinator
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.core import HomeAssistant
 from homeassistant.setup import async_setup_component
@@ -298,10 +298,10 @@ async def test_panel_registered_for_the_whole_run(
     with _patched_frontend(calls):
         entry = await _setup(hass)
         assert calls.kwargs["frontend_url_path"] == "appliances"
-        assert calls.kwargs["webcomponent_name"] == "appliance-live-activity-panel"
+        assert calls.kwargs["webcomponent_name"] == "appliance-mgmt-panel"
         assert calls.kwargs["require_admin"] is False
         assert calls.kwargs["module_url"].startswith(
-            "/appliance_live_activity_static/appliance-live-activity-panel.js?v="
+            "/appliance_mgmt_static/appliance-mgmt-panel.js?v="
         )
         (config,) = calls.static_paths
         assert Path(config.path) == panel.FRONTEND_DIR

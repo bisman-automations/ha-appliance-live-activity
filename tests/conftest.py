@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from custom_components.appliance_live_activity.config_flow import SECTION_OF, SECTIONS
+from custom_components.appliance_mgmt.config_flow import SECTION_OF, SECTIONS
 from homeassistant import data_entry_flow
 
 

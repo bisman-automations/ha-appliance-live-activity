@@ -11,11 +11,8 @@ from pytest_homeassistant_custom_component.common import (
     async_mock_service,
 )
 
-from custom_components.appliance_live_activity.const import DOMAIN
-from custom_components.appliance_live_activity.ge import (
-    entity_prefix,
-    leak_sensors_for_prefix,
-)
+from custom_components.appliance_mgmt.const import DOMAIN
+from custom_components.appliance_mgmt.ge import entity_prefix, leak_sensors_for_prefix
 from homeassistant import config_entries
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry as dr, entity_registry as er

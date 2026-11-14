@@ -1,6 +1,6 @@
 {
-  "domain": "appliance_live_activity",
-  "name": "Appliance Live Activity",
+  "domain": "appliance_mgmt",
+  "name": "Appliance Mgmt",
   "after_dependencies": [
     "frontend",
     "http",
@@ -16,10 +16,10 @@
   "dependencies": [
     "websocket_api"
   ],
-  "documentation": "https://github.com/bisman-automations/ha-appliance-live-activity",
+  "documentation": "https://github.com/bisman-automations/ha-appliance-mgmt",
   "integration_type": "service",
   "iot_class": "calculated",
-  "issue_tracker": "https://github.com/bisman-automations/ha-appliance-live-activity/issues",
+  "issue_tracker": "https://github.com/bisman-automations/ha-appliance-mgmt/issues",
   "requirements": [],
-  "version": "1.14.4"
+  "version": "2.0.0"
 }

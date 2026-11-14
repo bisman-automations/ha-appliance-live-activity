@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-from custom_components.appliance_live_activity.const import DOMAIN
-from custom_components.appliance_live_activity.device import own_device
+from custom_components.appliance_mgmt.const import DOMAIN
+from custom_components.appliance_mgmt.device import own_device
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry as dr, entity_registry as er
 
@@ -93,7 +93,7 @@ async def test_unload_cancels_pending_notification_clears(
 ):
     """A "resolved" notification is removed two minutes later; unloading the
     entry first cancels that, rather than leaving a timer behind."""
-    from custom_components.appliance_live_activity.notify import async_resolve  # noqa: PLC0415
+    from custom_components.appliance_mgmt.notify import async_resolve  # noqa: PLC0415
 
     entry = _ge_dishwasher(hass)
     assert await hass.config_entries.async_setup(entry.entry_id)

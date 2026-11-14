@@ -9,9 +9,9 @@ from pytest_homeassistant_custom_component.common import (
     async_fire_time_changed,
 )
 
-from custom_components.appliance_live_activity import config_flow as cf
-from custom_components.appliance_live_activity.const import DOMAIN
-from custom_components.appliance_live_activity.device import own_device
+from custom_components.appliance_mgmt import config_flow as cf
+from custom_components.appliance_mgmt.const import DOMAIN
+from custom_components.appliance_mgmt.device import own_device
 from homeassistant import config_entries
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.translation import async_get_translations

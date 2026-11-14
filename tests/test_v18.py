@@ -11,8 +11,8 @@ from pytest_homeassistant_custom_component.common import (
     async_mock_service,
 )
 
-from custom_components.appliance_live_activity.const import DOMAIN
-from custom_components.appliance_live_activity.diagnostics import (
+from custom_components.appliance_mgmt.const import DOMAIN
+from custom_components.appliance_mgmt.diagnostics import (
     async_get_config_entry_diagnostics,
 )
 from homeassistant import config_entries

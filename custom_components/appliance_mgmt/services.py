@@ -1,4 +1,4 @@
-"""Services exposed by the Appliance Live Activity integration.
+"""Services exposed by the Appliance Mgmt integration.
 
 Registered once from ``async_setup``, not when the first config entry loads.
 The handler looks the appliance up on ``entry.runtime_data``.
@@ -19,7 +19,7 @@ SERVICE_UPDATE_SCHEMA = vol.Schema({vol.Required("entry_id"): cv.string})
 
 
 async def async_setup_services(hass: HomeAssistant) -> None:
-    """Register ``appliance_live_activity.update``.
+    """Register ``appliance_mgmt.update``.
 
     Safe to call once at startup. Calling it again would raise because the
     service is already registered; ``async_setup`` is the only caller.

@@ -1,10 +1,10 @@
-"""Constants for the Appliance Live Activity integration."""
+"""Constants for the Appliance Mgmt integration."""
 
 from __future__ import annotations
 
 from homeassistant.const import Platform
 
-DOMAIN = "appliance_live_activity"
+DOMAIN = "appliance_mgmt"
 STORAGE_VERSION = 1
 
 # Config-entry minor version. Home Assistant runs ``async_migrate_entry``

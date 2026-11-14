@@ -1,16 +1,21 @@
-# Appliance Live Activity: notes for Claude and other coding agents
+# Appliance Mgmt: notes for Claude and other coding agents
 
 Instructions for AI coding agents (Claude, Codex, Copilot, etc.) and humans.
 `AGENTS.md` points here, so keep the rules in this file.
 
 ## What this is
 
-**Appliance Live Activity** (`appliance_live_activity`): a HACS custom integration
+**Appliance Mgmt** (`appliance_mgmt`): a HACS custom integration
 that sends iOS Live Activities and alerts (via the Home Assistant Companion app,
 `mobile_app` notify) for appliances: GE Home / SmartHQ (`ge_home`) appliances
 first, plus any other brand or a plain door/contact sensor set up manually.
 
-- Repo: `bisman-automations/ha-appliance-live-activity` (owner `@donavanbecker`).
+- Repo: `bisman-automations/ha-appliance-mgmt` (owner `@donavanbecker`; renamed
+  from `ha-appliance-live-activity`, which GitHub redirects). The domain and
+  folder are `appliance_mgmt`. Before 2.0.0 they were `appliance_live_activity`;
+  `migrate.py` moves those config entries, entities, devices and storage across
+  on the first start (only once the old folder is gone; `repairs.py` offers to
+  delete it). Keep that path working: people skip versions.
 - Minimum Home Assistant: `hacs.json` → `homeassistant` (currently 2026.8.0).
   Code must keep working from that version through the current dev release.
   Do not add a `homeassistant` key to `manifest.json`; hassfest rejects it.
@@ -37,7 +42,7 @@ first, plus any other brand or a plain door/contact sensor set up manually.
 - Each release's `CHANGELOG.md` entries are user-facing: what changed and why,
   with **bold lead-ins** like the existing entries.
 
-## Layout (`custom_components/appliance_live_activity/`)
+## Layout (`custom_components/appliance_mgmt/`)
 
 | File | Role |
 | --- | --- |
@@ -51,7 +56,8 @@ first, plus any other brand or a plain door/contact sensor set up manually.
 | `door.py`, `cooktop.py`, `leak.py`, `maintenance.py`, `oven_extras.py`, `oven_light.py` | Feature monitors |
 | `sensor.py`, `number.py`, `event.py`, `button.py` | Entities |
 | `health.py` | Repairs issues; `diagnostics.py` (redact personal data) |
-| `panel.py` + `frontend/appliance-live-activity-panel.js` | The Appliances sidebar dashboard. Registered once from `async_setup` (only when the frontend is loaded) and left in place for the whole run, including after the last appliance unloads, so a reload cannot remove the page or register it twice. Websocket `appliance_live_activity/appliances` lists every loaded appliance (everyone) and `appliance_live_activity/image` changes pictures (admins). Pictures are Home Assistant `image_upload` ids kept in the `appliance_live_activity.images` Store. The panel is plain JS with no build step; live values come from `hass.states`. |
+| `migrate.py`, `repairs.py` | Moving from `appliance_live_activity` (2.0.0), and the fix that deletes its old folder |
+| `panel.py` + `frontend/appliance-mgmt-panel.js` | The Appliances sidebar dashboard. Registered once from `async_setup` (only when the frontend is loaded) and left in place for the whole run, including after the last appliance unloads, so a reload cannot remove the page or register it twice. Websocket `appliance_mgmt/appliances` lists every loaded appliance (everyone) and `appliance_mgmt/image` changes pictures (admins). Pictures are Home Assistant `image_upload` ids kept in the `appliance_mgmt.images` Store. The panel is plain JS with no build step; live values come from `hass.states`. |
 | `strings.json` + `translations/en.json` | Must stay **identical**; edit both |
 | `brand/` | Icons shown by HACS / HA |
 

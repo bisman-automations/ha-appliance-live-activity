@@ -38,7 +38,7 @@ from .const import DOMAIN, DOOR_TYPES
 _LOGGER = logging.getLogger(__name__)
 
 PANEL_URL_PATH = "appliances"
-PANEL_COMPONENT = "appliance-live-activity-panel"
+PANEL_COMPONENT = "appliance-mgmt-panel"
 PANEL_TITLE = "Appliances"
 PANEL_ICON = "mdi:washing-machine"
 STATIC_URL = f"/{DOMAIN}_static"
@@ -176,7 +176,7 @@ async def _async_register_panel_and_static(
         sidebar_title=PANEL_TITLE,
         sidebar_icon=PANEL_ICON,
         # The version busts the browser cache after an update.
-        module_url=f"{STATIC_URL}/appliance-live-activity-panel.js?v={version or 'dev'}",
+        module_url=f"{STATIC_URL}/appliance-mgmt-panel.js?v={version or 'dev'}",
         require_admin=False,
         config={},
     )
